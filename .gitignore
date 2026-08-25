@@ -1,0 +1,15 @@
+node_modules/
+*.tmp
+logs/
+cache/
+export/
+backup/
+uploads/
+badges/
+tools/
+assets/images/
+assets/fonts/
+data/*.json
+.env
+.env.*
+!.env.example

@@ -1,0 +1,227 @@
+.fixture-tabs-shell {
+  margin: 0 0 1.25rem;
+  padding: .35rem;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  border: 1px solid rgba(15, 23, 42, .08);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 .6rem 1.4rem rgba(15, 23, 42, .05);
+}
+
+.fixture-tabs {
+  display: flex;
+  gap: .25rem;
+  min-width: max-content;
+  border: 0;
+}
+
+.fixture-tabs .nav-item {
+  flex: 0 0 auto;
+}
+
+.fixture-tabs .nav-link {
+  display: inline-flex;
+  align-items: center;
+  gap: .45rem;
+  min-height: 2.65rem;
+  padding: .62rem .8rem;
+  border: 0;
+  border-radius: 6px;
+  color: #475569;
+  background: transparent;
+  font-size: .88rem;
+  font-weight: 750;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+.fixture-tabs .nav-link i {
+  width: 1rem;
+  color: #7f1230;
+  text-align: center;
+}
+
+.fixture-tabs .nav-link:hover,
+.fixture-tabs .nav-link:focus-visible {
+  color: #4b0818;
+  background: rgba(127, 18, 48, .07);
+}
+
+.fixture-tabs .nav-link.active,
+.fixture-tabs .nav-link[aria-current="page"] {
+  color: #fff;
+  background: #5c1428;
+  box-shadow: 0 .45rem .9rem rgba(92, 20, 40, .16);
+}
+
+.fixture-tabs .nav-link.active i,
+.fixture-tabs .nav-link[aria-current="page"] i {
+  color: #f0bf1d;
+}
+
+.fixture-workspace {
+  display: grid;
+  gap: 1rem;
+}
+
+.fixture-workspace .tab-pane > .card,
+.fixture-panel {
+  border: 1px solid rgba(15, 23, 42, .08);
+  border-radius: 8px;
+  box-shadow: 0 .75rem 1.6rem rgba(15, 23, 42, .06) !important;
+}
+
+.fixture-workspace .card-body,
+.fixture-panel .card-body {
+  padding: 1.25rem;
+}
+
+.fixture-panel-title {
+  margin: 0;
+  color: #1f2937;
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.fixture-panel-kicker {
+  margin-bottom: .2rem;
+  color: #64748b;
+  font-size: .72rem;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.fixture-score-card .form-label,
+.fixture-details-card .form-label,
+.fixture-sponsorship-card .form-label {
+  color: #334155;
+  font-size: .82rem;
+  font-weight: 750;
+}
+
+.fixture-score-card .row.g-2,
+.fixture-details-card .row.g-3 {
+  --bs-gutter-x: .85rem;
+}
+
+.fixture-sponsorship-table {
+  margin-bottom: 0;
+}
+
+.fixture-sponsorship-table thead th {
+  padding-top: .7rem;
+  padding-bottom: .7rem;
+  border-bottom: 1px solid rgba(15, 23, 42, .1);
+  color: #64748b;
+  font-size: .74rem;
+  font-weight: 800;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+
+.fixture-sponsorship-table tbody td {
+  padding-top: .78rem;
+  padding-bottom: .78rem;
+}
+
+.fixture-starting11-shell {
+  overflow: hidden;
+  border: 1px solid rgba(15, 23, 42, .08);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 .75rem 1.6rem rgba(15, 23, 42, .06);
+}
+
+.fixture-starting11-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid rgba(15, 23, 42, .08);
+  background: #f8fafc;
+}
+
+.fixture-starting11-frame {
+  display: block;
+  width: 100%;
+  min-height: 900px;
+  border: 0;
+  background: #fff;
+}
+
+.hub-section-commandbar {
+  margin-bottom: 1rem;
+  padding: 1rem 1.15rem;
+  border: 1px solid rgba(15, 23, 42, .08);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 .6rem 1.4rem rgba(15, 23, 42, .05);
+}
+
+.hub-section-commandbar h2 {
+  margin: 0 0 .2rem;
+  color: #1f2937;
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.hub-section-commandbar p {
+  margin: 0;
+  color: #64748b;
+  font-size: .9rem;
+}
+
+.match-event-grid__button {
+  border-radius: 8px;
+}
+
+.match-event-timeline__item,
+.next-match-editor > [class*="col-"] > .card,
+.match-media-item,
+.hub-form-card,
+.hub-section {
+  border-color: rgba(15, 23, 42, .08) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 .75rem 1.6rem rgba(15, 23, 42, .06) !important;
+}
+
+.next-match-editor > [class*="col-"] > .card {
+  overflow: hidden;
+}
+
+.next-match-editor .card-body {
+  padding: 1.25rem;
+}
+
+.match-event-timeline__item {
+  background: #fff;
+}
+
+.match-event-timeline__item--shareable:hover,
+.match-event-timeline__item--shareable:focus-visible {
+  border-color: #5c1428;
+  background: rgba(92, 20, 40, .04);
+}
+
+@media (max-width: 767.98px) {
+  .fixture-tabs-shell {
+    margin-inline: -.25rem;
+  }
+
+  .fixture-workspace .card-body,
+  .fixture-panel .card-body {
+    padding: 1rem;
+  }
+
+  .fixture-starting11-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .hub-section-commandbar {
+    padding: 1rem;
+  }
+}
