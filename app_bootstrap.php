@@ -61,29 +61,20 @@ function app_nav_link_class(string $currentPage, string $page): string
     return $currentPage === $page ? 'aria-current="page"' : '';
 }
 
+/**
+ * The pages that call this now hard-exit unauthenticated requests (capability
+ * gate) before any HTML is produced, so this only renders in states that can
+ * no longer occur. It links to the single staff sign-in page rather than the
+ * old in-page fetch-login form, so there is exactly one staff login surface.
+ */
 function app_render_login_modal(string $title, string $message): void
 {
     ?>
-    <div id="loginModal" class="auth-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="loginModalTitle">
+    <div class="auth-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="loginModalTitle">
         <div class="auth-modal-card p-4">
             <h1 id="loginModalTitle" class="h4 mb-2"><?= safe($title) ?></h1>
             <p class="text-muted mb-4"><?= safe($message) ?></p>
-            <form id="loginForm" novalidate>
-                <input type="hidden" id="loginCsrfToken" name="csrf_token" value="<?= safe(auth_csrf_token()) ?>">
-                <div class="mb-3">
-                    <label for="loginIdentifier" class="form-label">Username or email</label>
-                    <input id="loginIdentifier" name="identifier" class="form-control" autocomplete="username" required>
-                </div>
-                <div class="mb-3">
-                    <label for="loginPassword" class="form-label">Password</label>
-                    <input id="loginPassword" name="password" type="password" class="form-control" autocomplete="current-password" required>
-                </div>
-                <div id="loginStatus" class="alert alert-danger d-none mb-3" role="status" aria-live="polite"></div>
-                <button id="loginSubmitBtn" type="submit" class="btn btn-maroon w-100">Log in</button>
-                <div class="auth-modal__footer mt-3">
-                    <a class="auth-modal__link" href="forgot_password.php">Forgot password?</a>
-                </div>
-            </form>
+            <a class="btn btn-maroon w-100" href="/login.php">Go to sign in</a>
         </div>
     </div>
     <?php
@@ -136,78 +127,6 @@ function app_render_auth_scripts(bool $isAuthenticated): void
 {
     ?>
     <script>
-        <?php if (!$isAuthenticated): ?>
-        (function() {
-            var form = document.getElementById('loginForm');
-            var usernameInput = document.getElementById('loginIdentifier');
-            var passwordInput = document.getElementById('loginPassword');
-            var csrfInput = document.getElementById('loginCsrfToken');
-            var statusEl = document.getElementById('loginStatus');
-            var submitBtn = document.getElementById('loginSubmitBtn');
-
-            function setLoginStatus(message) {
-                statusEl.textContent = message;
-                statusEl.classList.remove('d-none');
-            }
-
-            if (usernameInput) {
-                usernameInput.focus();
-            }
-
-            if (!form || !usernameInput || !passwordInput || !csrfInput || !statusEl || !submitBtn) {
-                return;
-            }
-
-            form.addEventListener('submit', function(event) {
-                event.preventDefault();
-                statusEl.classList.add('d-none');
-                submitBtn.disabled = true;
-                submitBtn.textContent = 'Logging in…';
-
-                fetch('auth_endpoint.php?action=login', {
-                    method: 'POST',
-                    credentials: 'same-origin',
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
-                    },
-                    body: 'identifier=' + encodeURIComponent(usernameInput.value)
-                        + '&password=' + encodeURIComponent(passwordInput.value)
-                        + '&csrf_token=' + encodeURIComponent(csrfInput.value)
-                }).then(function(response) {
-                    return response.json().then(function(json) {
-                        return {
-                            ok: response.ok,
-                            json: json
-                        };
-                    }).catch(function() {
-                        return {
-                            ok: response.ok,
-                            json: null
-                        };
-                    });
-                }).then(function(result) {
-                    if (!result.ok || !result.json || !result.json.ok) {
-                        throw new Error((result.json && result.json.error) ? result.json.error : 'Login failed.');
-                    }
-
-                    window.location.reload();
-                }).catch(function(error) {
-                    if (error.message === 'Session validation failed. Please reload and try again.') {
-                        window.location.reload();
-                        return;
-                    }
-
-                    setLoginStatus(error.message);
-                    passwordInput.value = '';
-                    passwordInput.focus();
-                }).finally(function() {
-                    submitBtn.disabled = false;
-                    submitBtn.textContent = 'Log in';
-                });
-            });
-        })();
-        <?php endif; ?>
-
         <?php if ($isAuthenticated): ?>
         (function() {
             var moreMenu = document.querySelector('.legacy-toolbar__more');
