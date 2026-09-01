@@ -20,7 +20,7 @@ body.bg-cream:not(.page-render) {
     min-height: 4.25rem;
     padding: .65rem 1rem;
     border-radius: 1rem;
-    background: #2e2e2e;
+    background: #2a2829;
     box-shadow: 0 .5rem 1.4rem rgba(31, 26, 29, .14);
 }
 
@@ -60,10 +60,15 @@ body.bg-cream:not(.page-render) {
 
 .legacy-toolbar__link:hover,
 .legacy-toolbar__more > summary:hover,
-.legacy-toolbar__link.is-active,
 .legacy-toolbar__more[open] > summary {
-    color: #1f1a1d;
-    background: #e0b42a;
+    color: #fff;
+    background: #454145;
+}
+
+.legacy-toolbar__link.is-active {
+    color: #fff;
+    background: var(--brand-primary, #6a2036);
+    box-shadow: inset 0 -3px 0 var(--brand-warning, #e0b42a);
 }
 
 .legacy-toolbar__more { position: relative; }

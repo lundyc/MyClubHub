@@ -80,8 +80,11 @@ function app_render_login_modal(string $title, string $message): void
     <?php
 }
 
-function app_render_primary_nav(string $currentPage, string $brandLabel = 'Club Hub'): void
+function app_render_primary_nav(string $currentPage, ?string $brandLabel = null): void
 {
+    // Match the modern header.php sidebar brand instead of a separate label.
+    $brandLabel ??= (defined('APP_NAME') ? APP_NAME : 'Hub');
+
     $primaryLinks = [
         ['key' => 'home', 'label' => 'Club overview', 'href' => '/index.php'],
         ['key' => 'matches', 'label' => 'Match day', 'href' => '/matches.php'],
