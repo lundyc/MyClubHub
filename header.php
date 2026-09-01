@@ -458,39 +458,6 @@ $documentTitle = $documentTitle !== '' ? $documentTitle . ' – ' . APP_NAME : A
                 $isAdmin = (string) $currentRole === 'admin';
                 ?>
                 <div class="nav-sections d-flex flex-column w-100">
-                    <?php if (($seasonContext['seasons'] ?? []) !== []): ?>
-                        <form class="hub-season-switcher" method="get" action="<?= htmlspecialchars($currentScript, ENT_QUOTES, 'UTF-8') ?>" id="hubSeasonSwitcherForm">
-                            <label for="hubSeasonSelect">Working season</label>
-                            <div class="hub-season-switcher__control">
-                                <i class="fa-solid fa-calendar-days" aria-hidden="true"></i>
-                                <select id="hubSeasonSelect" name="season_id" aria-describedby="hubSeasonHelp">
-                                    <?php foreach ($seasonContext['seasons'] as $navSeason): ?>
-                                        <option value="<?= (int) $navSeason['id'] ?>" <?= (int) $seasonContext['season_id'] === (int) $navSeason['id'] ? 'selected' : '' ?>><?= htmlspecialchars((string) $navSeason['name'], ENT_QUOTES, 'UTF-8') ?><?= !empty($navSeason['is_current']) ? ' · Current' : '' ?><?= !empty($navSeason['is_locked']) ? ' · Locked' : '' ?></option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </div>
-                            <span id="hubSeasonHelp" class="visually-hidden">Changing this updates season-based information across the Hub.</span>
-                        </form>
-                        <script>
-                            // Keep whatever report/filters/tab the user is on when they just switch season,
-                            // instead of the plain season_id-only submit resetting the page to its defaults.
-                            (function () {
-                                var form = document.getElementById('hubSeasonSwitcherForm');
-                                if (!form) return;
-                                form.addEventListener('submit', function () {
-                                    var params = new URLSearchParams(window.location.search);
-                                    params.delete('season_id');
-                                    params.forEach(function (value, key) {
-                                        var input = document.createElement('input');
-                                        input.type = 'hidden';
-                                        input.name = key;
-                                        input.value = value;
-                                        form.appendChild(input);
-                                    });
-                                });
-                            })();
-                        </script>
-                    <?php endif; ?>
                     <section class="nav-section">
                         <div class="nav-section-label">Overview</div>
                         <ul class="navbar-nav nav-main mb-0">
@@ -653,6 +620,56 @@ $documentTitle = $documentTitle !== '' ? $documentTitle . ' – ' . APP_NAME : A
 
     <main class="hub-main" id="hubMainContent" tabindex="-1">
         <div class="container-fluid">
+        <?php
+        // Persistent working-season indicator + switcher. Shown on every Hub
+        // page so it is impossible to be reading another season's figures on
+        // an inner page without noticing. index.php keeps its own richer
+        // context bar, so it opts out here.
+        if ($currentScript !== 'index.php' && ($seasonContext['seasons'] ?? []) !== []):
+            $activeSeasonRow = null;
+            foreach ($seasonContext['seasons'] as $seasonRow) {
+                if ((int) $seasonRow['id'] === (int) ($seasonContext['season_id'] ?? 0)) {
+                    $activeSeasonRow = $seasonRow;
+                    break;
+                }
+            }
+        ?>
+            <div class="hub-season-bar" role="region" aria-label="Working season">
+                <form class="hub-season-bar__form" method="get" action="<?= htmlspecialchars($currentScript, ENT_QUOTES, 'UTF-8') ?>" id="hubSeasonSwitcherForm">
+                    <label for="hubSeasonSelect"><i class="fa-solid fa-calendar-days" aria-hidden="true"></i>Working season</label>
+                    <select id="hubSeasonSelect" name="season_id" aria-describedby="hubSeasonHelp">
+                        <?php foreach ($seasonContext['seasons'] as $navSeason): ?>
+                            <option value="<?= (int) $navSeason['id'] ?>" <?= (int) ($seasonContext['season_id'] ?? 0) === (int) $navSeason['id'] ? 'selected' : '' ?>><?= htmlspecialchars((string) $navSeason['name'], ENT_QUOTES, 'UTF-8') ?><?= !empty($navSeason['is_current']) ? ' · Current' : '' ?><?= !empty($navSeason['is_locked']) ? ' · Locked' : '' ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                    <noscript><button type="submit" class="btn btn-sm btn-outline-secondary">Change</button></noscript>
+                </form>
+                <?php if (!empty($activeSeasonRow['is_locked'])): ?>
+                    <span class="hub-season-bar__flag" title="This season is locked for editing"><i class="fa-solid fa-lock" aria-hidden="true"></i>Locked</span>
+                <?php endif; ?>
+                <span id="hubSeasonHelp" class="visually-hidden">Changing this updates season-based information across the Hub.</span>
+            </div>
+            <script>
+                // Keep whatever report/filter/tab the user is on when they just switch
+                // season, instead of the plain season_id-only submit resetting the page
+                // to its defaults. (Moved here with the switcher from the sidebar.)
+                (function () {
+                    var form = document.getElementById('hubSeasonSwitcherForm');
+                    if (!form) return;
+                    form.addEventListener('submit', function () {
+                        var params = new URLSearchParams(window.location.search);
+                        params.delete('season_id');
+                        params.forEach(function (value, key) {
+                            var input = document.createElement('input');
+                            input.type = 'hidden';
+                            input.name = key;
+                            input.value = value;
+                            form.appendChild(input);
+                        });
+                    });
+                })();
+            </script>
+        <?php endif; ?>
         <?php if (!empty($pageHero) && is_array($pageHero)): ?>
             <?php hub_render_page_hero($pageHero); ?>
         <?php endif; ?>
