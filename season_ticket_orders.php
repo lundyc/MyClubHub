@@ -350,7 +350,7 @@ $stoPageUrl = static function (int $target) use ($stoQueryBase): string {
 <?php if ($errors): ?><div class="alert alert-danger"><?= h(implode(' ', $errors)) ?></div><?php endif; ?>
 
 <div class="hub-section-commandbar">
-  <div><h2>Season Tickets</h2><p><?= count($orders) ?> ticket order<?= count($orders) === 1 ? '' : 's' ?> · <?= gbp($totalPaid) ?> paid · <?= gbp($totalOutstanding) ?> outstanding</p></div>
+  <div><h2>Season Ticket Orders</h2><p><?= count($orders) ?> ticket order<?= count($orders) === 1 ? '' : 's' ?> · <?= gbp($totalPaid) ?> paid · <?= gbp($totalOutstanding) ?> outstanding</p></div>
   <div class="hub-local-actions">
     <a class="btn btn-outline-secondary btn-sm" href="club_people.php">People &amp; Users</a>
     <a class="btn btn-outline-secondary btn-sm" href="season_ticket_free_codes.php">Free links</a>

@@ -551,7 +551,7 @@ $documentTitle = $documentTitle !== '' ? $documentTitle . ' – ' . APP_NAME : A
                             <span>Ticketing</span><i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
                         </button>
                         <ul class="navbar-nav nav-main nav-submenu collapse <?= $ticketingActive === 'active' ? 'show' : '' ?> mb-0" id="hubTicketingNavigation">
-                            <li class="nav-item"><a class="nav-link <?= activeGroup(['season_ticket_orders.php', 'season_ticket_order.php']) ?>"<?= hub_nav_current(['season_ticket_orders.php', 'season_ticket_order.php']) ?> href="/season_ticket_orders.php"><i class="fa-solid fa-id-card me-1" aria-hidden="true"></i>Season Tickets</a></li>
+                            <li class="nav-item"><a class="nav-link <?= activeGroup(['season_ticket_orders.php', 'season_ticket_order.php']) ?>"<?= hub_nav_current(['season_ticket_orders.php', 'season_ticket_order.php']) ?> href="/season_ticket_orders.php"><i class="fa-solid fa-id-card me-1" aria-hidden="true"></i>Season Ticket Orders</a></li>
                             <li class="nav-item"><a class="nav-link <?= activePage('fixture_tickets.php') ?>"<?= hub_nav_current(['fixture_tickets.php']) ?> href="/fixture_tickets.php"><i class="fa-solid fa-cash-register me-1" aria-hidden="true"></i>Match Tickets</a></li>
                             <li class="nav-item"><a class="nav-link <?= activePage('ticket_orders.php') ?>"<?= hub_nav_current(['ticket_orders.php']) ?> href="/ticket_orders.php"><i class="fa-solid fa-list-check me-1" aria-hidden="true"></i>Ticket Orders</a></li>
                             <li class="nav-item"><a class="nav-link <?= activePage('ticket_packages.php') ?>"<?= hub_nav_current(['ticket_packages.php']) ?> href="/ticket_packages.php"><i class="fa-solid fa-box-open me-1" aria-hidden="true"></i>Ticket Packages</a></li>
@@ -564,7 +564,7 @@ $documentTitle = $documentTitle !== '' ? $documentTitle . ' – ' . APP_NAME : A
                     <section class="nav-section">
                         <?php $membersActive = activeGroup(['announcements.php', 'announcement.php', 'feedback.php', 'feedback_item.php', 'venue_reviews.php', 'motm.php']); ?>
                         <button class="nav-section-toggle <?= $membersActive ?>" type="button" data-bs-toggle="collapse" data-bs-target="#hubMembersNavigation" aria-expanded="<?= $membersActive === 'active' ? 'true' : 'false' ?>" aria-controls="hubMembersNavigation">
-                            <span>Members Area</span><i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
+                            <span>Supporter content</span><i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
                         </button>
                         <ul class="navbar-nav nav-main nav-submenu collapse <?= $membersActive === 'active' ? 'show' : '' ?> mb-0" id="hubMembersNavigation">
                             <li class="nav-item"><a class="nav-link <?= activeGroup(['announcements.php', 'announcement.php']) ?>"<?= hub_nav_current(['announcements.php', 'announcement.php']) ?> href="/announcements.php"><i class="fa-solid fa-bullhorn me-1" aria-hidden="true"></i>Announcements</a></li>
@@ -624,7 +624,7 @@ $documentTitle = $documentTitle !== '' ? $documentTitle . ' – ' . APP_NAME : A
                             <div class="nav-section-label">Admin</div>
                             <ul class="navbar-nav nav-main mb-0">
                                 <li class="nav-item"><a class="nav-link <?= activeGroup(['match_photos.php', 'media.php', 'facebook_photo_import.php']) ?>"<?= hub_nav_current(['match_photos.php', 'media.php', 'facebook_photo_import.php']) ?> href="/match_photos.php"><i class="fa-solid fa-photo-film me-1" aria-hidden="true"></i>Media Library</a></li>
-                                <li class="nav-item"><a class="nav-link <?= activePage('people.php') ?>"<?= hub_nav_current(['people.php']) ?> href="/people.php"><i class="fa-solid fa-user-tag me-1" aria-hidden="true"></i>Tagged people</a></li>
+                                <li class="nav-item"><a class="nav-link <?= activePage('people.php') ?>"<?= hub_nav_current(['people.php']) ?> href="/people.php"><i class="fa-solid fa-user-tag me-1" aria-hidden="true"></i>Photo tags</a></li>
                                 <li class="nav-item"><a class="nav-link <?= activeGroup(['settings.php', 'social_post_settings.php']) ?>"<?= hub_nav_current(['settings.php', 'social_post_settings.php']) ?> href="/settings.php"><i class="fa-solid fa-gear me-1" aria-hidden="true"></i>Settings</a></li>
                                 <li class="nav-item"><a class="nav-link <?= activeGroup(['club_people.php', 'club_person.php']) ?>"<?= hub_nav_current(['club_people.php', 'club_person.php']) ?> href="/club_people.php"><i class="fa-solid fa-address-book me-1" aria-hidden="true"></i>People &amp; Users</a></li>
                                 <li class="nav-item"><a class="nav-link <?= activePage('positions.php') ?>"<?= hub_nav_current(['positions.php']) ?> href="/positions.php"><i class="fa-solid fa-sitemap me-1" aria-hidden="true"></i>Roles &amp; Positions</a></li>
