@@ -57,7 +57,9 @@ if (!defined('DEVELOPER_EMAIL')) {
     define('DEVELOPER_EMAIL', hub_config_value($hubFileEnv, 'HUB_DEVELOPER_EMAIL', ''));
 }
 if (!defined('APP_DEBUG')) {
-    define('APP_DEBUG', filter_var(hub_config_value($hubFileEnv, 'HUB_APP_DEBUG', '1'), FILTER_VALIDATE_BOOL));
+    // Fail safe: an environment with no HUB_APP_DEBUG set does not leak
+    // stack traces. Set HUB_APP_DEBUG=1 in .env to turn display_errors on.
+    define('APP_DEBUG', filter_var(hub_config_value($hubFileEnv, 'HUB_APP_DEBUG', '0'), FILTER_VALIDATE_BOOL));
 }
 
 error_reporting(E_ALL);

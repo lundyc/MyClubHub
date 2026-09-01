@@ -172,6 +172,21 @@ $memberPageTitle = [
     'match.php' => 'Match Centre',
     'table.php' => 'League Table',
 ][$currentScript] ?? 'Members';
+$memberPageDescription = [
+    'matches.php' => 'Upcoming fixtures and latest results for Saltcoats Victoria FC.',
+    'match.php' => 'Match details, line-ups, events and head-to-head record for Saltcoats Victoria FC.',
+    'table.php' => 'The current league table for Saltcoats Victoria FC.',
+][$currentScript] ?? '';
+$memberCanonicalUrl = '';
+if ($memberIsPublicContentPage) {
+    $memberScheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+    $memberHost = preg_replace('/[^A-Za-z0-9.:-]/', '', (string) ($_SERVER['HTTP_HOST'] ?? 'myclubhub.co.uk'));
+    $memberPath = '/members/' . $currentScript;
+    if ($currentScript === 'match.php' && (int) ($_GET['id'] ?? 0) > 0) {
+        $memberPath .= '?id=' . (int) $_GET['id'];
+    }
+    $memberCanonicalUrl = $memberScheme . '://' . $memberHost . $memberPath;
+}
 ?>
 <!doctype html>
 <html lang="en">
@@ -180,7 +195,20 @@ $memberPageTitle = [
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="color-scheme" content="light">
     <meta name="theme-color" content="#4b0818">
-    <?php if (!$memberIsPublicContentPage): ?><meta name="robots" content="noindex">
+    <?php if (!$memberIsPublicContentPage): ?>
+    <meta name="robots" content="noindex">
+    <?php elseif ($memberCanonicalUrl !== ''): ?>
+    <link rel="canonical" href="<?= h($memberCanonicalUrl) ?>">
+    <?php if ($memberPageDescription !== ''): ?>
+    <meta name="description" content="<?= h($memberPageDescription) ?>">
+    <?php endif; ?>
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Saltcoats Victoria FC">
+    <meta property="og:title" content="<?= h($memberPageTitle) ?> &middot; Saltcoats Victoria FC">
+    <meta property="og:description" content="<?= h($memberPageDescription) ?>">
+    <meta property="og:url" content="<?= h($memberCanonicalUrl) ?>">
+    <meta property="og:image" content="<?= h($memberScheme . '://' . $memberHost) ?>/Saltcoats%20Victoria%20FC%20-White_Transparent.png">
+    <meta name="twitter:card" content="summary">
     <?php endif; ?>
     <title><?= h($memberPageTitle) ?> &middot; Saltcoats Victoria FC</title>
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
