@@ -22,4 +22,4 @@ if ($id) {
           }
           player_sponsors_sync_social_directory();
 }
-header('Location: players_list.php');
+header('Location: players.php');
