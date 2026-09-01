@@ -1903,7 +1903,10 @@ main .small {
             display: none !important;
       }
 
-      .navbar .collapse:not(.show) {
+      /* Keep the sidebar shell itself visible on desktop (Bootstrap leaves
+         #navbarMain as .collapse without .show at >=lg). Scoped to that one
+         element so it does NOT force collapsed nav *sections* back open. */
+      #navbarMain.collapse:not(.show) {
             display: flex !important;
       }
 }

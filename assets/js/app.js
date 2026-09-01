@@ -275,10 +275,12 @@ document.addEventListener("click", (e) => {
   }
 });
 
-// Sidebar sections — remember each collapsible section's open/closed state per
-// browser. The section containing the current page is always shown by the
-// server and its state is never stored, so navigating never fights the
-// preference.
+// Sidebar sections — personalisation. Every collapse/expand the user makes is
+// remembered per browser (localStorage "hubNavSections") and reapplied on
+// every page. The one exception: the section that contains the current page
+// is revealed on load so you can always see where you are — but that reveal
+// is transient and does NOT change the stored preference, so it collapses
+// again as soon as you navigate elsewhere.
 (function () {
   const KEY = "hubNavSections";
   const toggles = document.querySelectorAll(".nav-section-toggle[data-nav-section]");
@@ -294,8 +296,13 @@ document.addEventListener("click", (e) => {
     try {
       window.localStorage.setItem(KEY, JSON.stringify(store));
     } catch (error) {
-      /* storage unavailable (private mode) — state just won't persist */
+      /* storage unavailable (private mode) — preference just won't persist */
     }
+  };
+
+  const setOpen = (btn, panel, open) => {
+    panel.classList.toggle("show", open);
+    btn.setAttribute("aria-expanded", open ? "true" : "false");
   };
 
   toggles.forEach((btn) => {
@@ -304,17 +311,15 @@ document.addEventListener("click", (e) => {
     const panel = target ? document.querySelector(target) : null;
     if (!panel) return;
 
-    // Current section: leave exactly as the server rendered it, don't record.
-    if (panel.querySelector(".nav-link.active")) return;
-
+    // 1. Apply the remembered preference (falls back to the server render).
     if (Object.prototype.hasOwnProperty.call(store, key)) {
-      const wantOpen = store[key] === 1;
-      if (wantOpen !== panel.classList.contains("show")) {
-        panel.classList.toggle("show", wantOpen);
-        btn.setAttribute("aria-expanded", wantOpen ? "true" : "false");
-      }
+      setOpen(btn, panel, store[key] === 1);
     }
-
+    // 2. Always reveal the section you're currently in — without recording it.
+    if (panel.querySelector(".nav-link.active") && !panel.classList.contains("show")) {
+      setOpen(btn, panel, true);
+    }
+    // 3. Any deliberate toggle from here on is the preference.
     panel.addEventListener("shown.bs.collapse", () => { store[key] = 1; save(); });
     panel.addEventListener("hidden.bs.collapse", () => { store[key] = 0; save(); });
   });
