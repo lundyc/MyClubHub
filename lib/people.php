@@ -86,6 +86,100 @@ function legacyHolderIdFromPersonId(PDO $pdo, int $personId): ?int
 }
 
 /**
+ * Resolve the public marketing unsubscribe token against the people table
+ * first, falling back to the legacy holder token for old links. Returned
+ * holder data is compatibility context only; people remains authoritative
+ * when a person row exists.
+ *
+ * @return array{person: ?array<string,mixed>, holder: ?array<string,mixed>}|null
+ */
+function findMarketingContactByUnsubscribeToken(PDO $pdo, string $token): ?array
+{
+    $token = trim($token);
+    if ($token === '') {
+        return null;
+    }
+
+    $personStmt = $pdo->prepare('SELECT * FROM people WHERE unsubscribe_token = :token LIMIT 1');
+    $personStmt->execute([':token' => $token]);
+    $person = $personStmt->fetch(PDO::FETCH_ASSOC) ?: null;
+    if ($person) {
+        $holderId = getLegacyHolderIdForPerson($pdo, (int) $person['id']);
+        return [
+            'person' => $person,
+            'holder' => $holderId !== null ? getSeasonTicketHolder($pdo, $holderId) : null,
+        ];
+    }
+
+    $holderStmt = $pdo->prepare('SELECT * FROM season_ticket_holders WHERE unsubscribe_token = :token LIMIT 1');
+    $holderStmt->execute([':token' => $token]);
+    $holder = $holderStmt->fetch(PDO::FETCH_ASSOC) ?: null;
+    if (!$holder) {
+        return null;
+    }
+
+    return [
+        'person' => getPersonByLegacyHolderId($pdo, (int) $holder['id']),
+        'holder' => $holder,
+    ];
+}
+
+/**
+ * Applies a marketing opt-out to the person row first and mirrors it to the
+ * mapped legacy holder so old member/ticket pages stay consistent.
+ *
+ * @return array{person: ?array<string,mixed>, holder: ?array<string,mixed>}|null
+ */
+function unsubscribeMarketingContact(PDO $pdo, string $token): ?array
+{
+    $contact = findMarketingContactByUnsubscribeToken($pdo, $token);
+    if ($contact === null) {
+        return null;
+    }
+
+    $person = $contact['person'];
+    $holder = $contact['holder'];
+
+    if ($person) {
+        $pdo->prepare('UPDATE people SET marketing_opt_in = 0, unsubscribed_at = COALESCE(unsubscribed_at, NOW()) WHERE id = :id')
+            ->execute([':id' => (int) $person['id']]);
+    }
+
+    if ($holder) {
+        $pdo->prepare('UPDATE season_ticket_holders SET marketing_opt_in = 0, unsubscribed_at = COALESCE(unsubscribed_at, NOW()) WHERE id = :id')
+            ->execute([':id' => (int) $holder['id']]);
+    }
+
+    return findMarketingContactByUnsubscribeToken($pdo, $token);
+}
+
+function marketingContactDisplayName(array $contact): string
+{
+    $person = is_array($contact['person'] ?? null) ? $contact['person'] : null;
+    if ($person !== null && trim((string) ($person['display_name'] ?? '')) !== '') {
+        return trim((string) $person['display_name']);
+    }
+
+    $holder = is_array($contact['holder'] ?? null) ? $contact['holder'] : null;
+    if ($holder !== null && trim((string) ($holder['name'] ?? '')) !== '') {
+        return trim((string) $holder['name']);
+    }
+
+    return 'supporter';
+}
+
+function marketingContactIsUnsubscribed(array $contact): bool
+{
+    $person = is_array($contact['person'] ?? null) ? $contact['person'] : null;
+    if ($person !== null) {
+        return (int) ($person['marketing_opt_in'] ?? 1) === 0 && !empty($person['unsubscribed_at']);
+    }
+
+    $holder = is_array($contact['holder'] ?? null) ? $contact['holder'] : null;
+    return $holder !== null && (int) ($holder['marketing_opt_in'] ?? 1) === 0 && !empty($holder['unsubscribed_at']);
+}
+
+/**
  * Transitional bridge for legacy ticketing tables that still require a
  * season_ticket_holders.id. New identity must begin with people/accounts; this
  * adapter is the only normal place that should create a holder row now.

@@ -158,8 +158,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
         }
 
         if (!$errors) {
-            $pdo->prepare('UPDATE accounts SET password_hash = :hash WHERE id = :id')
-                ->execute([':hash' => password_hash($new, PASSWORD_DEFAULT), ':id' => (int) $account['id']]);
+            updateAccountPasswordHash($pdo, (int) $account['id'], password_hash($new, PASSWORD_DEFAULT));
             identityAuditLog($pdo, 'member_password_changed', 'Member changed password for account #' . (int) $account['id']);
             $success = 'Password updated.';
             $account = member_auth_current_account() ?: $account;

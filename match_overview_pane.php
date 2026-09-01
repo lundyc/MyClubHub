@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 // PHASE3B_GUARD_MARKER
 require_once __DIR__ . '/auth.php';
-if (!hub_auth_has_capability('content_social')) {
+if (!hub_auth_has_capability('football_ops')) {
     http_response_code(403);
     exit('Access denied.');
 }
@@ -66,6 +66,134 @@ $overviewEventLabels = [
         <i class="fa-solid fa-file-arrow-down me-2"></i>Download Poster
       </a>
     </div>
+  </div>
+</div>
+
+<?php if (isset($_GET['staffing_saved'])): ?>
+  <div class="alert alert-success">Matchday staffing updated.</div>
+<?php endif; ?>
+<?php if (isset($_GET['staffing_deleted'])): ?>
+  <div class="alert alert-success">Matchday staffing assignment removed.</div>
+<?php endif; ?>
+<?php if (isset($_GET['staffing_error'])): ?>
+  <div class="alert alert-danger"><?= h((string) $_GET['staffing_error']) ?></div>
+<?php endif; ?>
+
+<div class="card shadow-sm mb-4" id="matchdayStaffingCard">
+  <div class="card-body p-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+      <div>
+        <div class="small fw-semibold text-uppercase text-muted mb-1">Matchday</div>
+        <h2 class="h4 mb-0">Staffing & Volunteers</h2>
+      </div>
+      <div class="d-flex flex-wrap gap-2">
+        <span class="badge text-bg-light"><?= (int) $staffingSummary['active'] ?> active</span>
+        <span class="badge text-bg-primary"><?= (int) $staffingSummary['confirmed'] ?> confirmed</span>
+        <span class="badge text-bg-success"><?= (int) $staffingSummary['checked_in'] ?> checked in</span>
+      </div>
+    </div>
+
+    <?php if ($staffingAssignments === []): ?>
+      <div class="alert alert-info mb-3">No matchday roles assigned yet.</div>
+    <?php else: ?>
+      <div class="table-responsive mb-3">
+        <table class="table table-sm align-middle mb-0">
+          <thead>
+            <tr>
+              <th>Role</th>
+              <th>Person</th>
+              <th>Report</th>
+              <th>Status</th>
+              <th>Notes</th>
+              <th class="text-end">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <?php foreach ($staffingAssignments as $assignment): ?>
+              <?php $assignmentStatus = (string) ($assignment['status'] ?? 'planned'); ?>
+              <tr>
+                <td class="fw-semibold"><?= h((string) $assignment['role_label']) ?></td>
+                <td>
+                  <?= h((string) ($assignment['person_name'] ?: 'Unassigned')) ?>
+                  <?php if (!empty($assignment['person_email'])): ?><div class="small text-muted"><?= h((string) $assignment['person_email']) ?></div><?php endif; ?>
+                </td>
+                <td><?= !empty($assignment['report_time']) ? h(substr((string) $assignment['report_time'], 0, 5)) : '<span class="text-muted">-</span>' ?></td>
+                <td><span class="badge <?= h(matchday_staffing_badge_class($assignmentStatus)) ?>"><?= h(matchday_staffing_status_label($assignmentStatus)) ?></span></td>
+                <td><?= trim((string) ($assignment['notes'] ?? '')) !== '' ? h((string) $assignment['notes']) : '<span class="text-muted">-</span>' ?></td>
+                <td class="text-end">
+                  <div class="btn-group btn-group-sm" role="group" aria-label="Staffing actions">
+                    <?php foreach (['confirmed' => 'Confirm', 'checked_in' => 'In', 'checked_out' => 'Out'] as $nextStatus => $label): ?>
+                      <?php if ($assignmentStatus !== $nextStatus): ?>
+                        <form method="post" action="/matchday_staffing_action.php" class="d-inline">
+                          <?= csrf_field() ?>
+                          <input type="hidden" name="fixture_id" value="<?= (int) $fixture['id'] ?>">
+                          <input type="hidden" name="season_id" value="<?= (int) $seasonId ?>">
+                          <input type="hidden" name="assignment_id" value="<?= (int) $assignment['id'] ?>">
+                          <input type="hidden" name="action" value="status">
+                          <input type="hidden" name="status" value="<?= h($nextStatus) ?>">
+                          <button type="submit" class="btn btn-outline-secondary"><?= h($label) ?></button>
+                        </form>
+                      <?php endif; ?>
+                    <?php endforeach; ?>
+                    <form method="post" action="/matchday_staffing_action.php" class="d-inline" onsubmit="return confirm('Remove this staffing assignment?');">
+                      <?= csrf_field() ?>
+                      <input type="hidden" name="fixture_id" value="<?= (int) $fixture['id'] ?>">
+                      <input type="hidden" name="season_id" value="<?= (int) $seasonId ?>">
+                      <input type="hidden" name="assignment_id" value="<?= (int) $assignment['id'] ?>">
+                      <input type="hidden" name="action" value="delete">
+                      <button type="submit" class="btn btn-outline-danger" aria-label="Remove staffing assignment"><i class="fa-solid fa-trash" aria-hidden="true"></i></button>
+                    </form>
+                  </div>
+                </td>
+              </tr>
+            <?php endforeach; ?>
+          </tbody>
+        </table>
+      </div>
+    <?php endif; ?>
+
+    <form method="post" action="/matchday_staffing_action.php" class="row g-2 align-items-end">
+      <?= csrf_field() ?>
+      <input type="hidden" name="fixture_id" value="<?= (int) $fixture['id'] ?>">
+      <input type="hidden" name="season_id" value="<?= (int) $seasonId ?>">
+      <input type="hidden" name="action" value="save">
+      <div class="col-md-3">
+        <label class="form-label small" for="staffRoleKey">Role</label>
+        <select class="form-select form-select-sm" id="staffRoleKey" name="role_key" required>
+          <?php foreach ($staffingRoles as $roleKey => $roleLabel): ?>
+            <option value="<?= h((string) $roleKey) ?>"><?= h((string) $roleLabel) ?></option>
+          <?php endforeach; ?>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label small" for="staffPersonId">Person</label>
+        <select class="form-select form-select-sm" id="staffPersonId" name="person_id">
+          <option value="0">Unassigned</option>
+          <?php foreach ($staffingPeopleOptions as $personOption): ?>
+            <option value="<?= (int) $personOption['id'] ?>"><?= h((string) $personOption['display_name']) ?></option>
+          <?php endforeach; ?>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small" for="staffReportTime">Report time</label>
+        <input type="time" class="form-control form-control-sm" id="staffReportTime" name="report_time">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small" for="staffStatus">Status</label>
+        <select class="form-select form-select-sm" id="staffStatus" name="status">
+          <?php foreach ($staffingStatuses as $statusKey => $statusLabel): ?>
+            <option value="<?= h((string) $statusKey) ?>"><?= h((string) $statusLabel) ?></option>
+          <?php endforeach; ?>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small" for="staffNotes">Notes</label>
+        <input type="text" class="form-control form-control-sm" id="staffNotes" name="notes" maxlength="255">
+      </div>
+      <div class="col-12 text-end">
+        <button type="submit" class="btn btn-outline-secondary btn-sm"><i class="fa-solid fa-plus me-1" aria-hidden="true"></i>Add role</button>
+      </div>
+    </form>
   </div>
 </div>
 

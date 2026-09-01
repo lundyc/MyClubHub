@@ -16,8 +16,15 @@ RewriteRule ^uploads/secretary_documents(/|$) - [F,L]
 RewriteRule ^season-tickets/?$ season_tickets_signup.php [L,QSA]
 RewriteRule ^season-tickets/checkout/?$ season_tickets_checkout.php [L,QSA]
 RewriteRule ^tickets/?$ tickets_shop.php [L,QSA]
+
+RewriteRule ^shop/?$ shop/index.php [L,QSA]
+RewriteRule ^shop/p/([A-Za-z0-9-]+)/?$ shop/product.php?slug=$1 [L,QSA]
+RewriteRule ^shop/basket/?$ shop/basket.php [L,QSA]
+RewriteRule ^shop/checkout/?$ shop/checkout.php [L,QSA]
+RewriteRule ^shop/order/([A-Za-z0-9]+)/?$ shop/confirmation.php?token=$1 [L,QSA]
 RewriteRule ^playersponsors/?$ playersponsors.php [L,QSA]
 RewriteRule ^playersponsors/checkout/?$ playersponsors_checkout.php [L,QSA]
+RewriteRule ^p/([A-Za-z0-9]{6,24})/?$ pay.php?c=$1 [L,QSA]
 
 <IfModule mod_deflate.c>
     AddOutputFilterByType DEFLATE text/html text/css text/javascript application/javascript application/json image/svg+xml

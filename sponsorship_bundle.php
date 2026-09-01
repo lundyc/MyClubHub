@@ -67,7 +67,7 @@ if($id>0&&$bundle){
   foreach($linksStmt->fetchAll(PDO::FETCH_ASSOC) as $link){
    $sid=(string)$link['stripe_checkout_session_id'];
    if(!isset($stripeSessions[$sid])){
-    $stripeSessions[$sid]=['session_id'=>$sid,'url'=>$link['url'],'status'=>$link['status'],'created_at'=>$link['created_at'],'expires_at'=>$link['expires_at'],'amount'=>0.0,'item_count'=>0,'first_link_id'=>(int)$link['id']];
+    $stripeSessions[$sid]=['session_id'=>$sid,'url'=>stripe_payment_link_public_url($link),'status'=>$link['status'],'created_at'=>$link['created_at'],'expires_at'=>$link['expires_at'],'amount'=>0.0,'item_count'=>0,'first_link_id'=>(int)$link['id']];
    }
    $stripeSessions[$sid]['amount']+=(float)$link['amount'];
    $stripeSessions[$sid]['item_count']++;

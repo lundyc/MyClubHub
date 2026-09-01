@@ -2383,15 +2383,24 @@ function deleteMatchOpponent(PDO $pdo, int $opponentId): void
 function getMatchFixtures(PDO $pdo, int $seasonId): array
 {
           ensureMatchSchema($pdo);
+          if (function_exists('ensureCompetitionStructureSchema')) {
+                    ensureCompetitionStructureSchema($pdo);
+          }
           $stmt = $pdo->prepare("
                     SELECT f.*,
                            COALESCE(o.clubname, f.opponent) AS opponent_name,
                            o.logo_path AS opponent_logo,
                            o.ground_location AS opponent_ground_location,
+                           COALESCE(mc.competition_type, legacy_mc.competition_type, '') AS competition_type,
                            COALESCE(day_counts.match_day_count, 0) AS match_day_count,
                            COALESCE(ball_counts.match_ball_count, 0) AS match_ball_count
                     FROM match_fixtures f
                     LEFT JOIN match_opponents o ON o.id = f.opponent_id
+                    LEFT JOIN competition_seasons cs ON cs.id = f.competition_season_id
+                    LEFT JOIN match_competitions mc ON mc.id = cs.competition_id
+                    LEFT JOIN match_competitions legacy_mc
+                              ON f.competition_season_id IS NULL
+                             AND LOWER(TRIM(legacy_mc.name)) = LOWER(TRIM(f.competition))
                     LEFT JOIN (
                               SELECT fixture_id, COUNT(*) AS match_day_count
                               FROM match_sponsorships

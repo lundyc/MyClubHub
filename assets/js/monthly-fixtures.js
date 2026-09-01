@@ -163,13 +163,35 @@
     });
 
     var controlMap = {
-        'heading-font': function (value) { graphic.style.setProperty('--monthly-heading-font', "'" + value.replace(/["']/g, '') + "'"); },
-        'body-font': function (value) { graphic.style.setProperty('--monthly-body-font', "'" + value.replace(/["']/g, '') + "'"); },
-        'legend-size': function (value) { graphic.style.setProperty('--monthly-legend-size', value + 'px'); },
-        'fixture-size': function (value) { graphic.style.setProperty('--monthly-fixture-size', value + 'px'); },
+        'heading-font': function (value) {
+            var font = value.replace(/["']/g, '');
+            graphic.style.setProperty('--monthly-heading-font', "'" + font + "'");
+            setPreviewStyle(['legend', 'month_heading'], 'font-family', '"' + font + '",Arial,sans-serif');
+        },
+        'body-font': function (value) {
+            var font = value.replace(/["']/g, '');
+            graphic.style.setProperty('--monthly-body-font', "'" + font + "'");
+            setPreviewStyle(['fixtures', 'footer_meta'], 'font-family', '"' + font + '",Arial,sans-serif');
+        },
+        'legend-size': function (value) {
+            var size = value + 'px';
+            graphic.style.setProperty('--monthly-legend-size', size);
+            setPreviewStyle(['legend', 'month_heading'], 'font-size', size);
+        },
+        'fixture-size': function (value) {
+            var size = value + 'px';
+            graphic.style.setProperty('--monthly-fixture-size', size);
+            setPreviewStyle(['fixtures'], 'font-size', size);
+        },
         'badge-size': function (value) { graphic.style.setProperty('--monthly-badge-size', value + 'px'); },
         'card-gap': function (value) { graphic.style.setProperty('--monthly-card-gap', value + 'px'); }
     };
+    function setPreviewStyle(keys, property, value) {
+        keys.forEach(function (key) {
+            var element = graphic.querySelector('[data-editor-element="' + CSS.escape(key) + '"]');
+            if (element) element.style.setProperty(property, value, 'important');
+        });
+    }
     function applyControl(control) {
         var key = control.dataset.graphicControl;
         if (controlMap[key]) controlMap[key](control.value);

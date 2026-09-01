@@ -394,7 +394,7 @@
 .monthly-graphic-element--legend {
     justify-content: flex-start;
     gap: 20px;
-    font-family: var(--monthly-heading-font), Arial, sans-serif;
+    font-family: var(--monthly-heading-font), Arial, sans-serif !important;
     font-size: var(--monthly-legend-size, 38px) !important;
     font-weight: 900;
 }
@@ -402,7 +402,7 @@
 .monthly-graphic-element--month_heading {
     justify-content: flex-start;
     overflow: visible;
-    font-family: var(--monthly-heading-font), Arial, sans-serif;
+    font-family: var(--monthly-heading-font), Arial, sans-serif !important;
     font-size: var(--monthly-legend-size, 38px) !important;
     font-weight: 900;
     white-space: nowrap;
@@ -434,6 +434,7 @@
 
 .monthly-graphic-element--fixtures {
     align-items: stretch;
+    font-family: var(--monthly-body-font), Arial, sans-serif !important;
     font-size: var(--monthly-fixture-size, 18px) !important;
 }
 
@@ -484,7 +485,7 @@
     border: 1px solid rgba(255, 255, 255, .12);
     box-shadow: 0 .6rem 1.4rem rgba(0, 0, 0, .28);
     color: var(--monthly-text);
-    font-family: var(--monthly-body-font), Arial, sans-serif;
+    font-family: var(--monthly-body-font), Arial, sans-serif !important;
     text-align: center;
 }
 
@@ -546,7 +547,7 @@
     place-items: center;
     background: var(--monthly-accent);
     color: var(--monthly-primary-ink);
-    font-family: var(--monthly-body-font), Arial, sans-serif;
+    font-family: var(--monthly-body-font), Arial, sans-serif !important;
     font-size: .7em;
     font-weight: 900;
 }
@@ -575,6 +576,30 @@
     color: var(--monthly-primary);
 }
 
+.monthly-fixture-cup-icon {
+    position: absolute;
+    right: 10px;
+    bottom: 10px;
+    display: grid;
+    width: 30px;
+    height: 30px;
+    place-items: center;
+    border: 1px solid rgba(255, 255, 255, .25);
+    background: var(--monthly-accent);
+    color: var(--monthly-primary-ink);
+    font-size: .68em;
+    line-height: 1;
+}
+
+.monthly-fixture-block.is-away .monthly-fixture-cup-icon {
+    background: var(--monthly-primary);
+    color: var(--monthly-accent);
+}
+
+.monthly-fixture-block.has-cup .monthly-fixture-score {
+    right: 54px;
+}
+
 .monthly-fixture-result {
     position: absolute;
     bottom: 10px;
@@ -585,7 +610,7 @@
     place-items: center;
     background: var(--monthly-accent);
     color: var(--monthly-primary-ink);
-    font-family: var(--monthly-body-font), Arial, sans-serif;
+    font-family: var(--monthly-body-font), Arial, sans-serif !important;
     font-size: .7em;
     font-weight: 900;
 }
@@ -609,7 +634,7 @@
     left: 0;
     height: 32px;
     color: var(--monthly-secondary);
-    font-family: var(--monthly-heading-font), Arial, sans-serif;
+    font-family: var(--monthly-heading-font), Arial, sans-serif !important;
     font-size: .8em;
     font-weight: 800;
 }
@@ -649,7 +674,7 @@
     position: absolute;
     top: 7px;
     left: 8px;
-    font-family: var(--monthly-body-font), Arial, sans-serif;
+    font-family: var(--monthly-body-font), Arial, sans-serif !important;
     font-size: .85em;
     font-weight: 900;
 }
@@ -661,6 +686,21 @@
     width: 26px;
     height: 26px;
     font-size: .65em;
+}
+
+.monthly-calendar-day .monthly-fixture-cup-icon {
+    right: 7px;
+    bottom: 7px;
+    width: 24px;
+    height: 24px;
+    background: var(--monthly-primary);
+    color: var(--monthly-accent);
+    font-size: .55em;
+}
+
+.monthly-calendar-day.is-away .monthly-fixture-cup-icon {
+    background: var(--monthly-accent);
+    color: var(--monthly-primary);
 }
 
 .monthly-calendar-day img {
@@ -688,7 +728,7 @@
     gap: 9px;
     place-content: center;
     color: var(--monthly-secondary);
-    font-family: var(--monthly-body-font), Arial, sans-serif;
+    font-family: var(--monthly-body-font), Arial, sans-serif !important;
 }
 
 .monthly-graphic-element--footer_meta strong,

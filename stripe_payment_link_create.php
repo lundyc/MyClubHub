@@ -68,7 +68,7 @@ try {
         'ok' => true,
         'link' => [
             'id' => (int) $link['id'],
-            'url' => (string) $link['url'],
+            'url' => stripe_payment_link_public_url($link),
             'amount' => (float) $link['amount'],
             'expires_at' => (string) $link['expires_at'],
             'sponsor_contact_email' => (string) ($agreement['sponsor_contact_email'] ?? ''),

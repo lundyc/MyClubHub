@@ -567,6 +567,11 @@ function pos_record_admission_items(PDO $pdo, int $saleId, int $locationId, arra
 function pos_create_sale(PDO $pdo, int $locationId, array $actor, array $items, string $paymentMethod, ?array $member, int $pointsRedeemed, string $status = 'complete'): array
 {
     pos_ensure_schema($pdo);
+    require_once __DIR__ . '/pos_trading_days.php';
+    require_once __DIR__ . '/pos_controls.php';
+    pos_controls_ensure_schema($pdo);
+    $tradingDay = pos_trading_day_require_open($pdo);
+    $tillSession = pos_till_session_require_open($pdo, (int) $tradingDay['id'], $locationId);
     $products = pos_products_for_location($pdo, $locationId);
     $productMap = [];
     foreach ($products as $product) {
@@ -581,6 +586,9 @@ function pos_create_sale(PDO $pdo, int $locationId, array $actor, array $items, 
             continue;
         }
         $product = $productMap[$productId];
+        if (array_key_exists('stock_on_hand', $product) && $product['stock_on_hand'] !== null && (float) $product['stock_on_hand'] < $qty) {
+            throw new RuntimeException((string) $product['name'] . ' has only ' . number_format((float) $product['stock_on_hand'], 2) . ' in stock.');
+        }
         $unit = round((float) $product['sell_price'], 2);
         $lineSubtotal = round($unit * $qty, 2);
         $discount = pos_best_discount_for_item($pdo, $locationId, $product, $lineSubtotal, (bool) ($member['season_ticket_valid'] ?? false));
@@ -619,14 +627,17 @@ function pos_create_sale(PDO $pdo, int $locationId, array $actor, array $items, 
     $pdo->beginTransaction();
     try {
         $stmt = $pdo->prepare('INSERT INTO pos_sales
-            (sale_ref, location_id, operator_id, hub_user_id, person_id, holder_name, subtotal, discount_total, points_redeemed, points_discount, total, payment_method, status)
-            VALUES (:sale_ref, :location, :operator, :hub_user, :person, :holder_name, :subtotal, :discount_total, :points_redeemed, :points_discount, :total, :payment_method, :status)');
+            (sale_ref, trading_day_id, till_session_id, location_id, operator_id, hub_user_id, person_id, holder_id, holder_name, subtotal, discount_total, points_redeemed, points_discount, total, payment_method, status, completed_at)
+            VALUES (:sale_ref, :trading_day_id, :till_session_id, :location, :operator, :hub_user, :person, :holder_id, :holder_name, :subtotal, :discount_total, :points_redeemed, :points_discount, :total, :payment_method, :status, :completed_at)');
         $stmt->execute([
             ':sale_ref' => $saleRef,
+            ':trading_day_id' => (int) $tradingDay['id'],
+            ':till_session_id' => (int) $tillSession['id'],
             ':location' => $locationId,
             ':operator' => (string) $actor['type'] === 'operator' ? (int) $actor['id'] : null,
             ':hub_user' => (string) $actor['type'] === 'hub_user' ? (int) $actor['id'] : null,
             ':person' => $personId > 0 ? $personId : null,
+            ':holder_id' => $holderId > 0 ? $holderId : null,
             ':holder_name' => $personId > 0 ? (string) ($member['name'] ?? '') : null,
             ':subtotal' => $subtotal,
             ':discount_total' => $discountTotal,
@@ -635,8 +646,12 @@ function pos_create_sale(PDO $pdo, int $locationId, array $actor, array $items, 
             ':total' => $total,
             ':payment_method' => $paymentMethod,
             ':status' => $status,
+            ':completed_at' => $status === 'complete' ? date('Y-m-d H:i:s') : null,
         ]);
         $saleId = (int) $pdo->lastInsertId();
+        if ($status === 'complete') {
+            pos_assign_receipt_number($pdo, $saleId);
+        }
         $itemStmt = $pdo->prepare('INSERT INTO pos_sale_items
             (sale_id, product_id, product_name, category_name, qty, unit_price, discount_amount, line_total)
             VALUES (:sale, :product, :product_name, :category_name, :qty, :unit, :discount, :line_total)');
@@ -656,6 +671,7 @@ function pos_create_sale(PDO $pdo, int $locationId, array $actor, array $items, 
         if ($status === 'complete') {
             pos_apply_sale_points($pdo, $saleId, $pointsEarned);
             pos_record_admission_items($pdo, $saleId, $locationId, $actor);
+            pos_record_stock_for_sale($pdo, $saleId);
         }
         $pdo->commit();
     } catch (Throwable $exception) {
@@ -674,6 +690,8 @@ function pos_create_sale(PDO $pdo, int $locationId, array $actor, array $items, 
         'total' => $total,
         'points_balance' => $personId > 0 ? pos_points_balance($pdo, $personId, $holderId) : 0,
         'status' => $status,
+        'trading_day_id' => (int) $tradingDay['id'],
+        'till_session_id' => (int) $tillSession['id'],
     ];
 }
 
@@ -722,9 +740,11 @@ function pos_apply_sale_points(PDO $pdo, int $saleId, ?int $pointsEarned = null)
     return ['points_earned' => $pointsEarned, 'points_balance' => pos_points_balance($pdo, $personId, $holderId)];
 }
 
-function pos_complete_pending_card_sale(PDO $pdo, int $saleId, array $actor): array
+function pos_complete_pending_card_sale(PDO $pdo, int $saleId, array $actor, string $paymentReference = ''): array
 {
     pos_ensure_schema($pdo);
+    require_once __DIR__ . '/pos_controls.php';
+    pos_controls_ensure_schema($pdo);
     $stmt = $pdo->prepare('SELECT * FROM pos_sales WHERE id = :id LIMIT 1');
     $stmt->execute([':id' => $saleId]);
     $sale = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -740,10 +760,12 @@ function pos_complete_pending_card_sale(PDO $pdo, int $saleId, array $actor): ar
 
     $pdo->beginTransaction();
     try {
-        $pdo->prepare("UPDATE pos_sales SET status = 'complete', payment_method = 'card_stripe_app' WHERE id = :id AND status = 'pending_card'")
-            ->execute([':id' => $saleId]);
+        $pdo->prepare("UPDATE pos_sales SET status = 'complete', payment_method = 'card_stripe_app', payment_reference = :payment_reference, completed_at = NOW() WHERE id = :id AND status = 'pending_card'")
+            ->execute([':id' => $saleId, ':payment_reference' => trim($paymentReference) !== '' ? trim($paymentReference) : null]);
+        pos_assign_receipt_number($pdo, $saleId);
         $points = pos_apply_sale_points($pdo, $saleId);
         pos_record_admission_items($pdo, $saleId, (int) $sale['location_id'], $actor);
+        pos_record_stock_for_sale($pdo, $saleId);
         $pdo->commit();
     } catch (Throwable $exception) {
         $pdo->rollBack();
@@ -782,6 +804,8 @@ function pos_cancel_pending_card_sale(PDO $pdo, int $saleId, array $actor): void
 function pos_complete_pending_cash_sale(PDO $pdo, int $saleId, array $actor): array
 {
     pos_ensure_schema($pdo);
+    require_once __DIR__ . '/pos_controls.php';
+    pos_controls_ensure_schema($pdo);
     $stmt = $pdo->prepare('SELECT * FROM pos_sales WHERE id = :id LIMIT 1');
     $stmt->execute([':id' => $saleId]);
     $sale = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -797,10 +821,12 @@ function pos_complete_pending_cash_sale(PDO $pdo, int $saleId, array $actor): ar
 
     $pdo->beginTransaction();
     try {
-        $pdo->prepare("UPDATE pos_sales SET status = 'complete', payment_method = 'cash' WHERE id = :id AND status = 'pending_cash'")
+        $pdo->prepare("UPDATE pos_sales SET status = 'complete', payment_method = 'cash', completed_at = NOW() WHERE id = :id AND status = 'pending_cash'")
             ->execute([':id' => $saleId]);
+        pos_assign_receipt_number($pdo, $saleId);
         $points = pos_apply_sale_points($pdo, $saleId);
         pos_record_admission_items($pdo, $saleId, (int) $sale['location_id'], $actor);
+        pos_record_stock_for_sale($pdo, $saleId);
         $pdo->commit();
     } catch (Throwable $exception) {
         $pdo->rollBack();
@@ -881,6 +907,16 @@ function pos_pending_cash_sale(PDO $pdo, int $saleId, array $actor): ?array
 function pos_sales_summary(PDO $pdo, ?string $date = null): array
 {
     pos_ensure_schema($pdo);
+    if ($date === null) {
+        require_once __DIR__ . '/pos_trading_days.php';
+        $activeTradingDay = pos_trading_day_active($pdo);
+        if ($activeTradingDay) {
+            $stmt = $pdo->prepare('SELECT COUNT(*) AS sales_count, COALESCE(SUM(total),0) AS total, COALESCE(SUM(payment_method = "cash"),0) AS cash_count, COALESCE(SUM(payment_method IN ("card","card_stripe_app")),0) AS card_count FROM pos_sales WHERE trading_day_id = :trading_day_id AND status = "complete"');
+            $stmt->execute([':trading_day_id' => (int) $activeTradingDay['id']]);
+            return $stmt->fetch(PDO::FETCH_ASSOC) ?: ['sales_count' => 0, 'total' => 0, 'cash_count' => 0, 'card_count' => 0];
+        }
+    }
+
     $date = $date ?: date('Y-m-d');
     $stmt = $pdo->prepare('SELECT COUNT(*) AS sales_count, COALESCE(SUM(total),0) AS total, COALESCE(SUM(payment_method = "cash"),0) AS cash_count, COALESCE(SUM(payment_method IN ("card","card_stripe_app")),0) AS card_count FROM pos_sales WHERE DATE(created_at) = :date AND status = "complete"');
     $stmt->execute([':date' => $date]);

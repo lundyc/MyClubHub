@@ -495,6 +495,7 @@ $documentTitle = $documentTitle !== '' ? $documentTitle . ' – ' . APP_NAME : A
                         <div class="nav-section-label">Overview</div>
                         <ul class="navbar-nav nav-main mb-0">
                             <li class="nav-item"><a class="nav-link <?= activePage('index.php') ?>"<?= hub_nav_current(['index.php']) ?> href="/index.php"><i class="fa-solid fa-house me-1" aria-hidden="true"></i>Club overview</a></li>
+                            <li class="nav-item"><a class="nav-link <?= activePage('club_reminders.php') ?>"<?= hub_nav_current(['club_reminders.php']) ?> href="/club_reminders.php"><i class="fa-solid fa-bell me-1" aria-hidden="true"></i>Reminders</a></li>
                         </ul>
                     </section>
 
@@ -512,6 +513,7 @@ $documentTitle = $documentTitle !== '' ? $documentTitle . ' – ' . APP_NAME : A
                         <div class="nav-section-label">Sponsorship</div>
                         <ul class="navbar-nav nav-main mb-0">
                             <li class="nav-item"><a class="nav-link <?= activeGroup(['sponsors.php','sponsor.php']) ?>"<?= hub_nav_current(['sponsors.php', 'sponsor.php']) ?> href="/sponsors.php"><i class="fa-solid fa-handshake me-1" aria-hidden="true"></i>Sponsors</a></li>
+                            <li class="nav-item"><a class="nav-link <?= activePage('sponsor_followups.php') ?>"<?= hub_nav_current(['sponsor_followups.php']) ?> href="/sponsor_followups.php"><i class="fa-solid fa-phone-volume me-1" aria-hidden="true"></i>Follow-ups</a></li>
                             <li class="nav-item"><a class="nav-link <?= activeGroup(['sponsorship_agreements.php','sponsorship_agreement.php']) ?>"<?= hub_nav_current(['sponsorship_agreements.php', 'sponsorship_agreement.php']) ?> href="/sponsorship_agreements.php"><i class="fa-solid fa-file-signature me-1" aria-hidden="true"></i>Agreements</a></li>
                             <li class="nav-item"><a class="nav-link <?= activeGroup(['sponsorship_bundles.php','sponsorship_bundle.php']) ?>"<?= hub_nav_current(['sponsorship_bundles.php', 'sponsorship_bundle.php']) ?> href="/sponsorship_bundles.php"><i class="fa-solid fa-boxes-stacked me-1" aria-hidden="true"></i>Bundles</a></li>
                             <li class="nav-item"><a class="nav-link <?= activeGroup(['sponsorship_packages.php','sponsorship_package.php', 'sponsorship_types.php', 'sponsorship_type.php']) ?>"<?= hub_nav_current(['sponsorship_packages.php', 'sponsorship_package.php']) ?> href="/sponsorship_packages.php"><i class="fa-solid fa-box-open me-1" aria-hidden="true"></i>Packages</a></li>
@@ -524,6 +526,24 @@ $documentTitle = $documentTitle !== '' ? $documentTitle . ' – ' . APP_NAME : A
                             <li class="nav-item"><a class="nav-link <?= activeGroup(['hidden_team_games.php', 'hidden_team_game.php']) ?>"<?= hub_nav_current(['hidden_team_games.php', 'hidden_team_game.php']) ?> href="/hidden_team_games.php"><i class="fa-solid fa-futbol me-1" aria-hidden="true"></i>Hidden Team</a></li>
                         </ul>
                     </section>
+
+                    <?php if ($isAdmin): ?>
+                    <section class="nav-section">
+                        <?php $shopActive = activeGroup(['shop_overview.php', 'shop_products.php', 'shop_product.php', 'shop_categories.php', 'shop_modifiers.php', 'shop_orders.php', 'shop_order.php', 'shop_settings.php']); ?>
+                        <button class="nav-section-toggle <?= $shopActive ?>" type="button" data-bs-toggle="collapse" data-bs-target="#hubShopNavigation" aria-expanded="<?= $shopActive === 'active' ? 'true' : 'false' ?>" aria-controls="hubShopNavigation">
+                            <span>Shop</span><i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
+                        </button>
+                        <ul class="navbar-nav nav-main nav-submenu collapse <?= $shopActive === 'active' ? 'show' : '' ?> mb-0" id="hubShopNavigation">
+                            <li class="nav-item"><a class="nav-link <?= activePage('shop_overview.php') ?>"<?= hub_nav_current(['shop_overview.php']) ?> href="/shop_overview.php"><i class="fa-solid fa-bag-shopping me-1" aria-hidden="true"></i>Overview</a></li>
+                            <li class="nav-item"><a class="nav-link <?= activeGroup(['shop_orders.php', 'shop_order.php']) ?>"<?= hub_nav_current(['shop_orders.php', 'shop_order.php']) ?> href="/shop_orders.php"><i class="fa-solid fa-receipt me-1" aria-hidden="true"></i>Orders</a></li>
+                            <li class="nav-item"><a class="nav-link <?= activeGroup(['shop_products.php', 'shop_product.php']) ?>"<?= hub_nav_current(['shop_products.php', 'shop_product.php']) ?> href="/shop_products.php"><i class="fa-solid fa-shirt me-1" aria-hidden="true"></i>Products</a></li>
+                            <li class="nav-item"><a class="nav-link <?= activePage('shop_categories.php') ?>"<?= hub_nav_current(['shop_categories.php']) ?> href="/shop_categories.php"><i class="fa-solid fa-layer-group me-1" aria-hidden="true"></i>Categories</a></li>
+                            <li class="nav-item"><a class="nav-link <?= activePage('shop_modifiers.php') ?>"<?= hub_nav_current(['shop_modifiers.php']) ?> href="/shop_modifiers.php"><i class="fa-solid fa-sliders me-1" aria-hidden="true"></i>Modifiers</a></li>
+                            <li class="nav-item"><a class="nav-link <?= activePage('shop_settings.php') ?>"<?= hub_nav_current(['shop_settings.php']) ?> href="/shop_settings.php"><i class="fa-solid fa-gear me-1" aria-hidden="true"></i>Shop settings</a></li>
+                            <li class="nav-item"><a class="nav-link" href="/shop/" target="_blank" rel="noopener"><i class="fa-solid fa-arrow-up-right-from-square me-1" aria-hidden="true"></i>View storefront</a></li>
+                        </ul>
+                    </section>
+                    <?php endif; ?>
 
                     <section class="nav-section">
                         <?php $ticketingActive = activeGroup(['season_ticket_orders.php', 'season_ticket_order.php', 'fixture_tickets.php', 'ticket_orders.php', 'ticket_packages.php', 'season_ticket_renewals.php', 'season_ticket_free_codes.php', 'season_ticket_types.php', 'season_ticket_type.php']); ?>
@@ -578,7 +598,7 @@ $documentTitle = $documentTitle !== '' ? $documentTitle . ' – ' . APP_NAME : A
                     </section>
 
                     <section class="nav-section">
-                        <?php $setupActive = activeGroup(['seasons.php', 'season.php', 'opponents.php', 'opponent.php', 'competitions.php', 'competition.php', 'venues.php', 'venue.php']); ?>
+                        <?php $setupActive = activeGroup(['seasons.php', 'season.php', 'opponents.php', 'opponent.php', 'competitions.php', 'competition.php', 'venues.php', 'venue.php', 'facilities.php']); ?>
                         <button class="nav-section-toggle <?= $setupActive ?>" type="button" data-bs-toggle="collapse" data-bs-target="#hubSetupNavigation" aria-expanded="<?= $setupActive === 'active' ? 'true' : 'false' ?>" aria-controls="hubSetupNavigation">
                             <span>Club setup</span><i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
                         </button>
@@ -587,6 +607,7 @@ $documentTitle = $documentTitle !== '' ? $documentTitle . ' – ' . APP_NAME : A
                             <li class="nav-item"><a class="nav-link <?= activeGroup(['opponents.php', 'opponent.php']) ?>" href="/opponents.php"><i class="fa-solid fa-people-arrows me-1" aria-hidden="true"></i>Opponents</a></li>
                             <li class="nav-item"><a class="nav-link <?= activeGroup(['competitions.php', 'competition.php']) ?>" href="/competitions.php"><i class="fa-solid fa-trophy me-1" aria-hidden="true"></i>Competitions</a></li>
                             <li class="nav-item"><a class="nav-link <?= activeGroup(['venues.php', 'venue.php']) ?>" href="/venues.php"><i class="fa-solid fa-map-location-dot me-1" aria-hidden="true"></i>Venues</a></li>
+                            <li class="nav-item"><a class="nav-link <?= activePage('facilities.php') ?>"<?= hub_nav_current(['facilities.php']) ?> href="/facilities.php"><i class="fa-solid fa-screwdriver-wrench me-1" aria-hidden="true"></i>Facilities</a></li>
                         </ul>
                     </section>
 

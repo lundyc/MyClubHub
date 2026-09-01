@@ -88,6 +88,7 @@ function ensureStripeSchema(PDO $pdo): void
         amount DECIMAL(10,2) NOT NULL,
         currency VARCHAR(10) NOT NULL DEFAULT 'gbp',
         url VARCHAR(500) NOT NULL,
+        slug VARCHAR(24) DEFAULT NULL,
         status VARCHAR(20) NOT NULL DEFAULT 'open',
         sent_to_email VARCHAR(190) DEFAULT NULL,
         sent_at DATETIME DEFAULT NULL,
@@ -98,6 +99,7 @@ function ensureStripeSchema(PDO $pdo): void
         PRIMARY KEY (id),
         UNIQUE KEY uq_stripe_payment_links_session (stripe_checkout_session_id),
         KEY idx_stripe_payment_links_agreement (agreement_id, status),
+        KEY idx_stripe_payment_links_slug (slug),
         CONSTRAINT fk_stripe_payment_links_agreement FOREIGN KEY (agreement_id) REFERENCES sponsorship_agreements (id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 
@@ -140,6 +142,20 @@ function ensureStripeSchema(PDO $pdo): void
     }
     if (!isset($linkIndexes['idx_stripe_payment_links_session'])) {
         $pdo->exec('ALTER TABLE stripe_payment_links ADD KEY idx_stripe_payment_links_session (stripe_checkout_session_id)');
+    }
+
+    // Short, on-brand redirect slug (myclubhub.co.uk/p/<slug>) that forwards to the
+    // long Stripe Checkout URL — the URL actually handed to a sponsor. A bundle's
+    // several rows share one slug, so this is a plain index, not unique.
+    $linkColumns = [];
+    foreach ($pdo->query('SHOW COLUMNS FROM stripe_payment_links') as $row) {
+        $linkColumns[(string) $row['Field']] = true;
+    }
+    if (!isset($linkColumns['slug'])) {
+        $pdo->exec("ALTER TABLE stripe_payment_links ADD COLUMN slug VARCHAR(24) DEFAULT NULL AFTER url");
+    }
+    if (!isset($linkIndexes['idx_stripe_payment_links_slug'])) {
+        $pdo->exec('ALTER TABLE stripe_payment_links ADD KEY idx_stripe_payment_links_slug (slug)');
     }
 
     $txnIndexes = [];
@@ -279,6 +295,59 @@ function stripe_agreement_display_name(array $agreement): string
 }
 
 /**
+ * Scheme + host for building public-facing links (the /p/<slug> redirect).
+ */
+function stripe_public_base_url(): string
+{
+    $https = (!empty($_SERVER['HTTPS']) && strtolower((string) $_SERVER['HTTPS']) !== 'off')
+        || strtolower((string) ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '')) === 'https';
+    $host = preg_replace('/[^A-Za-z0-9.\-:]/', '', (string) ($_SERVER['HTTP_HOST'] ?? ''));
+    if ($host === '') {
+        $host = 'myclubhub.co.uk';
+    }
+    return ($https ? 'https://' : 'http://') . $host;
+}
+
+/**
+ * A short [A-Za-z0-9] slug for stripe_payment_links.slug, checked for collisions.
+ */
+function stripe_generate_payment_link_slug(PDO $pdo): string
+{
+    $alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+    $len = strlen($alphabet);
+    $check = $pdo->prepare('SELECT 1 FROM stripe_payment_links WHERE slug = :slug LIMIT 1');
+
+    for ($attempt = 0; $attempt < 8; $attempt++) {
+        $bytes = random_bytes(11);
+        $slug = '';
+        for ($i = 0; $i < 11; $i++) {
+            $slug .= $alphabet[ord($bytes[$i]) % $len];
+        }
+        $check->execute([':slug' => $slug]);
+        if (!$check->fetchColumn()) {
+            return $slug;
+        }
+    }
+
+    return substr(bin2hex(random_bytes(8)), 0, 16);
+}
+
+/**
+ * The URL to actually hand a sponsor: the short /p/<slug> redirect when the row
+ * has a slug, otherwise the raw Stripe URL (older rows created before slugs).
+ *
+ * @param array<string, mixed> $link a stripe_payment_links row
+ */
+function stripe_payment_link_public_url(array $link): string
+{
+    $slug = trim((string) ($link['slug'] ?? ''));
+    if ($slug !== '') {
+        return stripe_public_base_url() . '/p/' . rawurlencode($slug);
+    }
+    return (string) ($link['url'] ?? '');
+}
+
+/**
  * Create a Stripe Checkout Session for an agreement's outstanding balance
  * and persist it in stripe_payment_links. The amount is always computed
  * server-side from the agreement record — never trust a client-submitted
@@ -356,6 +425,9 @@ function stripe_create_checkout_session_for_agreement(PDO $pdo, array $agreement
     ]);
 
     $linkId = (int) $pdo->lastInsertId();
+    $pdo->prepare('UPDATE stripe_payment_links SET slug = :slug WHERE id = :id')
+        ->execute([':slug' => stripe_generate_payment_link_slug($pdo), ':id' => $linkId]);
+
     $stmt = $pdo->prepare('SELECT * FROM stripe_payment_links WHERE id = :id');
     $stmt->execute([':id' => $linkId]);
     return $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
@@ -469,9 +541,15 @@ function stripe_create_checkout_session_for_bundle(PDO $pdo, array $agreements, 
         ]);
     }
 
+    // One slug shared by every row of this session — the sponsor gets one link.
+    $bundleSlug = stripe_generate_payment_link_slug($pdo);
+    $pdo->prepare('UPDATE stripe_payment_links SET slug = :slug WHERE stripe_checkout_session_id = :session_id')
+        ->execute([':slug' => $bundleSlug, ':session_id' => $sessionId]);
+
     return [
         'session_id' => $sessionId,
         'session_url' => $url,
+        'short_url' => stripe_public_base_url() . '/p/' . $bundleSlug,
         'total_amount' => round($totalAmount, 2),
         'agreement_ids' => $agreementIds,
     ];
@@ -563,7 +641,7 @@ function stripe_build_payment_message(string $sponsorName, array $agreement, arr
     }
     $out[] = 'Amount due: ' . $amount;
     $out[] = '';
-    $out[] = 'Pay securely here: ' . (string) $link['url'];
+    $out[] = 'Pay securely here: ' . stripe_payment_link_public_url($link);
     $out[] = '';
     $out[] = 'This link expires on ' . $expires . '.';
     $out[] = '';
@@ -585,7 +663,7 @@ function stripe_build_payment_email_html(string $sponsorName, array $agreement, 
 {
     $amount = gbp((float) $link['amount']);
     $expires = date('d/m/Y H:i', strtotime((string) $link['expires_at']));
-    $url = (string) $link['url'];
+    $url = stripe_payment_link_public_url($link);
     $greetingName = $sponsorName !== '' ? h($sponsorName) : 'there';
 
     $rows = '';
@@ -871,6 +949,18 @@ function stripe_handle_webhook_event(PDO $pdo, array $event): void
         return;
     }
 
+    if ($kind === 'shop' && in_array($type, ['checkout.session.completed', 'checkout.session.expired'], true)) {
+        // Club Shop (/shop/*, lib/shop.php) — pre-creates a pending shop_orders
+        // row at checkout, so both completed and expired are handled here.
+        require_once __DIR__ . '/shop.php';
+        if ($type === 'checkout.session.completed') {
+            shop_stripe_handle_checkout_completed($pdo, $object);
+        } else {
+            shop_stripe_handle_checkout_expired($pdo, $object);
+        }
+        return;
+    }
+
     if ($type === 'checkout.session.completed') {
         stripe_handle_checkout_session_completed($pdo, $object);
     } elseif ($type === 'checkout.session.expired') {
@@ -1152,7 +1242,7 @@ function stripe_dashboard_summary(PDO $pdo): array
  * timestamp (Stripe writes it via NOW()), so recorded_at just mirrors it there.
  *
  * @param array<string, mixed> $agreement
- * @return list<array{paid_at: string, recorded_at: string, amount: float, method: ?string, note: ?string}>
+ * @return list<array{id: int, paid_at: string, recorded_at: string, amount: float, method: ?string, note: ?string}>
  */
 function getAgreementPayments(PDO $pdo, array $agreement): array
 {
@@ -1160,18 +1250,18 @@ function getAgreementPayments(PDO $pdo, array $agreement): array
     $legacyId = (int) ($agreement['legacy_id'] ?? 0);
 
     if ($legacySource === 'match' && $legacyId > 0) {
-        $stmt = $pdo->prepare('SELECT paid_at, paid_at AS recorded_at, amount, method, note FROM match_sponsorship_payments WHERE match_sponsorship_id = :id ORDER BY paid_at DESC, id DESC');
+        $stmt = $pdo->prepare('SELECT id, paid_at, paid_at AS recorded_at, amount, method, note FROM match_sponsorship_payments WHERE match_sponsorship_id = :id ORDER BY paid_at DESC, id DESC');
         $stmt->execute([':id' => $legacyId]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
     if ($legacySource === 'player' && $legacyId > 0) {
-        $stmt = $pdo->prepare('SELECT paid_at, paid_at AS recorded_at, amount, method, note FROM sponsorship_payments WHERE sponsorship_id = :id ORDER BY paid_at DESC, id DESC');
+        $stmt = $pdo->prepare('SELECT id, paid_at, paid_at AS recorded_at, amount, method, note FROM sponsorship_payments WHERE sponsorship_id = :id ORDER BY paid_at DESC, id DESC');
         $stmt->execute([':id' => $legacyId]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    $stmt = $pdo->prepare('SELECT paid_at, created_at AS recorded_at, amount, method, note FROM sponsorship_agreement_payments WHERE agreement_id = :id ORDER BY paid_at DESC, id DESC');
+    $stmt = $pdo->prepare('SELECT id, paid_at, created_at AS recorded_at, amount, method, note FROM sponsorship_agreement_payments WHERE agreement_id = :id ORDER BY paid_at DESC, id DESC');
     $stmt->execute([':id' => (int) $agreement['id']]);
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }

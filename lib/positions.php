@@ -31,6 +31,9 @@ const HUB_CAPABILITIES = [
  * @var array<string, list<string>>
  */
 const HUB_PAGE_CAPABILITIES = [
+    // Cross-club overview
+    'club_reminders.php' => ['finance', 'football_ops', 'tickets_ops', 'secretary_ops'],
+
     // Finance / Stripe (already gated)
     'stripe_dashboard.php' => ['finance'],
     'stripe_refund.php' => ['finance'],
@@ -49,6 +52,7 @@ const HUB_PAGE_CAPABILITIES = [
     'competitions.php' => ['football_ops'],
     'feedback.php' => ['football_ops'],
     'feedback_item.php' => ['football_ops'],
+    'facilities.php' => ['football_ops'],
     'fixture_starting_11.php' => ['football_ops'],
     'match.php' => ['football_ops'],
     'match_next_match.php' => ['football_ops'],
@@ -87,6 +91,7 @@ const HUB_PAGE_CAPABILITIES = [
     'payment_edit.php' => ['finance'],
     'playersponsors_orders.php' => ['finance'],
     'sponsor.php' => ['finance'],
+    'sponsor_followups.php' => ['finance'],
     'sponsors.php' => ['finance'],
     'sponsorship_agreement.php' => ['finance'],
     'sponsorship_agreement_bulk.php' => ['finance'],

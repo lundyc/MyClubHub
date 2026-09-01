@@ -14,6 +14,7 @@ $pageHero = [
 require_once __DIR__ . '/header.php';
 require_once __DIR__ . '/lib/committee_meetings.php';
 require_once __DIR__ . '/lib/secretary_tasks.php';
+require_once __DIR__ . '/lib/committee_actions.php';
 require_once __DIR__ . '/lib/audit.php';
 
 $errors = [];
@@ -53,7 +54,27 @@ $formNextMeetingDate = (string) ($meeting['next_meeting_date'] ?? '');
 $formStatus = (string) ($meeting['status'] ?? 'draft');
 $formAgmConstitutionVersion = (string) ($meeting['agm_constitution_version'] ?? '');
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string) ($_POST['post_action'] ?? 'save_meeting') === 'create_actions') {
+    if (!csrf_check()) {
+        $errors[] = 'Your session expired. Refresh the page and try again.';
+    }
+
+    if ($action !== 'edit') {
+        $errors[] = 'Save the meeting before creating actions.';
+    }
+
+    if (!$errors) {
+        try {
+            $userId = (int) ($_SESSION['hub_user_id'] ?? 0) ?: null;
+            $created = committee_meeting_create_actions_from_minutes($pdo, $id, $userId);
+            auditLog($pdo, 'committee_meeting_actions_created', 'Created ' . $created . ' action(s) from committee meeting #' . $id);
+            header('Location: committee_meeting_edit.php?id=' . (int) $id . '&actions_created=' . $created);
+            exit;
+        } catch (Throwable $e) {
+            $errors[] = $e->getMessage();
+        }
+    }
+} elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!csrf_check()) {
         $errors[] = 'Your session expired. Refresh the page and try again.';
     }
@@ -127,9 +148,17 @@ $agendaTemplate = [
             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>
     <?php endif; ?>
+    <?php if (isset($_GET['actions_created'])): ?>
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            <i class="fa-solid fa-circle-check" aria-hidden="true"></i>
+            <span><?= (int) $_GET['actions_created'] ?> action<?= (int) $_GET['actions_created'] === 1 ? '' : 's' ?> created from the minutes.</span>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    <?php endif; ?>
 
     <form method="post" action="committee_meeting_edit.php<?= $action === 'edit' ? '?id=' . (int) $id : '' ?>">
         <?= csrf_field() ?>
+        <input type="hidden" name="post_action" value="save_meeting">
 
         <div class="hub-section">
             <div class="row g-3">
@@ -235,10 +264,20 @@ $agendaTemplate = [
                     <h2 id="cmActionsTitle">Actions from this meeting</h2>
                     <p>Every committee action needs an owner and a due date — "committee to look at this" is not an action.</p>
                 </div>
-                <a href="secretary_task_edit.php?<?= http_build_query(['category' => 'committee', 'meeting_id' => $id]) ?>" class="btn btn-brand venues-directory__add">
-                    <i class="fa-solid fa-plus" aria-hidden="true"></i>
-                    <span>Add action</span>
-                </a>
+                <div class="d-flex gap-2 flex-wrap">
+                    <form method="post" action="committee_meeting_edit.php?id=<?= (int) $id ?>">
+                        <?= csrf_field() ?>
+                        <input type="hidden" name="post_action" value="create_actions">
+                        <button type="submit" class="btn btn-outline-primary venues-directory__add">
+                            <i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i>
+                            <span>Create from minutes</span>
+                        </button>
+                    </form>
+                    <a href="secretary_task_edit.php?<?= http_build_query(['category' => 'committee', 'meeting_id' => $id]) ?>" class="btn btn-brand venues-directory__add">
+                        <i class="fa-solid fa-plus" aria-hidden="true"></i>
+                        <span>Add action</span>
+                    </a>
+                </div>
             </div>
 
             <?php if ($meetingActions === []): ?>

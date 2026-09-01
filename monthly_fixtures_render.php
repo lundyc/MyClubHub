@@ -82,6 +82,20 @@ function monthlyGraphicRoundedRect(GdImage $image, int $x1, int $y1, int $x2, in
     imagefilledellipse($image, $x2 - $radius, $y2 - $radius, $radius * 2, $radius * 2, $colour);
 }
 
+function monthlyGraphicDrawCupIcon(GdImage $image, int $x, int $y, int $size, int $backgroundColour, int $iconColour): void
+{
+    monthlyGraphicRoundedRect($image, $x, $y, $x + $size, $y + $size, 4, $backgroundColour);
+    $cupLeft = $x + (int)round($size * .32);
+    $cupTop = $y + (int)round($size * .24);
+    $cupRight = $x + (int)round($size * .68);
+    $cupBottom = $y + (int)round($size * .52);
+    imagefilledrectangle($image, $cupLeft, $cupTop, $cupRight, $cupBottom, $iconColour);
+    imagefilledellipse($image, $cupLeft, $cupTop + (int)round($size * .15), (int)round($size * .24), (int)round($size * .22), $iconColour);
+    imagefilledellipse($image, $cupRight, $cupTop + (int)round($size * .15), (int)round($size * .24), (int)round($size * .22), $iconColour);
+    imagefilledrectangle($image, $x + (int)round($size * .46), $cupBottom, $x + (int)round($size * .54), $y + (int)round($size * .70), $iconColour);
+    imagefilledrectangle($image, $x + (int)round($size * .35), $y + (int)round($size * .70), $x + (int)round($size * .65), $y + (int)round($size * .77), $iconColour);
+}
+
 function monthlyGraphicTextWidth(string $font, float $size, string $text): float
 {
     $box = imagettfbbox($size, 0, $font, $text);
@@ -255,6 +269,9 @@ if ($layout === 'calendar') {
             if (count($dayFixtures) > 1) {
                 monthlyGraphicText($image, $fontBold, 9, $x + 8, $y + $cellHeight - 12, $textColour, '+' . (count($dayFixtures) - 1));
             }
+            if (monthlyFixturesIsCupFixture($fixture)) {
+                monthlyGraphicDrawCupIcon($image, $x + $cellWidth - 33, $y + $cellHeight - 33, 24, $isHome ? $maroon : $gold, $isHome ? $gold : $ink);
+            }
         }
     }
 } else {
@@ -316,6 +333,9 @@ if ($layout === 'calendar') {
             $timestamp = strtotime((string)$fixture['match_date']);
             $dateLabel = $timestamp ? strtoupper(date('M j', $timestamp)) : 'DATE TBC';
             monthlyGraphicCenteredText($image, $fontBold, $rows <= 2 ? 15 : 12, $x + (int)floor($cardWidth / 2), $y + $cardHeight - 24, $cardTextColour, $dateLabel);
+            if (monthlyFixturesIsCupFixture($fixture)) {
+                monthlyGraphicDrawCupIcon($image, $x + $cardWidth - 44, $y + $cardHeight - 44, 32, $labelColour, $labelTextColour);
+            }
         }
         if (count($fixtures) > count($visibleFixtures)) {
             monthlyGraphicCenteredText($image, $fontBold, 13, 540, 1225, $cream, '+' . (count($fixtures) - count($visibleFixtures)) . ' MORE FIXTURES');

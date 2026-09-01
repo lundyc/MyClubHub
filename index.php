@@ -15,6 +15,11 @@ require_once __DIR__ . '/lib/season_passes.php';
 require_once __DIR__ . '/lib/sponsorship_catalog.php';
 require_once __DIR__ . '/lib/announcements.php';
 require_once __DIR__ . '/lib/publishing_history.php';
+require_once __DIR__ . '/lib/secretary_tasks.php';
+require_once __DIR__ . '/lib/facility_maintenance.php';
+require_once __DIR__ . '/lib/sponsor_followups.php';
+require_once __DIR__ . '/lib/pos.php';
+require_once __DIR__ . '/lib/pos_reconciliation.php';
 
 function hub_index_load_json_array(string $path): array
 {
@@ -105,7 +110,23 @@ $upcomingFixtures = [];
 $recentResults = [];
 $nextBirthdays = [];
 $fixtureTotals = ['upcoming' => 0, 'played' => 0];
-$attentionTotals = ['players_without_sponsors' => 0, 'unpaid_sponsorships' => 0, 'fixtures_missing_details' => 0, 'open_orders' => 0];
+$attentionTotals = [
+    'players_without_sponsors' => 0,
+    'unpaid_sponsorships' => 0,
+    'fixtures_missing_details' => 0,
+    'open_orders' => 0,
+    'secretary_overdue' => 0,
+    'facilities_overdue' => 0,
+    'sponsor_followups_overdue' => 0,
+    'cashup_variances' => 0,
+];
+$operationsTotals = [
+    'secretary_due' => 0,
+    'facilities_open' => 0,
+    'sponsor_followups_open' => 0,
+    'sponsor_pipeline_value' => 0.0,
+    'cashup_variance_total' => 0.0,
+];
 $openOrderSeasonId = 0;
 $leagueSnapshot = null;
 $seasonId = (int) ($seasonContext['season_id'] ?? 0);
@@ -129,7 +150,7 @@ try {
         $playerTotals['active'] = (int) $pdo->query("SELECT COUNT(*) FROM players WHERE status IN ('current', 'trialist') AND active = 1")->fetchColumn();
         $playerTotals['former'] = (int) $pdo->query("SELECT COUNT(*) FROM players WHERE status NOT IN ('current', 'trialist') OR active = 0")->fetchColumn();
         $playerTotals['total'] = $playerTotals['active'] + $playerTotals['former'];
-        $nextBirthdays = players_next_birthdays($pdo, 5);
+        $nextBirthdays = players_all_birthdays($pdo);
 
         $fixtureCountStmt = $pdo->prepare("
             SELECT
@@ -219,6 +240,31 @@ try {
             LIMIT 1
         ");
         $openOrderSeasonId = (int) ($openOrderSeasonStmt->fetchColumn() ?: 0);
+
+        $upcomingSecretaryTasks = secretary_task_upcoming($pdo, 14);
+        $operationsTotals['secretary_due'] = count($upcomingSecretaryTasks);
+        $attentionTotals['secretary_overdue'] = count(array_filter($upcomingSecretaryTasks, static fn(array $task): bool => !empty($task['due_at']) && (string) $task['due_at'] < date('Y-m-d')));
+
+        $facilityJobs = facility_maintenance_list($pdo, 'open');
+        $facilitySummary = facility_maintenance_summary($facilityJobs);
+        $operationsTotals['facilities_open'] = (int) $facilitySummary['open'];
+        $attentionTotals['facilities_overdue'] = (int) $facilitySummary['overdue'];
+
+        $sponsorFollowups = sponsor_followup_list($pdo, 'open');
+        $sponsorFollowupSummary = sponsor_followup_summary($sponsorFollowups);
+        $operationsTotals['sponsor_followups_open'] = (int) $sponsorFollowupSummary['open'];
+        $operationsTotals['sponsor_pipeline_value'] = (float) $sponsorFollowupSummary['pipeline_value'];
+        $attentionTotals['sponsor_followups_overdue'] = (int) $sponsorFollowupSummary['overdue'];
+
+        pos_ensure_schema($pdo);
+        $cashups = pos_reconciliation_recent($pdo, date('Y-m-d'), 50);
+        foreach ($cashups as $cashup) {
+            $variance = (float) ($cashup['variance_amount'] ?? 0);
+            if (abs($variance) >= 0.005) {
+                $attentionTotals['cashup_variances']++;
+                $operationsTotals['cashup_variance_total'] += abs($variance);
+            }
+        }
     }
 } catch (Throwable $e) {
     // Keep dashboard resilient if one of the legacy tables is unavailable.
@@ -370,6 +416,26 @@ if ($leagueSnapshot !== null) {
                     <span><strong><?= (int) $attentionTotals['open_orders'] ?> open orders</strong><small>Season tickets, match tickets and other orders awaiting payment</small></span>
                     <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
                 </a>
+                <a href="secretary_tasks.php" class="dashboard-attention__item">
+                    <span class="dashboard-attention__icon"><i class="fa-solid fa-list-check" aria-hidden="true"></i></span>
+                    <span><strong><?= (int) $attentionTotals['secretary_overdue'] ?> overdue secretary tasks</strong><small><?= (int) $operationsTotals['secretary_due'] ?> due within 14 days</small></span>
+                    <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+                </a>
+                <a href="facilities.php" class="dashboard-attention__item">
+                    <span class="dashboard-attention__icon"><i class="fa-solid fa-screwdriver-wrench" aria-hidden="true"></i></span>
+                    <span><strong><?= (int) $attentionTotals['facilities_overdue'] ?> overdue facilities jobs</strong><small><?= (int) $operationsTotals['facilities_open'] ?> open ground or safety jobs</small></span>
+                    <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+                </a>
+                <a href="sponsor_followups.php" class="dashboard-attention__item">
+                    <span class="dashboard-attention__icon"><i class="fa-solid fa-phone-volume" aria-hidden="true"></i></span>
+                    <span><strong><?= (int) $attentionTotals['sponsor_followups_overdue'] ?> overdue sponsor follow-ups</strong><small><?= gbp($operationsTotals['sponsor_pipeline_value']) ?> open pipeline value</small></span>
+                    <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+                </a>
+                <a href="pos/reports.php?date=<?= h(date('Y-m-d')) ?>" class="dashboard-attention__item">
+                    <span class="dashboard-attention__icon"><i class="fa-solid fa-cash-register" aria-hidden="true"></i></span>
+                    <span><strong><?= (int) $attentionTotals['cashup_variances'] ?> cash-up variances today</strong><small><?= gbp($operationsTotals['cashup_variance_total']) ?> total variance to review</small></span>
+                    <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+                </a>
             </div>
         </aside>
     </section>
@@ -390,6 +456,20 @@ if ($leagueSnapshot !== null) {
             ['label' => 'Announcements', 'value' => (int) $announcementsPublished, 'meta' => 'Published to members', 'icon' => 'fa-bullhorn', 'tone' => 'info', 'href' => 'announcements.php'],
             ['label' => 'Social posts', 'value' => (int) $publishingCounts['published'], 'meta' => (int) $publishingCounts['failed'] > 0 ? ((int) $publishingCounts['failed'] . ' failed — needs attention') : ((int) $publishingCounts['draft'] . ' drafts waiting'), 'icon' => 'fa-share-nodes', 'tone' => (int) $publishingCounts['failed'] > 0 ? 'danger' : 'neutral', 'href' => 'generate_and_post.php'],
         ], 'Snapshot'); ?>
+    </section>
+
+    <section class="hub-index-section" aria-labelledby="operationsSnapshotTitle">
+        <div class="hub-index-section__header">
+            <p class="page-kicker mb-1">Operations</p>
+            <h2 id="operationsSnapshotTitle" class="h4 mb-0">Open work across the club</h2>
+        </div>
+
+        <?php hub_render_metric_grid([
+            ['label' => 'Secretary deadlines', 'value' => (int) $operationsTotals['secretary_due'], 'meta' => (int) $attentionTotals['secretary_overdue'] . ' overdue', 'icon' => 'fa-list-check', 'tone' => (int) $attentionTotals['secretary_overdue'] > 0 ? 'danger' : ((int) $operationsTotals['secretary_due'] > 0 ? 'warning' : 'success'), 'href' => 'secretary_tasks.php'],
+            ['label' => 'Facilities jobs', 'value' => (int) $operationsTotals['facilities_open'], 'meta' => (int) $attentionTotals['facilities_overdue'] . ' overdue', 'icon' => 'fa-screwdriver-wrench', 'tone' => (int) $attentionTotals['facilities_overdue'] > 0 ? 'danger' : ((int) $operationsTotals['facilities_open'] > 0 ? 'warning' : 'success'), 'href' => 'facilities.php'],
+            ['label' => 'Sponsor follow-ups', 'value' => (int) $operationsTotals['sponsor_followups_open'], 'meta' => gbp($operationsTotals['sponsor_pipeline_value']) . ' pipeline, ' . (int) $attentionTotals['sponsor_followups_overdue'] . ' overdue', 'icon' => 'fa-phone-volume', 'tone' => (int) $attentionTotals['sponsor_followups_overdue'] > 0 ? 'danger' : ((int) $operationsTotals['sponsor_followups_open'] > 0 ? 'info' : 'success'), 'href' => 'sponsor_followups.php'],
+            ['label' => 'Cash-up variances', 'value' => (int) $attentionTotals['cashup_variances'], 'meta' => gbp($operationsTotals['cashup_variance_total']) . ' variance today', 'icon' => 'fa-cash-register', 'tone' => (int) $attentionTotals['cashup_variances'] > 0 ? 'danger' : 'success', 'href' => 'pos/reports.php?date=' . date('Y-m-d')],
+        ], 'Operations snapshot'); ?>
     </section>
 
     <section class="hub-section-commandbar" aria-labelledby="quickActionsTitle">
@@ -550,22 +630,22 @@ if ($leagueSnapshot !== null) {
                     <div class="d-flex justify-content-between align-items-center gap-2 mb-3">
                         <div>
                             <p class="page-kicker mb-1">Squad birthdays</p>
-                            <h3 class="h5 mb-0">Next birthdays</h3>
+                            <h3 class="h5 mb-0">All birthdays</h3>
                         </div>
-                        <a href="/players.php" class="btn btn-outline-secondary btn-sm">Open players</a>
+                        <a href="/club_people.php" class="btn btn-outline-secondary btn-sm">Open people</a>
                     </div>
                     <?php if ($nextBirthdays === []): ?>
-                        <div class="alert alert-light border mb-0 hub-empty-state">No player dates of birth have been recorded yet.</div>
+                        <div class="alert alert-light border mb-0 hub-empty-state">No dates of birth have been recorded yet.</div>
                     <?php else: ?>
                         <div class="dashboard-birthdays__list">
                             <?php foreach ($nextBirthdays as $birthday): ?>
-                                <a class="dashboard-birthdays__item" href="/player_view.php?id=<?= (int) $birthday['id'] ?>">
+                                <a class="dashboard-birthdays__item" href="<?= h((string) ($birthday['href'] ?? '/players.php')) ?>">
                                     <span class="dashboard-birthdays__days<?= (int) $birthday['days_until'] === 0 ? ' dashboard-birthdays__days--today' : '' ?>">
                                         <strong><?= (int) $birthday['days_until'] === 0 ? '🎉' : (int) $birthday['days_until'] ?></strong>
                                         <small><?= (int) $birthday['days_until'] === 0 ? 'Today' : ((int) $birthday['days_until'] === 1 ? 'day' : 'days') ?></small>
                                     </span>
                                     <span class="dashboard-birthdays__info">
-                                        <span class="dashboard-birthdays__name"><?= h($birthday['name']) ?></span>
+                                        <span class="dashboard-birthdays__name"><?= h($birthday['name']) ?> - <?= h((string) ($birthday['role_label'] ?? 'person')) ?></span>
                                         <small>Turns <?= (int) $birthday['age_turning'] ?> &middot; <?= h(date('d M', strtotime($birthday['next_birthday']))) ?></small>
                                     </span>
                                 </a>

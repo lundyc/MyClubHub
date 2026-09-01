@@ -121,6 +121,7 @@ try {
                 ->execute([':id' => $id]);
             if ($sponsorshipId > 0) {
                 recomputePaidFlag($pdo, $sponsorshipId);
+                syncPlayerSponsorshipAgreement($pdo, $sponsorshipId);
             }
             auditLog($pdo, 'player_sponsorship_payment_removed', "Deleted payment #{$id} from sponsorship slot #{$sponsorshipId}");
 

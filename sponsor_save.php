@@ -220,7 +220,9 @@ try {
                               ':note'   => $note ?: null,
                               ':season_id' => $season_id,
                     ]);
+                    $newPaymentId = (int)$pdo->lastInsertId();
                     recomputePaidFlag($pdo, $sponsorship_id);
+                    syncPlayerSponsorshipAgreement($pdo, $sponsorship_id);
 
                     // Reload sponsor totals
                     $totals = $pdo->prepare("
@@ -242,6 +244,7 @@ try {
                     echo json_encode([
                               'success' => true,
                               'payment' => [
+                                        'id'      => $newPaymentId,
                                         'paid_at' => date("d/m/Y H:i"),
                                         'player'  => $paidPlayerName,
                                         'slot'    => ucfirst($sponsorship['slot']),

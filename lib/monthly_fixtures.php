@@ -141,10 +141,12 @@ function monthlyFixturesStoreBackground(array $file, int $seasonId): array
     if (!is_dir($directory) && !@mkdir($directory, 0775, true) && !is_dir($directory)) {
         return ['path' => '', 'error' => 'The background directory could not be prepared.'];
     }
+    @chmod($directory, 0775);
     $destination = $directory . '/monthly_fixtures_bg_season_' . $seasonId . '.' . $extension;
     if (!move_uploaded_file($temporaryPath, $destination)) {
         return ['path' => '', 'error' => 'The background image could not be stored.'];
     }
+    @chmod($destination, 0664);
     foreach (['png', 'jpg', 'jpeg', 'webp'] as $oldExtension) {
         $oldPath = $directory . '/monthly_fixtures_bg_season_' . $seasonId . '.' . $oldExtension;
         if ($oldPath !== $destination && is_file($oldPath)) {
@@ -230,6 +232,16 @@ function monthlyFixturesScoreLabel(array $fixture): string
         return '';
     }
     return (int)$fixture['full_time_home_score'] . '-' . (int)$fixture['full_time_away_score'];
+}
+
+function monthlyFixturesIsCupFixture(array $fixture): bool
+{
+    if (strtolower(trim((string)($fixture['competition_type'] ?? ''))) === 'cup') {
+        return true;
+    }
+
+    $competition = strtolower(trim((string)($fixture['competition'] ?? '')));
+    return $competition !== '' && preg_match('/\bcup\b/', $competition) === 1;
 }
 
 /** @return 'W'|'L'|'D'|null */

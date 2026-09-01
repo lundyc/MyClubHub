@@ -13,6 +13,68 @@ ensureSponsorshipCatalogSchema($pdo);
 $seasonId = getSelectedSeasonId($pdo);
 $id = (int)($_GET['id'] ?? 0);
 
+// AJAX: delete a recorded sponsorship payment for this player. Must run before
+// any HTML output (header.php) so the response is clean JSON.
+if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && isset($_POST['ajax_delete_payment'])) {
+    require_once __DIR__ . '/auth.php';
+    header('Content-Type: application/json');
+
+    if (!hub_auth_is_authenticated()) {
+        http_response_code(401);
+        echo json_encode(['success' => false, 'error' => 'Please log in again.']);
+        exit;
+    }
+    if (!hub_auth_has_capability('finance')) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'error' => 'You do not have permission to delete payments.']);
+        exit;
+    }
+    if (!csrf_check()) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Invalid security token. Reload the page and try again.']);
+        exit;
+    }
+
+    $paymentId = (int) ($_POST['payment_id'] ?? 0);
+    if ($id <= 0 || $paymentId <= 0) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Invalid payment reference.']);
+        exit;
+    }
+
+    // Only a payment that belongs to one of THIS player's sponsorships may be deleted here.
+    $lookup = $pdo->prepare("
+        SELECT p.id, p.amount, p.sponsorship_id
+        FROM sponsorship_payments p
+        JOIN sponsorships s ON s.id = p.sponsorship_id
+        WHERE p.id = :pid AND s.player_id = :player_id
+        LIMIT 1
+    ");
+    $lookup->execute([':pid' => $paymentId, ':player_id' => $id]);
+    $payment = $lookup->fetch(PDO::FETCH_ASSOC);
+
+    if (!$payment) {
+        http_response_code(404);
+        echo json_encode(['success' => false, 'error' => 'Payment not found for this player.']);
+        exit;
+    }
+
+    $sponsorshipId = (int) $payment['sponsorship_id'];
+
+    $pdo->prepare('DELETE FROM sponsorship_payments WHERE id = :pid')->execute([':pid' => $paymentId]);
+    recomputePaidFlag($pdo, $sponsorshipId);
+    syncPlayerSponsorshipAgreement($pdo, $sponsorshipId);
+    auditLog(
+        $pdo,
+        'player_sponsorship_payment_removed',
+        'Deleted payment #' . $paymentId . ' (£' . number_format((float) $payment['amount'], 2)
+            . ') from sponsorship #' . $sponsorshipId . ' (player #' . $id . ')'
+    );
+
+    echo json_encode(['success' => true]);
+    exit;
+}
+
 if ($id <= 0) {
     $pageHero = [
         'eyebrow' => 'Player management',
@@ -61,7 +123,11 @@ $pageHero = [
 ];
 
 require_once __DIR__ . '/header.php';
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
 $playerViewJsVersion = (string) filemtime(__DIR__ . '/assets/js/player_view.js');
+echo '<script>window.PLAYER_VIEW_CSRF = ' . json_encode((string) $_SESSION['csrf_token'], JSON_UNESCAPED_SLASHES) . ';</script>';
 echo '<script src="/assets/js/player_view.js?v=' . h($playerViewJsVersion) . '" defer></script>';
 
 $stmt = $pdo->prepare("

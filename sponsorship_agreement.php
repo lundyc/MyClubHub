@@ -24,7 +24,14 @@ $currentSeason=$pdo->query('SELECT * FROM seasons WHERE is_current=1 ORDER BY id
 // losing the sponsor's/bundle's choice, and so a direct link (e.g. from the bundle
 // page) can preselect a package.
 $data=array_merge(['sponsor_id'=>$bundle?(int)$bundle['sponsor_id']:(int)($_GET['sponsor_id']??0),'package_id'=>(string)($_GET['package_id']??''),'season_id'=>(string)($_GET['season_id']??(($bundle['season_id']??null)?:($currentSeason['id']??''))),'team_id'=>'','fixture_id'=>'','player_id'=>'','start_date'=>$currentSeason['start_date']??date('Y-m-d'),'end_date'=>$currentSeason['end_date']??'','agreed_amount'=>'0.00','is_complimentary'=>0,'status'=>'active','display_order'=>0,'logo_variant'=>'package_default','notes'=>''],$agreement?:[]);
-$sponsors=$pdo->query('SELECT id,name FROM sponsors WHERE is_active=1 ORDER BY name')->fetchAll(PDO::FETCH_ASSOC);$packages=getSponsorshipPackages($pdo,true);$seasons=$pdo->query('SELECT id,name,start_date,end_date FROM seasons ORDER BY start_date DESC')->fetchAll(PDO::FETCH_ASSOC);$teams=$pdo->query('SELECT id,name FROM teams ORDER BY name')->fetchAll(PDO::FETCH_ASSOC);$players=$pdo->query('SELECT id,name FROM players WHERE active=1 ORDER BY name')->fetchAll(PDO::FETCH_ASSOC);$fixtures=$pdo->query("SELECT id,season_id,match_date,opponent FROM match_fixtures ORDER BY match_date DESC,id DESC")->fetchAll(PDO::FETCH_ASSOC);
+$sponsors=$pdo->query('SELECT id,name FROM sponsors WHERE is_active=1 ORDER BY name')->fetchAll(PDO::FETCH_ASSOC);$packages=getSponsorshipPackages($pdo,true);$seasons=$pdo->query('SELECT id,name,start_date,end_date FROM seasons ORDER BY start_date DESC')->fetchAll(PDO::FETCH_ASSOC);$teams=$pdo->query('SELECT id,name FROM teams ORDER BY name')->fetchAll(PDO::FETCH_ASSOC);$players=$pdo->query('SELECT id,name,active,status FROM players WHERE active=1 ORDER BY name')->fetchAll(PDO::FETCH_ASSOC);$fixtures=$pdo->query("SELECT id,season_id,match_date,opponent FROM match_fixtures ORDER BY match_date DESC,id DESC")->fetchAll(PDO::FETCH_ASSOC);
+$selectedPlayerId=(int)($data['player_id']??0);
+if($selectedPlayerId>0&&!in_array($selectedPlayerId,array_map(static fn(array $p):int=>(int)$p['id'],$players),true)){
+ $selectedPlayerStmt=$pdo->prepare('SELECT id,name,active,status FROM players WHERE id=:id LIMIT 1');
+ $selectedPlayerStmt->execute([':id'=>$selectedPlayerId]);
+ $selectedPlayer=$selectedPlayerStmt->fetch(PDO::FETCH_ASSOC);
+ if($selectedPlayer)$players[]=$selectedPlayer;
+}
 $errors=[];
 $batchResults=null;
 if($_SERVER['REQUEST_METHOD']==='POST'){
@@ -36,6 +43,40 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
  } elseif($formAction==='detach_bundle'){
   if(!$id)$errors[]='Agreement not found.';
   if(!$errors){detachSponsorshipAgreementFromBundle($pdo,$id);auditLog($pdo,'sponsorship_agreement_detached_from_bundle',"Detached agreement #{$id} from bundle #".(int)($agreement['bundle_id']??0));header('Location: sponsorship_agreement.php?id='.$id.'&detached=1');exit;}
+ } elseif($formAction==='delete_payment'){
+  // Remove one recorded payment. Agreements synced from a legacy player/match
+  // sponsorship keep their payment history in that legacy table (see
+  // getAgreementPayments()), so delete from whichever table this agreement reads.
+  $paymentId=(int)($_POST['payment_id']??0);
+  if(!$id||!$agreement)$errors[]='Agreement not found.';
+  if(!$errors&&$paymentId<=0)$errors[]='Invalid payment reference.';
+  if(!$errors){
+   try{
+    $legacySource=(string)($agreement['legacy_source']??'');
+    $legacyId=(int)($agreement['legacy_id']??0);
+    if($legacySource==='match'&&$legacyId>0){
+     $del=$pdo->prepare('DELETE FROM match_sponsorship_payments WHERE id=:pid AND match_sponsorship_id=:legacy');
+     $del->execute([':pid'=>$paymentId,':legacy'=>$legacyId]);
+     $removed=$del->rowCount();
+     if($removed>0)recomputeMatchPaidFlag($pdo,$legacyId);
+    } elseif($legacySource==='player'&&$legacyId>0){
+     $del=$pdo->prepare('DELETE FROM sponsorship_payments WHERE id=:pid AND sponsorship_id=:legacy');
+     $del->execute([':pid'=>$paymentId,':legacy'=>$legacyId]);
+     $removed=$del->rowCount();
+     if($removed>0){recomputePaidFlag($pdo,$legacyId);syncPlayerSponsorshipAgreement($pdo,$legacyId);}
+    } else {
+     $del=$pdo->prepare('DELETE FROM sponsorship_agreement_payments WHERE id=:pid AND agreement_id=:agreement');
+     $del->execute([':pid'=>$paymentId,':agreement'=>$id]);
+     $removed=$del->rowCount();
+    }
+    if(!empty($removed)){
+     auditLog($pdo,'sponsorship_agreement_payment_removed',"Removed payment #{$paymentId} from agreement #{$id} (".(string)($agreement['sponsor_name']??'').')');
+     header('Location: sponsorship_agreement.php?id='.$id.'&payment_deleted=1');
+     exit;
+    }
+    $errors[]='That payment could not be found on this agreement.';
+   }catch(Throwable $e){$errors[]=$e->getMessage();}
+  }
  } elseif($formAction==='save_batch'){
   // New match-scope agreement(s) created from the fixture checklist below — one
   // saveSponsorshipAgreement() call per selected fixture, same validation/legacy-sync
@@ -169,6 +210,7 @@ if($id===0&&$scopeForNew==='match'){
 <nav class="hub-breadcrumb" aria-label="Breadcrumb"><a href="sponsorship_agreements.php">Agreements</a><i class="fa-solid fa-chevron-right" aria-hidden="true"></i><span aria-current="page"><?= $id ? 'Manage agreement' : 'Add agreement' ?></span></nav>
 <?php if($bundle): ?><div class="alert alert-info d-flex flex-wrap align-items-center justify-content-between gap-2"><div><i class="fa-solid fa-boxes-stacked me-1" aria-hidden="true"></i>Part of bundle #<?= (int)$bundle['id'] ?><?= $bundle['name']?': '.h((string)$bundle['name']):'' ?> — <?= h((string)$bundle['sponsor_name']) ?></div><a class="btn btn-sm btn-outline-primary" href="sponsorship_bundle.php?id=<?= (int)$bundle['id'] ?>">View bundle</a></div><?php endif; ?>
 <?php if(isset($_GET['payment_saved'])): ?><div class="alert alert-success">Agreement payment recorded.</div><?php endif; ?>
+<?php if(isset($_GET['payment_deleted'])): ?><div class="alert alert-success">Payment removed. The outstanding balance has been updated.</div><?php endif; ?>
 <?php if(isset($_GET['detached'])): ?><div class="alert alert-success">Agreement removed from its bundle. The agreement and its payment history are unchanged.</div><?php endif; ?>
 <?php if($errors): ?><div class="alert alert-danger"><ul class="mb-0"><?php foreach($errors as $e): ?><li><?= h($e) ?></li><?php endforeach; ?></ul></div><?php endif; ?>
 <?php if($batchResults): ?>
@@ -195,7 +237,7 @@ if($id===0&&$scopeForNew==='match'){
  <div class="col-md-6"><label class="form-label">Season</label><select class="form-select" name="season_id"><option value="">No specific season</option><?php foreach($seasons as $s): ?><option value="<?= (int)$s['id'] ?>" <?= (int)$data['season_id']===(int)$s['id']?'selected':'' ?>><?= h((string)$s['name']) ?></option><?php endforeach; ?></select></div>
  <div class="col-md-6 agreement-target" data-target-scope="team"><label class="form-label">Team</label><select class="form-select" name="team_id"><option value="">Select team</option><?php foreach($teams as $t): ?><option value="<?= (int)$t['id'] ?>" <?= (int)$data['team_id']===(int)$t['id']?'selected':'' ?>><?= h((string)$t['name']) ?></option><?php endforeach; ?></select></div>
  <div class="col-md-6 agreement-target" data-target-scope="match"><label class="form-label">Fixture</label><select class="form-select" name="fixture_id"><option value="">Select fixture</option><?php foreach($fixtures as $f): ?><option value="<?= (int)$f['id'] ?>" <?= (int)$data['fixture_id']===(int)$f['id']?'selected':'' ?>><?= h(date('d/m/Y',strtotime((string)$f['match_date'])).' · '.$f['opponent']) ?></option><?php endforeach; ?></select></div>
- <div class="col-md-6 agreement-target" data-target-scope="player"><label class="form-label">Player</label><select class="form-select" name="player_id"><option value="">Select player</option><?php foreach($players as $p): ?><option value="<?= (int)$p['id'] ?>" <?= (int)$data['player_id']===(int)$p['id']?'selected':'' ?>><?= h((string)$p['name']) ?></option><?php endforeach; ?></select></div>
+ <div class="col-md-6 agreement-target" data-target-scope="player"><label class="form-label">Player</label><select class="form-select" name="player_id"><option value="">Select player</option><?php foreach($players as $p): ?><option value="<?= (int)$p['id'] ?>" <?= (int)$data['player_id']===(int)$p['id']?'selected':'' ?>><?= h((string)$p['name'].((int)($p['active']??1)===1?'':' (former)')) ?></option><?php endforeach; ?></select></div>
  <div class="col-md-3"><label class="form-label">Start date</label><input type="date" class="form-control" name="start_date" value="<?= h((string)$data['start_date']) ?>"></div><div class="col-md-3"><label class="form-label">End date</label><input type="date" class="form-control" name="end_date" value="<?= h((string)$data['end_date']) ?>"></div>
  <div class="col-md-3"><label class="form-label">Agreed amount</label><div class="input-group"><span class="input-group-text">£</span><input type="number" min="0" step="0.01" class="form-control" name="agreed_amount" id="agreementAmount" value="<?= h((string)$data['agreed_amount']) ?>"></div></div>
  <div class="col-md-3"><label class="form-label">Status</label><select class="form-select" name="status"><?php foreach(['active'=>'Active','scheduled'=>'Scheduled','expired'=>'Expired','cancelled'=>'Cancelled'] as $v=>$l): ?><option value="<?= $v ?>" <?= $data['status']===$v?'selected':'' ?>><?= $l ?></option><?php endforeach; ?></select></div>
@@ -263,7 +305,7 @@ if($id===0&&$scopeForNew==='match'){
   <?php elseif($scopeForNew==='team'): ?>
    <div class="mb-3"><label class="form-label">Team</label><select class="form-select" name="team_id" required><option value="">Select team</option><?php foreach($teams as $t): ?><option value="<?= (int)$t['id'] ?>"><?= h((string)$t['name']) ?></option><?php endforeach; ?></select></div>
   <?php elseif($scopeForNew==='player'): ?>
-   <div class="mb-3"><label class="form-label">Player</label><select class="form-select" name="player_id" required><option value="">Select player</option><?php foreach($players as $p): ?><option value="<?= (int)$p['id'] ?>"><?= h((string)$p['name']) ?></option><?php endforeach; ?></select></div>
+   <div class="mb-3"><label class="form-label">Player</label><select class="form-select" name="player_id" required><option value="">Select player</option><?php foreach($players as $p): ?><option value="<?= (int)$p['id'] ?>"><?= h((string)$p['name'].((int)($p['active']??1)===1?'':' (former)')) ?></option><?php endforeach; ?></select></div>
   <?php endif; ?>
 
   <div class="row g-3">
@@ -367,7 +409,7 @@ if($id===0&&$scopeForNew==='match'){
   <div class="col-md-3"><label class="form-label">Note</label><input class="form-control" name="note"></div>
   <div class="col-md-1 d-grid"><button class="btn btn-success">Add</button></div>
  </form>
- <div class="table-responsive"><table class="table table-sm hub-data-table align-middle mb-0"><thead><tr><th>Date</th><th>Amount</th><th>Method</th><th>Note</th></tr></thead><tbody><?php foreach($agreementPayments as $payment): ?><tr><td><?= h(date('d/m/Y H:i',strtotime((string)$payment['recorded_at']))) ?></td><td><?= gbp((float)$payment['amount']) ?></td><td><?= h((string)$payment['method']) ?></td><td><?= h((string)$payment['note']) ?></td></tr><?php endforeach; ?><?php if(!$agreementPayments): ?><tr><td colspan="4" class="text-center text-muted hub-record-empty">No payments recorded yet.</td></tr><?php endif; ?></tbody></table></div>
+ <div class="table-responsive"><table class="table table-sm hub-data-table align-middle mb-0"><thead><tr><th>Date</th><th>Amount</th><th>Method</th><th>Note</th><th class="text-end">Action</th></tr></thead><tbody><?php foreach($agreementPayments as $payment): ?><tr><td><?= h(date('d/m/Y H:i',strtotime((string)$payment['recorded_at']))) ?></td><td><?= gbp((float)$payment['amount']) ?></td><td><?= h((string)$payment['method']) ?></td><td><?= h((string)$payment['note']) ?></td><td class="text-end"><?php if(!empty($payment['id'])): ?><form method="post" action="sponsorship_agreement.php?id=<?= $id ?>" class="d-inline"><?= csrf_field() ?><input type="hidden" name="form_action" value="delete_payment"><input type="hidden" name="payment_id" value="<?= (int)$payment['id'] ?>"><button type="submit" class="btn btn-sm btn-outline-danger" formnovalidate data-confirm="Remove this <?= h(gbp((float)$payment['amount'])) ?> payment from the agreement? The outstanding balance will go back up." data-confirm-title="Remove payment?" data-confirm-action="Remove payment">Remove</button></form><?php endif; ?></td></tr><?php endforeach; ?><?php if(!$agreementPayments): ?><tr><td colspan="5" class="text-center text-muted hub-record-empty">No payments recorded yet.</td></tr><?php endif; ?></tbody></table></div>
  <?php endif; ?>
 </div></section>
 <?php endif; ?>

@@ -82,6 +82,44 @@ function ensureSponsorProfileColumns(PDO $pdo, ?string &$error = null): bool
 $schemaError = null;
 $schemaReady = ensureSponsorProfileColumns($pdo, $schemaError);
 
+function sponsorProfileDate(?string $date, string $fallback): string
+{
+  $date = trim((string)$date);
+  if ($date === '') {
+    return $fallback;
+  }
+  $timestamp = strtotime($date);
+  return $timestamp ? date('d/m/Y', $timestamp) : $date;
+}
+
+function sponsorProfileDateTime(?string $date, string $fallback = 'Not recorded'): string
+{
+  $date = trim((string)$date);
+  if ($date === '') {
+    return $fallback;
+  }
+  $timestamp = strtotime($date);
+  return $timestamp ? date('d/m/Y H:i', $timestamp) : $date;
+}
+
+function sponsorProfileStatusBadge(string $status): string
+{
+  $classes = [
+    'active' => 'text-bg-success',
+    'scheduled' => 'text-bg-info',
+    'expired' => 'text-bg-secondary',
+    'cancelled' => 'text-bg-dark',
+  ];
+  $class = $classes[$status] ?? 'text-bg-light';
+  return '<span class="badge hub-status ' . h($class) . '">' . h(ucfirst($status)) . '</span>';
+}
+
+function sponsorProfileSlotLabel(?string $slot): string
+{
+  $slot = strtolower(trim((string)$slot));
+  return $slot !== '' ? ucfirst($slot) . ' kit' : 'Player sponsorship';
+}
+
 $action = $_GET['action'] ?? 'view';
 if (!in_array($action, ['new', 'edit'], true)) {
   $action = 'view';
@@ -166,34 +204,49 @@ if ($action === 'view') {
   $sponsorshipStmt = $pdo->prepare("
         SELECT sp.id,
                sp.player_id,
+               sp.season_id,
                sp.slot,
                sp.amount,
+               sp.started_at,
+               sp.ended_at,
+               sp.ended_reason,
+               se.name AS season_name,
                p.name AS player_name,
+               p.active AS player_active,
+               a.id AS agreement_id,
                COALESCE(SUM(pay.amount), 0) AS paid_total
         FROM sponsorships sp
         JOIN players p ON sp.player_id = p.id
+        LEFT JOIN seasons se ON se.id = sp.season_id
         LEFT JOIN sponsorship_payments pay ON pay.sponsorship_id = sp.id
+        LEFT JOIN sponsorship_agreements a ON a.legacy_source = 'player' AND a.legacy_id = sp.id
         WHERE sp.sponsor_id = :id
-          AND sp.season_id = :season_id
-          AND sp.ended_at IS NULL
-        GROUP BY sp.id, sp.player_id, sp.slot, sp.amount, p.name
-        ORDER BY p.name
+        GROUP BY sp.id, sp.player_id, sp.season_id, sp.slot, sp.amount, sp.started_at, sp.ended_at, sp.ended_reason, se.name, p.name, p.active, a.id
+        ORDER BY sp.ended_at IS NULL DESC, sp.season_id DESC, p.name ASC, FIELD(sp.slot, 'home', 'away', 'third')
     ");
-  $sponsorshipStmt->execute([':id' => $id, ':season_id' => $seasonId]);
+  $sponsorshipStmt->execute([':id' => $id]);
   $sponsorships = $sponsorshipStmt->fetchAll(PDO::FETCH_ASSOC);
+  $payableSponsorships = array_values(array_filter($sponsorships, static function (array $sp) use ($seasonId): bool {
+    return (int)$sp['season_id'] === $seasonId && empty($sp['ended_at']);
+  }));
 
   $paymentsStmt = $pdo->prepare("
-        SELECT pay.*, p.name AS player_name, sp.slot
+        SELECT pay.*, p.name AS player_name, sp.slot, sp.season_id, sp.ended_at, se.name AS season_name
         FROM sponsorship_payments pay
         JOIN sponsorships sp ON pay.sponsorship_id = sp.id
         JOIN players p ON sp.player_id = p.id
+        LEFT JOIN seasons se ON se.id = COALESCE(pay.season_id, sp.season_id)
         WHERE sp.sponsor_id = :id
-          AND sp.season_id = :season_id
-          AND sp.ended_at IS NULL
         ORDER BY pay.paid_at DESC
     ");
-  $paymentsStmt->execute([':id' => $id, ':season_id' => $seasonId]);
+  $paymentsStmt->execute([':id' => $id]);
   $payments = $paymentsStmt->fetchAll(PDO::FETCH_ASSOC);
+  $activeSponsorshipCount = count(array_filter($sponsorships, static fn(array $sp): bool => empty($sp['ended_at'])));
+  $historicSponsorshipCount = count(array_filter($sponsorships, static fn(array $sp): bool => !empty($sp['ended_at'])));
+  $playerSponsorshipDue = array_sum(array_map(static fn(array $sp): float => empty($sp['ended_at']) ? (float)$sp['amount'] : 0.0, $sponsorships));
+  $playerSponsorshipPaid = array_sum(array_map(static fn(array $sp): float => empty($sp['ended_at']) ? (float)$sp['paid_total'] : 0.0, $sponsorships));
+  $playerSponsorshipOutstanding = max(0, $playerSponsorshipDue - $playerSponsorshipPaid);
+  $allPlayerPaymentTotal = array_sum(array_map(static fn(array $payment): float => (float)$payment['amount'], $payments));
 
   $notesStmt = $pdo->prepare("
         SELECT n.*
@@ -247,6 +300,12 @@ if ($action === 'view') {
     <?php if ($assigned): ?>
       <div class="alert alert-success alert-dismissible fade show" role="alert">
         Sponsorship added successfully.
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+    <?php endif; ?>
+    <?php if (isset($_GET['payment_removed'])): ?>
+      <div class="alert alert-success alert-dismissible fade show" role="alert">
+        Payment removed. The outstanding balance has been updated.
         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
       </div>
     <?php endif; ?>
@@ -322,39 +381,135 @@ if ($action === 'view') {
       </div>
     <?php endif; ?>
 
+    <style>
+      .sponsor-tab-panel {
+        background: #fff;
+        border: 1px solid rgba(33, 37, 41, .08);
+        border-radius: 8px;
+        box-shadow: 0 8px 22px rgba(15, 23, 42, .04);
+        margin-bottom: 1rem;
+        padding: 1rem;
+      }
+      .sponsor-tab-head {
+        align-items: flex-start;
+        display: flex;
+        gap: 1rem;
+        justify-content: space-between;
+        margin-bottom: .9rem;
+      }
+      .sponsor-tab-head h3,
+      .sponsor-action-panel h4 {
+        font-size: 1rem;
+        line-height: 1.25;
+        margin: 0;
+      }
+      .sponsor-tab-head p,
+      .sponsor-action-panel p {
+        color: #6c757d;
+        font-size: .86rem;
+        margin: .25rem 0 0;
+      }
+      .sponsor-tab-summary {
+        display: grid;
+        gap: .75rem;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+      .sponsor-tab-summary > div {
+        background: #f8f9fa;
+        border: 1px solid rgba(33, 37, 41, .06);
+        border-radius: 8px;
+        min-width: 0;
+        padding: .8rem;
+      }
+      .sponsor-tab-summary span {
+        color: #6c757d;
+        display: block;
+        font-size: .74rem;
+        font-weight: 700;
+        text-transform: uppercase;
+      }
+      .sponsor-tab-summary strong {
+        display: block;
+        font-size: 1.05rem;
+        margin-top: .2rem;
+      }
+      .sponsor-profile-table-wrap {
+        background: #fff;
+        border: 1px solid rgba(33, 37, 41, .08);
+        border-radius: 8px;
+      }
+      .sponsor-profile-table-wrap .table > :not(caption) > * > * {
+        padding: .85rem;
+      }
+      .sponsor-action-panel {
+        background: #fff;
+        border: 1px solid rgba(33, 37, 41, .08);
+        border-radius: 8px;
+        padding: 1rem;
+      }
+      .sponsor-notes-list .list-group-item {
+        border-color: rgba(33, 37, 41, .08);
+        padding: 1rem;
+      }
+      @media (max-width: 991.98px) {
+        .sponsor-tab-head {
+          flex-direction: column;
+        }
+        .sponsor-tab-summary {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+      @media (max-width: 575.98px) {
+        .sponsor-tab-summary {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+
     <ul class="nav nav-tabs reports-tabs flex-nowrap" role="tablist">
       <li class="nav-item">
-        <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#agreements" type="button">Agreements</button>
+        <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#agreements" type="button"><i class="fa-solid fa-file-signature me-1" aria-hidden="true"></i>Agreements <span class="badge text-bg-light ms-1"><?= count($clubAgreements) ?></span></button>
       </li>
       <li class="nav-item">
-        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#sponsorships" type="button">Player Sponsorships</button>
+        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#sponsorships" type="button"><i class="fa-solid fa-shirt me-1" aria-hidden="true"></i>Players <span class="badge text-bg-light ms-1"><?= count($sponsorships) ?></span></button>
       </li>
       <li class="nav-item">
-        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#payments" type="button">Payments</button>
+        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#payments" type="button"><i class="fa-solid fa-wallet me-1" aria-hidden="true"></i>Payments <span class="badge text-bg-light ms-1"><?= count($payments) ?></span></button>
       </li>
       <li class="nav-item">
-        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#notes" type="button">Notes</button>
+        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#notes" type="button"><i class="fa-regular fa-note-sticky me-1" aria-hidden="true"></i>Notes <span class="badge text-bg-light ms-1"><?= count($notes) ?></span></button>
       </li>
     </ul>
 
     <div class="tab-content mt-3">
       <div class="tab-pane fade show active" id="agreements">
-        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-          <div><h4 class="mb-0">Sponsorship Agreements</h4><div class="small text-muted">Club-wide, match, player, team and digital relationships.</div></div>
-          <a class="btn btn-brand btn-sm" href="/sponsorship_agreement.php?action=new&amp;sponsor_id=<?= $id ?>">Add Agreement</a>
+        <div class="sponsor-tab-panel">
+          <div class="sponsor-tab-head">
+            <div>
+              <h3>Agreement Portfolio</h3>
+              <p>Club-wide, match, player, team and digital agreements linked to this sponsor.</p>
+            </div>
+            <a class="btn btn-brand btn-sm" href="/sponsorship_agreement.php?action=new&amp;sponsor_id=<?= $id ?>"><i class="fa-solid fa-plus me-1" aria-hidden="true"></i>Add agreement</a>
+          </div>
+          <div class="sponsor-tab-summary">
+            <div><span>Total value</span><strong><?= gbp($agreementTotalDue) ?></strong></div>
+            <div><span>Paid</span><strong><?= gbp($agreementTotalPaid) ?></strong></div>
+            <div><span>Outstanding</span><strong><?= gbp($agreementTotalOutstanding) ?></strong></div>
+            <div><span>Agreements</span><strong><?= count($clubAgreements) ?></strong></div>
+          </div>
         </div>
-        <div class="table-responsive">
-          <table class="table table-sm align-middle">
-            <thead><tr><th>Package</th><th>Applies to</th><th>Dates</th><th>Value</th><th>Status</th><th></th></tr></thead>
+        <div class="table-responsive sponsor-profile-table-wrap">
+          <table class="table table-modern table-hover align-middle mb-0">
+            <thead><tr><th>Package</th><th>Applies to</th><th>Dates</th><th class="text-end">Value</th><th>Status</th><th class="text-end">Action</th></tr></thead>
             <tbody>
               <?php foreach ($clubAgreements as $agreement): ?>
                 <?php $target = (string)($agreement['season_name'] ?: 'Club-wide'); if (!empty($agreement['fixture_id'])) $target = 'Fixture #' . (int)$agreement['fixture_id'] . ' · ' . (string)$agreement['fixture_opponent']; elseif (!empty($agreement['player_id'])) $target = (string)$agreement['player_name']; ?>
                 <tr>
                   <td><div class="fw-semibold"><?= h((string)$agreement['package_name']) ?></div><span class="badge text-bg-light"><?= h((string)$agreement['package_category']) ?></span></td>
-                  <td><?= h($target) ?></td>
-                  <td><?= h((string)($agreement['start_date'] ?: 'Open')) ?> → <?= h((string)($agreement['end_date'] ?: 'Ongoing')) ?></td>
-                  <td><?= gbp((float)$agreement['agreed_amount']) ?></td>
-                  <td><span class="badge <?= $agreement['effective_status'] === 'active' ? 'text-bg-success' : 'text-bg-secondary' ?>"><?= h(ucfirst((string)$agreement['effective_status'])) ?></span></td>
+                  <td><div><?= h($target) ?></div><div class="small text-muted"><?= h((string)($agreement['season_name'] ?: 'No season')) ?></div></td>
+                  <td class="text-nowrap"><?= h(sponsorProfileDate($agreement['start_date'] ?? null, 'Open')) ?> &rarr; <?= h(sponsorProfileDate($agreement['end_date'] ?? null, 'Ongoing')) ?></td>
+                  <td class="text-end fw-semibold"><?= gbp((float)$agreement['agreed_amount']) ?></td>
+                  <td><?= sponsorProfileStatusBadge((string)$agreement['effective_status']) ?></td>
                   <td class="text-end"><a class="btn btn-sm btn-outline-primary" href="/sponsorship_agreement.php?id=<?= (int)$agreement['id'] ?>">Manage</a></td>
                 </tr>
               <?php endforeach; ?>
@@ -365,58 +520,95 @@ if ($action === 'view') {
       </div>
 
       <div class="tab-pane fade" id="sponsorships">
-        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
-          <h4 class="mb-0">Sponsorships</h4>
-          <button type="button" class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#addSponsorshipModal">
-            <i class="fa-solid fa-user-plus me-1"></i>Add Sponsorship
-          </button>
+        <div class="sponsor-tab-panel">
+          <div class="sponsor-tab-head">
+            <div>
+              <h3>Player Sponsorships</h3>
+              <p>Current and historic player kit sponsorships held by this sponsor.</p>
+            </div>
+            <button type="button" class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#addSponsorshipModal">
+              <i class="fa-solid fa-user-plus me-1"></i>Add sponsorship
+            </button>
+          </div>
+          <div class="sponsor-tab-summary">
+            <div><span>Active</span><strong><?= (int)$activeSponsorshipCount ?></strong></div>
+            <div><span>Historic</span><strong><?= (int)$historicSponsorshipCount ?></strong></div>
+            <div><span>Active value</span><strong><?= gbp($playerSponsorshipDue) ?></strong></div>
+            <div><span>Outstanding</span><strong><?= gbp($playerSponsorshipOutstanding) ?></strong></div>
+          </div>
         </div>
-        <div class="table-responsive">
-        <table class="table table-striped table-sm align-middle">
+        <div class="table-responsive sponsor-profile-table-wrap">
+        <table class="table table-modern table-hover align-middle mb-0">
           <thead>
             <tr>
               <th>Player</th>
-              <th>Slot</th>
-              <th>Amount</th>
-              <th>Paid</th>
-              <th>Outstanding</th>
-              <th>Actions</th>
+              <th>Package</th>
+              <th>Season</th>
+              <th>Status</th>
+              <th class="text-end">Value</th>
+              <th class="text-end">Paid</th>
+              <th class="text-end">Outstanding</th>
+              <th class="text-end">Action</th>
             </tr>
           </thead>
           <tbody>
             <?php foreach ($sponsorships as $sp): ?>
-              <?php $outstanding = (float)$sp['amount'] - (float)$sp['paid_total']; ?>
+              <?php
+                $isEnded = !empty($sp['ended_at']);
+                $outstanding = max(0, (float)$sp['amount'] - (float)$sp['paid_total']);
+              ?>
               <tr>
                 <td>
-                  <a href="player_view.php?id=<?= (int)$sp['player_id'] ?>"><?= h($sp['player_name']) ?></a>
+                  <a class="fw-semibold" href="player_view.php?id=<?= (int)$sp['player_id'] ?>"><?= h($sp['player_name']) ?></a>
+                  <?php if ((int)($sp['player_active'] ?? 1) !== 1): ?><div class="small text-muted">Former player</div><?php endif; ?>
                 </td>
-                <td><?= ucfirst($sp['slot']) ?></td>
-                <td><?= gbp($sp['amount']) ?></td>
-                <td><?= gbp($sp['paid_total']) ?></td>
-                <td><?= gbp($outstanding) ?></td>
+                <td><?= h(sponsorProfileSlotLabel($sp['slot'] ?? '')) ?></td>
+                <td><?= h((string)($sp['season_name'] ?: ('Season #' . (int)$sp['season_id']))) ?></td>
                 <td>
-                  <?php if ($outstanding > 0): ?>
-                    <button
-                      type="button"
-                      class="btn btn-sm btn-outline-success"
-                      data-bs-toggle="modal"
-                      data-bs-target="#markPaidModal"
-                      data-sponsorship-id="<?= (int)$sp['id'] ?>"
-                      data-player-name="<?= h($sp['player_name']) ?>"
-                      data-slot="<?= h(ucfirst((string)$sp['slot'])) ?>"
-                      data-outstanding="<?= h(number_format($outstanding, 2, '.', '')) ?>"
-                    >
-                      Mark Paid
-                    </button>
+                  <?php if ($isEnded): ?>
+                    <span class="badge hub-status text-bg-secondary">Ended</span>
+                    <div class="small text-muted"><?= h(sponsorProfileDateTime($sp['ended_at'] ?? null)) ?></div>
                   <?php else: ?>
-                    <span class="badge bg-success">Paid</span>
+                    <span class="badge hub-status text-bg-success">Active</span>
+                  <?php endif; ?>
+                </td>
+                <td class="text-end fw-semibold"><?= gbp($sp['amount']) ?></td>
+                <td class="text-end"><?= gbp($sp['paid_total']) ?></td>
+                <td class="text-end"><?= gbp($outstanding) ?></td>
+                <td class="text-end">
+                  <?php if (!$isEnded && (int)$sp['season_id'] === $seasonId && $outstanding > 0): ?>
+                    <div class="d-inline-flex flex-wrap gap-1 justify-content-end">
+                      <button
+                        type="button"
+                        class="btn btn-sm btn-outline-success"
+                        data-bs-toggle="modal"
+                        data-bs-target="#markPaidModal"
+                        data-sponsorship-id="<?= (int)$sp['id'] ?>"
+                        data-player-name="<?= h($sp['player_name']) ?>"
+                        data-slot="<?= h(ucfirst((string)$sp['slot'])) ?>"
+                        data-outstanding="<?= h(number_format($outstanding, 2, '.', '')) ?>"
+                      >
+                        Mark Paid
+                      </button>
+                      <?php if (!empty($sp['agreement_id'])): ?>
+                        <a class="btn btn-sm btn-outline-primary" href="/sponsorship_agreement.php?id=<?= (int)$sp['agreement_id'] ?>#stripePaymentCard" title="Generate / send a Stripe payment link for this slot">
+                          <i class="fa-brands fa-stripe-s me-1" aria-hidden="true"></i>Stripe link
+                        </a>
+                      <?php endif; ?>
+                    </div>
+                  <?php elseif (!$isEnded && $outstanding <= 0): ?>
+                    <span class="badge text-bg-success">Paid</span>
+                  <?php elseif (!$isEnded): ?>
+                    <span class="text-muted small">Different season selected</span>
+                  <?php else: ?>
+                    <span class="text-muted small">No action</span>
                   <?php endif; ?>
                 </td>
               </tr>
             <?php endforeach; ?>
             <?php if (!$sponsorships): ?>
               <tr data-placeholder="sponsorships-empty">
-                <td colspan="6" class="text-muted text-center">
+                <td colspan="8" class="text-muted text-center py-4">
                   No sponsorships found for this sponsor.
                   <button type="button" class="btn btn-link btn-sm align-baseline p-0 ms-1" data-bs-toggle="modal" data-bs-target="#addSponsorshipModal">
                     Add one now
@@ -430,86 +622,155 @@ if ($action === 'view') {
       </div>
 
       <div class="tab-pane fade" id="payments">
-        <h4>Payments</h4>
-        <div class="table-responsive">
-        <table class="table table-sm table-hover align-middle">
+        <div class="sponsor-tab-panel">
+          <div class="sponsor-tab-head">
+            <div>
+              <h3>Payments</h3>
+              <p>Recorded payments across every player sponsorship for this sponsor.</p>
+            </div>
+          </div>
+          <div class="sponsor-tab-summary">
+            <div><span>Current due</span><strong><?= gbp($total_due) ?></strong></div>
+            <div><span>Current paid</span><strong><?= gbp($total_paid) ?></strong></div>
+            <div><span>Current outstanding</span><strong><?= gbp($total_outstanding) ?></strong></div>
+            <div><span>All payments</span><strong><?= gbp($allPlayerPaymentTotal) ?></strong></div>
+          </div>
+        </div>
+        <div class="table-responsive sponsor-profile-table-wrap mb-3">
+        <table class="table table-modern table-hover align-middle mb-0">
           <thead>
             <tr>
               <th>Date</th>
               <th>Player</th>
               <th>Slot</th>
+              <th>Season</th>
               <th>Amount</th>
               <th>Method</th>
               <th>Note</th>
+              <th class="text-end">Action</th>
             </tr>
           </thead>
           <tbody>
             <?php foreach ($payments as $pay): ?>
               <tr>
-                <td><?= date('d/m/Y H:i', strtotime($pay['paid_at'])) ?></td>
-                <td><?= h($pay['player_name']) ?></td>
-                <td><?= ucfirst($pay['slot']) ?></td>
-                <td><?= gbp($pay['amount']) ?></td>
-                <td><?= h($pay['method']) ?></td>
-                <td><?= h($pay['note']) ?></td>
+                <td class="text-nowrap"><?= h(sponsorProfileDateTime($pay['paid_at'] ?? null)) ?></td>
+                <td><?= h($pay['player_name']) ?><?php if (!empty($pay['ended_at'])): ?><div class="small text-muted">Ended sponsorship</div><?php endif; ?></td>
+                <td><?= h(sponsorProfileSlotLabel($pay['slot'] ?? '')) ?></td>
+                <td><?= h((string)($pay['season_name'] ?: ('Season #' . (int)$pay['season_id']))) ?></td>
+                <td class="fw-semibold"><?= gbp($pay['amount']) ?></td>
+                <td><?= h((string)($pay['method'] ?: 'Not recorded')) ?></td>
+                <td><?= h((string)($pay['note'] ?: '')) ?></td>
+                <td class="text-end">
+                  <button type="button" class="btn btn-sm btn-outline-danger sponsor-payment-delete"
+                    data-payment-id="<?= (int)$pay['id'] ?>"
+                    data-amount="<?= h(number_format((float)$pay['amount'], 2)) ?>">Remove</button>
+                </td>
               </tr>
             <?php endforeach; ?>
             <?php if (!$payments): ?>
               <tr data-placeholder="payments-empty">
-                <td colspan="6" class="text-muted text-center">No payments recorded yet.</td>
+                <td colspan="8" class="text-muted text-center py-4">No payments recorded yet.</td>
               </tr>
             <?php endif; ?>
           </tbody>
         </table>
         </div>
 
-        <div class="card mb-3">
-          <div class="card-body d-flex flex-wrap justify-content-evenly gap-3" id="paymentTotals">
-            <div><strong>Total Due:</strong> <?= gbp($total_due) ?></div>
-            <div><strong>Total Paid:</strong> <?= gbp($total_paid) ?></div>
-            <div><strong>Outstanding:</strong> <?= gbp($total_outstanding) ?></div>
+        <div class="sponsor-action-panel">
+          <div>
+            <h4>Add payment</h4>
+            <p>Payments can be recorded against active player sponsorships in the selected season.</p>
           </div>
+          <form method="post" action="sponsor_save.php" class="row g-2 align-items-end" id="paymentForm">
+            <input type="hidden" name="action" value="add_payment">
+            <input type="hidden" name="sponsor_id" value="<?= $id ?>">
+            <input type="hidden" name="season_id" value="<?= $seasonId ?>">
+
+            <div class="col-12 col-lg-4">
+              <label class="form-label small text-muted mb-1" for="sponsorshipSelect">Player / slot</label>
+              <select name="sponsorship_id" id="sponsorshipSelect" class="form-select form-select-sm" required>
+                <option value="">Select Player / Slot</option>
+                <?php foreach ($payableSponsorships as $sp): ?>
+                  <?php
+                  $outstanding = max(0, (float)$sp['amount'] - (float)$sp['paid_total']);
+                  $label = $sp['player_name'] . ' - ' . sponsorProfileSlotLabel($sp['slot']) . ' - ' . gbp($sp['amount']);
+                  $label .= $outstanding > 0 ? ' - Outstanding: ' . gbp($outstanding) : ' - Fully Paid';
+                  ?>
+                  <option value="<?= (int)$sp['id'] ?>" data-outstanding="<?= h(number_format($outstanding, 2, '.', '')) ?>">
+                    <?= h($label) ?>
+                  </option>
+                <?php endforeach; ?>
+              </select>
+            </div>
+
+            <div class="col-12 col-lg-3">
+              <label class="form-label small text-muted mb-1" for="amountInput">Amount</label>
+              <div class="input-group input-group-sm">
+                <span class="input-group-text">&pound;</span>
+                <input type="number" step="0.01" min="0" name="amount" id="amountInput" class="form-control" placeholder="Amount" required>
+                <button type="button" id="fillOutstanding" class="btn btn-outline-secondary" disabled>Due</button>
+              </div>
+            </div>
+
+            <div class="col-6 col-lg-2">
+              <label class="form-label small text-muted mb-1" for="paymentMethod">Method</label>
+              <select name="method" id="paymentMethod" class="form-select form-select-sm">
+                <option value="">Not recorded</option>
+                <option value="Cash">Cash</option>
+                <option value="Bank Transfer">Bank Transfer</option>
+                <option value="Cheque">Cheque</option>
+                <option value="Card">Card</option>
+                <option value="Stripe">Stripe</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+
+            <div class="col-6 col-lg-2">
+              <label class="form-label small text-muted mb-1">Note</label>
+              <input type="text" name="note" class="form-control form-control-sm" placeholder="Optional">
+            </div>
+
+            <div class="col-12 col-lg-1 d-grid">
+              <button class="btn btn-sm btn-primary" type="submit" <?= !$payableSponsorships ? 'disabled' : '' ?>>Add</button>
+            </div>
+            <?php if (!$payableSponsorships): ?><div class="col-12"><div class="small text-muted">No active player sponsorships are available for payment in the selected season.</div></div><?php endif; ?>
+          </form>
         </div>
 
-        <h5>Add Payment</h5>
-        <form method="post" action="sponsor_save.php" class="row g-2" id="paymentForm">
-          <input type="hidden" name="action" value="add_payment">
-          <input type="hidden" name="sponsor_id" value="<?= $id ?>">
-          <input type="hidden" name="season_id" value="<?= $seasonId ?>">
-
-          <div class="col-md-3">
-            <select name="sponsorship_id" id="sponsorshipSelect" class="form-select form-select-sm" required>
-              <option value="">Select Player / Slot</option>
-              <?php foreach ($sponsorships as $sp): ?>
-                <?php
-                $outstanding = (float)$sp['amount'] - (float)$sp['paid_total'];
-                $label = $sp['player_name'] . ' (' . ucfirst($sp['slot']) . ') - ' . gbp($sp['amount']);
-                $label .= $outstanding > 0 ? ' - Outstanding: ' . gbp($outstanding) : ' - Fully Paid';
-                ?>
-                <option value="<?= (int)$sp['id'] ?>" data-outstanding="<?= $outstanding ?>">
-                  <?= h($label) ?>
-                </option>
-              <?php endforeach; ?>
-            </select>
+        <?php
+        $stripeLinkRows = array_values(array_filter($sponsorships, static function (array $sp) use ($seasonId): bool {
+          return empty($sp['ended_at'])
+            && !empty($sp['agreement_id'])
+            && (int)$sp['season_id'] === $seasonId
+            && ((float)$sp['amount'] - (float)$sp['paid_total']) > 0.0001;
+        }));
+        ?>
+        <?php if ($stripeLinkRows): ?>
+          <div class="sponsor-action-panel">
+            <div>
+              <h4>Send a Stripe payment link</h4>
+              <p>Generate a short pay-by-card link for an outstanding player sponsorship, then copy it or email it to the sponsor.</p>
+            </div>
+            <div class="table-responsive">
+              <table class="table table-sm align-middle mb-0">
+                <thead><tr><th>Player / slot</th><th class="text-end">Outstanding</th><th class="text-end">Action</th></tr></thead>
+                <tbody>
+                  <?php foreach ($stripeLinkRows as $sp): ?>
+                    <tr>
+                      <td><?= h($sp['player_name']) ?> &middot; <?= h(sponsorProfileSlotLabel($sp['slot'] ?? '')) ?></td>
+                      <td class="text-end fw-semibold"><?= gbp(max(0, (float)$sp['amount'] - (float)$sp['paid_total'])) ?></td>
+                      <td class="text-end">
+                        <a class="btn btn-sm btn-outline-primary" href="/sponsorship_agreement.php?id=<?= (int)$sp['agreement_id'] ?>#stripePaymentCard">
+                          <i class="fa-brands fa-stripe-s me-1" aria-hidden="true"></i>Stripe link
+                        </a>
+                      </td>
+                    </tr>
+                  <?php endforeach; ?>
+                </tbody>
+              </table>
+            </div>
           </div>
-
-          <div class="col-md-3 d-flex">
-            <input type="number" step="0.01" min="0" name="amount" id="amountInput" class="form-control form-control-sm me-1" placeholder="Amount" required>
-            <button type="button" id="fillOutstanding" class="btn btn-sm btn-outline-secondary" disabled>Outstanding</button>
-          </div>
-
-          <div class="col-md-2">
-            <input type="text" name="method" class="form-control form-control-sm" placeholder="Method">
-          </div>
-
-          <div class="col-md-3">
-            <input type="text" name="note" class="form-control form-control-sm" placeholder="Note">
-          </div>
-
-          <div class="col-md-1">
-            <button class="btn btn-sm btn-primary" type="submit">Add</button>
-          </div>
-        </form>
+        <?php endif; ?>
 
         <script>
           (function() {
@@ -520,6 +781,7 @@ if ($action === 'view') {
             const amountInput = document.getElementById('amountInput');
             const outstandingBtn = document.getElementById('fillOutstanding');
             const totals = document.getElementById('paymentTotals');
+            const currentSeasonName = <?= json_encode((string)($season['name'] ?? ('Season #' . $seasonId)), JSON_UNESCAPED_SLASHES) ?>;
 
             if (select && outstandingBtn) {
               select.addEventListener('change', function() {
@@ -570,9 +832,11 @@ if ($action === 'view') {
       <td>${data.payment.paid_at}</td>
       <td>${data.payment.player}</td>
       <td>${data.payment.slot}</td>
+      <td>${currentSeasonName}</td>
       <td>&pound;${data.payment.amount}</td>
       <td>${data.payment.method}</td>
       <td>${data.payment.note}</td>
+      <td class="text-end"><button type="button" class="btn btn-sm btn-outline-danger sponsor-payment-delete" data-payment-id="${data.payment.id}" data-amount="${data.payment.amount}">Remove</button></td>
     `;
                     tableBody.prepend(row);
                     const placeholder = tableBody.querySelector('[data-placeholder="payments-empty"]');
@@ -607,31 +871,43 @@ if ($action === 'view') {
       </div>
 
       <div class="tab-pane fade" id="notes">
-        <h4>Notes</h4>
-        <ul class="list-group mb-3" id="notesList">
-          <?php foreach ($notes as $note): ?>
-            <li class="list-group-item">
-              <strong>Note:</strong>
-              <?= nl2br(h($note['note'])) ?>
-              <div class="text-muted small"><?= date('d/m/Y H:i', strtotime($note['created_at'])) ?></div>
-            </li>
-          <?php endforeach; ?>
-          <?php if (!$notes): ?>
-            <li class="list-group-item text-muted" data-placeholder="notes-empty">No notes yet.</li>
-          <?php endif; ?>
-        </ul>
-
-        <h5>Add Note</h5>
-        <form method="post" action="sponsor_save.php" class="row g-2" id="noteForm">
-          <input type="hidden" name="action" value="add_note">
-          <input type="hidden" name="sponsor_id" value="<?= $id ?>">
-          <div class="col-md-8">
-            <textarea name="note" class="form-control form-control-sm" placeholder="Write a note..." required></textarea>
+        <div class="sponsor-tab-panel">
+          <div class="sponsor-tab-head">
+            <div>
+              <h3>Notes</h3>
+              <p>Internal context, follow-up reminders and sponsor relationship notes.</p>
+            </div>
           </div>
-          <div class="col-md-2">
-            <button class="btn btn-sm btn-primary" type="submit">Add</button>
+        </div>
+        <div class="row g-3">
+          <div class="col-12 col-lg-7">
+            <ul class="list-group sponsor-notes-list" id="notesList">
+              <?php foreach ($notes as $note): ?>
+                <li class="list-group-item">
+                  <div><?= nl2br(h($note['note'])) ?></div>
+                  <div class="text-muted small mt-2"><?= h(sponsorProfileDateTime($note['created_at'] ?? null)) ?></div>
+                </li>
+              <?php endforeach; ?>
+              <?php if (!$notes): ?>
+                <li class="list-group-item text-muted" data-placeholder="notes-empty">No notes yet.</li>
+              <?php endif; ?>
+            </ul>
           </div>
-        </form>
+          <div class="col-12 col-lg-5">
+            <div class="sponsor-action-panel h-100">
+              <div>
+                <h4>Add note</h4>
+                <p>Keep this factual and useful for the next person reviewing the sponsor.</p>
+              </div>
+              <form method="post" action="sponsor_save.php" class="d-grid gap-2" id="noteForm">
+                <input type="hidden" name="action" value="add_note">
+                <input type="hidden" name="sponsor_id" value="<?= $id ?>">
+                <textarea name="note" class="form-control form-control-sm" rows="6" placeholder="Write a note..." required></textarea>
+                <button class="btn btn-sm btn-primary justify-self-start" type="submit">Add note</button>
+              </form>
+            </div>
+          </div>
+        </div>
       </div>
 
       <script>
@@ -664,8 +940,8 @@ if ($action === 'view') {
                 const li = document.createElement('li');
                 li.className = 'list-group-item';
                 li.innerHTML = `
-      <strong>Note:</strong> ${data.note.note}
-      <div class="text-muted small">${data.note.created_at}</div>
+      <div>${data.note.note}</div>
+      <div class="text-muted small mt-2">${data.note.created_at}</div>
     `;
                 notesList.prepend(li);
                 const placeholder = notesList.querySelector('[data-placeholder="notes-empty"]');
@@ -982,6 +1258,50 @@ if ($action === 'view') {
 
       syncSlotsForPlayer();
     })();
+  </script>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      // Reopen a specific tab after a redirect, e.g. ?tab=payments
+      var wantedTab = new URLSearchParams(window.location.search).get('tab');
+      if (wantedTab) {
+        var tabBtn = document.querySelector('.nav-tabs [data-bs-target="#' + wantedTab.replace(/[^a-z0-9_-]/gi, '') + '"]');
+        if (tabBtn && typeof bootstrap !== 'undefined') {
+          try { new bootstrap.Tab(tabBtn).show(); } catch (e) {}
+        }
+      }
+
+      var sponsorId = <?= (int) $id ?>;
+      document.addEventListener('click', function (event) {
+        var btn = event.target.closest('.sponsor-payment-delete');
+        if (!btn) return;
+
+        var paymentId = btn.getAttribute('data-payment-id');
+        var amount = btn.getAttribute('data-amount') || '';
+        if (!paymentId) return;
+        if (!window.confirm('Remove this £' + amount + ' payment? The outstanding balance will go back up.')) return;
+
+        btn.disabled = true;
+        fetch('sponsor_ajax.php', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: 'action=delete_payment&id=' + encodeURIComponent(paymentId)
+        })
+          .then(function (r) { return r.json(); })
+          .then(function (data) {
+            if (data && data.success) {
+              window.location = 'sponsor.php?id=' + sponsorId + '&tab=payments&payment_removed=1';
+            } else {
+              btn.disabled = false;
+              window.alert((data && data.message) ? data.message : 'Could not remove the payment.');
+            }
+          })
+          .catch(function () {
+            btn.disabled = false;
+            window.alert('Request failed. Please try again.');
+          });
+      });
+    });
   </script>
 
 <?php

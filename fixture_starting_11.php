@@ -7,6 +7,7 @@ require_once __DIR__ . '/header.php';
 require_once __DIR__ . '/lib/match_sponsorship.php';
 require_once __DIR__ . '/lib/template_pack_render.php';
 require_once __DIR__ . '/lib/audit.php';
+require_once __DIR__ . '/lib/player_availability.php';
 
 $ajaxHeader = strtolower((string)($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '')) === 'xmlhttprequest';
 if (
@@ -53,10 +54,16 @@ $players = $pdo->query("
   WHERE active = 1
   ORDER BY name ASC
 ")->fetchAll(PDO::FETCH_ASSOC);
+$availabilityByPlayer = player_availability_by_fixture($pdo, $fixtureId);
+$players = player_availability_merge_players($players, $availabilityByPlayer);
+$availabilitySummary = player_availability_summary($players);
+$availabilityStatuses = player_availability_selectable_statuses();
 $playerNames = array_map(static fn(array $row): string => (string)$row['name'], $players);
 $playerStatusesByName = [];
+$playerAvailabilityByName = [];
 foreach ($players as $playerRow) {
           $playerStatusesByName[(string)$playerRow['name']] = (string)($playerRow['status'] ?? '');
+          $playerAvailabilityByName[(string)$playerRow['name']] = $playerRow;
 }
 
 $errors = [];
@@ -274,6 +281,12 @@ $effectiveBackgroundUrl = $fixtureBackgroundUrl !== '' ? $fixtureBackgroundUrl :
   <?php foreach ($errors as $error): ?>
     <div class="alert alert-danger"><?= h($error) ?></div>
   <?php endforeach; ?>
+  <?php if (isset($_GET['availability_saved'])): ?>
+    <div class="alert alert-success">Player availability saved.</div>
+  <?php endif; ?>
+  <?php if (isset($_GET['availability_error'])): ?>
+    <div class="alert alert-danger"><?= h((string) $_GET['availability_error']) ?></div>
+  <?php endif; ?>
 
   <form method="post" enctype="multipart/form-data" id="starting11Form">
     <?= csrf_field() ?>
@@ -313,7 +326,14 @@ $effectiveBackgroundUrl = $fixtureBackgroundUrl !== '' ? $fixtureBackgroundUrl :
                       <select class="form-select starter-select" name="starters[]" data-slot="<?= $i ?>">
                         <option value="">Select player</option>
                         <?php foreach ($playerNames as $name): ?>
-                          <option value="<?= h($name) ?>" <?= $selectedStarter === $name ? 'selected' : '' ?>><?= h($name) ?><?= ($playerStatusesByName[$name] ?? '') === 'trialist' ? ' (Trialist)' : '' ?></option>
+                          <?php
+                          $availability = $playerAvailabilityByName[$name] ?? [];
+                          $availabilityLabel = (string)($availability['availability_label'] ?? 'Unknown');
+                          $availabilityBlocks = !empty($availability['availability_blocks_selection']);
+                          ?>
+                          <option value="<?= h($name) ?>" <?= $selectedStarter === $name ? 'selected' : '' ?> data-availability-status="<?= h((string)($availability['availability_status'] ?? 'unknown')) ?>">
+                            <?= h($name) ?><?= ($playerStatusesByName[$name] ?? '') === 'trialist' ? ' (Trialist)' : '' ?><?= $availabilityBlocks ? ' - ' . h($availabilityLabel) : '' ?>
+                          </option>
                         <?php endforeach; ?>
                       </select>
                     </td>
@@ -336,9 +356,14 @@ $effectiveBackgroundUrl = $fixtureBackgroundUrl !== '' ? $fixtureBackgroundUrl :
           <div class="starting11-subs">
             <?php foreach ($playerNames as $name): ?>
               <?php $substituteNumber = (int)($fixture['starting11_squad_numbers'][$name] ?? 0); ?>
-              <button type="button" class="starting11-sub-pill<?= in_array($name, $fixture['starting11_substitutes'] ?? [], true) ? ' is-selected' : '' ?>" data-player-name="<?= h($name) ?>" aria-pressed="<?= in_array($name, $fixture['starting11_substitutes'] ?? [], true) ? 'true' : 'false' ?>">
+              <?php
+              $availability = $playerAvailabilityByName[$name] ?? [];
+              $availabilityStatus = (string)($availability['availability_status'] ?? 'unknown');
+              $availabilityBlocks = !empty($availability['availability_blocks_selection']);
+              ?>
+              <button type="button" class="starting11-sub-pill<?= in_array($name, $fixture['starting11_substitutes'] ?? [], true) ? ' is-selected' : '' ?><?= $availabilityBlocks ? ' is-unavailable' : '' ?>" data-player-name="<?= h($name) ?>" data-availability-status="<?= h($availabilityStatus) ?>" aria-pressed="<?= in_array($name, $fixture['starting11_substitutes'] ?? [], true) ? 'true' : 'false' ?>"<?= $availabilityBlocks ? ' title="' . h((string)$availability['availability_label']) . '"' : '' ?>>
                 <span class="starting11-sub-pill-number"<?= $substituteNumber > 0 ? '' : ' hidden' ?>><?= $substituteNumber > 0 ? $substituteNumber : '' ?></span>
-                <span class="starting11-sub-pill-name"><?= h($name) ?><?= ($playerStatusesByName[$name] ?? '') === 'trialist' ? ' (Trialist)' : '' ?></span>
+                <span class="starting11-sub-pill-name"><?= h($name) ?><?= ($playerStatusesByName[$name] ?? '') === 'trialist' ? ' (Trialist)' : '' ?><?= $availabilityBlocks ? ' - ' . h((string)$availability['availability_label']) : '' ?></span>
               </button>
             <?php endforeach; ?>
           </div>
@@ -347,6 +372,67 @@ $effectiveBackgroundUrl = $fixtureBackgroundUrl !== '' ? $fixtureBackgroundUrl :
       </div>
 
       <div class="col-12 col-xl-4">
+        <div class="starting11-panel p-4 mb-4" id="playerAvailabilityPanel">
+          <div class="starting11-kicker">Squad welfare</div>
+          <h2 class="starting11-title h4 mb-1">Availability</h2>
+          <div class="d-flex flex-wrap gap-2 mb-3">
+            <span class="badge text-bg-success"><?= (int)$availabilitySummary['available'] ?> available</span>
+            <span class="badge text-bg-warning"><?= (int)$availabilitySummary['doubtful'] ?> doubtful</span>
+            <span class="badge text-bg-danger"><?= (int)$availabilitySummary['blocked'] ?> unavailable</span>
+            <span class="badge text-bg-light"><?= (int)$availabilitySummary['unknown'] ?> unknown</span>
+          </div>
+          <form method="post" action="/player_availability_save.php" class="row g-2">
+            <?= csrf_field() ?>
+            <input type="hidden" name="fixture_id" value="<?= (int)$fixtureId ?>">
+            <input type="hidden" name="season_id" value="<?= (int)$seasonId ?>">
+            <div class="col-12">
+              <label class="form-label small" for="availabilityPlayerId">Player</label>
+              <select class="form-select form-select-sm" id="availabilityPlayerId" name="player_id" required>
+                <option value="">Select player</option>
+                <?php foreach ($players as $playerOption): ?>
+                  <option value="<?= (int)$playerOption['id'] ?>"><?= h((string)$playerOption['name']) ?></option>
+                <?php endforeach; ?>
+              </select>
+            </div>
+            <div class="col-12">
+              <label class="form-label small" for="availabilityStatus">Status</label>
+              <select class="form-select form-select-sm" id="availabilityStatus" name="status" required>
+                <?php foreach ($availabilityStatuses as $statusKey => $statusLabel): ?>
+                  <option value="<?= h((string)$statusKey) ?>"><?= h((string)$statusLabel) ?></option>
+                <?php endforeach; ?>
+              </select>
+            </div>
+            <div class="col-12">
+              <label class="form-label small" for="availabilityReason">Reason</label>
+              <input type="text" class="form-control form-control-sm" id="availabilityReason" name="reason" maxlength="80" placeholder="Work, injury, suspension">
+            </div>
+            <div class="col-12">
+              <label class="form-label small" for="availabilityNotes">Notes</label>
+              <input type="text" class="form-control form-control-sm" id="availabilityNotes" name="notes" maxlength="255">
+            </div>
+            <div class="col-12 text-end">
+              <button type="submit" class="btn btn-outline-secondary btn-sm"><i class="fa-solid fa-notes-medical me-1" aria-hidden="true"></i>Save availability</button>
+            </div>
+          </form>
+
+          <?php $availabilityRows = array_values(array_filter($players, static fn(array $row): bool => (string)($row['availability_status'] ?? 'unknown') !== 'unknown')); ?>
+          <?php if ($availabilityRows !== []): ?>
+            <hr>
+            <div class="small fw-semibold mb-2">Recorded for this fixture</div>
+            <div class="d-grid gap-2">
+              <?php foreach ($availabilityRows as $availabilityRow): ?>
+                <div class="d-flex justify-content-between align-items-start gap-2 small">
+                  <div>
+                    <strong><?= h((string)$availabilityRow['name']) ?></strong>
+                    <?php if (trim((string)$availabilityRow['availability_reason']) !== ''): ?><div class="text-muted"><?= h((string)$availabilityRow['availability_reason']) ?></div><?php endif; ?>
+                  </div>
+                  <span class="badge <?= h((string)$availabilityRow['availability_badge_class']) ?>"><?= h((string)$availabilityRow['availability_label']) ?></span>
+                </div>
+              <?php endforeach; ?>
+            </div>
+          <?php endif; ?>
+        </div>
+
         <div class="starting11-panel p-4 mb-4">
           <div class="starting11-kicker">Artwork</div>
           <h2 class="starting11-title h4 mb-1">Background</h2>
@@ -463,6 +549,26 @@ $effectiveBackgroundUrl = $fixtureBackgroundUrl !== '' ? $fixtureBackgroundUrl :
     }
     var allPlayerNames = <?=
       json_encode(array_values($playerNames), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)
+    ?>;
+    var playerSelectLabels = <?=
+      json_encode(array_reduce($players, static function (array $labels, array $playerRow): array {
+        $name = (string)($playerRow['name'] ?? '');
+        $label = $name;
+        if ((string)($playerRow['status'] ?? '') === 'trialist') {
+          $label .= ' (Trialist)';
+        }
+        if (!empty($playerRow['availability_blocks_selection'])) {
+          $label .= ' - ' . (string)($playerRow['availability_label'] ?? 'Unavailable');
+        }
+        $labels[$name] = $label;
+        return $labels;
+      }, []), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)
+    ?>;
+    var playerAvailabilityStatuses = <?=
+      json_encode(array_reduce($players, static function (array $statuses, array $playerRow): array {
+        $statuses[(string)($playerRow['name'] ?? '')] = (string)($playerRow['availability_status'] ?? 'unknown');
+        return $statuses;
+      }, []), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)
     ?>;
     var selectedSubs = <?=
       json_encode(array_values(matchStarting11PrepareLineup($fixture['starting11_substitutes'] ?? [])), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)
@@ -667,7 +773,8 @@ $effectiveBackgroundUrl = $fixtureBackgroundUrl !== '' ? $fixtureBackgroundUrl :
 
           var option = document.createElement('option');
           option.value = name;
-          option.textContent = name;
+          option.textContent = playerSelectLabels[name] || name;
+          option.dataset.availabilityStatus = playerAvailabilityStatuses[name] || 'unknown';
           if (name === previousValue) {
             option.selected = true;
           }

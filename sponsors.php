@@ -11,6 +11,7 @@ $seasonId = getSelectedSeasonId($pdo);
 $season = getSeasonById($pdo, $seasonId);
 $previousSeasonId = $seasonId > 0 ? getPreviousSeasonId($pdo, $seasonId) : 0;
 $seasonLocked = $season ? (int)$season['is_locked'] === 1 : false;
+ensureSponsorSeasonSchema($pdo);
 
 $pageHero = [
   'eyebrow' => 'Sponsor management',
@@ -159,9 +160,17 @@ if (!in_array($scopeFilter, array_merge(['all'], array_keys($scopeLabels)), true
   $scopeFilter = 'all';
 }
 
-$packageFilter = (int)($_GET['package'] ?? 0);
+$packageFilterRaw = $_GET['package'] ?? [];
+if (!is_array($packageFilterRaw)) {
+  $packageFilterRaw = $packageFilterRaw !== '' ? [$packageFilterRaw] : [];
+}
+$packageFilters = array_values(array_unique(array_filter(array_map('intval', $packageFilterRaw), static fn(int $id): bool => $id > 0)));
 $mainOnly = ($_GET['main'] ?? '') === '1';
 $noLogoOnly = ($_GET['nologo'] ?? '') === '1';
+$facebookFilter = $_GET['facebook'] ?? 'all';
+if (!in_array($facebookFilter, ['all', 'posted', 'not_posted'], true)) {
+  $facebookFilter = 'all';
+}
 
 $search = trim($_GET['q'] ?? '');
 
@@ -186,6 +195,11 @@ if ($noLogoOnly) {
   $whereParts[] = "(s.logo_path IS NULL OR s.logo_path = '')";
 }
 
+if ($facebookFilter !== 'all') {
+  $whereParts[] = 'COALESCE(ss.facebook_spotlight_posted, 0) = :facebook_spotlight_posted';
+  $params[':facebook_spotlight_posted'] = $facebookFilter === 'posted' ? 1 : 0;
+}
+
 $where = $whereParts ? 'WHERE ' . implode(' AND ', $whereParts) : '';
 
 // --- Fetch the sponsor directory, then attach every agreement type. ---
@@ -196,7 +210,9 @@ $sql = "
     s.is_active,
     s.is_main_sponsor,
     s.logo_path,
-    ss.notes
+    ss.notes,
+    COALESCE(ss.facebook_spotlight_posted, 0) AS facebook_spotlight_posted,
+    ss.facebook_spotlight_posted_at
   FROM sponsors s
   LEFT JOIN sponsor_seasons ss
     ON ss.sponsor_id = s.id
@@ -261,8 +277,22 @@ foreach ($agreements as $agreement) {
 }
 uasort($packageOptions, static fn(array $a, array $b): int => [$a['category'], $a['name']] <=> [$b['category'], $b['name']]);
 
-if ($packageFilter !== 0 && !isset($packageOptions[$packageFilter])) {
-  $packageFilter = 0;
+$packageFilters = array_values(array_intersect($packageFilters, array_keys($packageOptions)));
+
+// An explicit "every package checked" selection is functionally identical to no
+// filter at all (and must include sponsors with zero package agreements too), so
+// collapse it back to the empty/unfiltered state — the checkboxes still render
+// all-checked further down since $packageFilterIsAllSelected covers both cases.
+$packageFilterIsAllSelected = $packageFilters === [] || count($packageFilters) === count($packageOptions);
+if ($packageFilterIsAllSelected) {
+  $packageFilters = [];
+}
+
+$packageFilterSummary = 'All packages';
+if (!$packageFilterIsAllSelected) {
+  $packageFilterSummary = count($packageFilters) <= 2
+    ? implode(', ', array_map(static fn(int $id): string => $packageOptions[$id]['name'] ?? '', $packageFilters))
+    : count($packageFilters) . ' packages selected';
 }
 
 foreach ($sponsors as &$sponsor) {
@@ -311,14 +341,14 @@ function sponsorMatchesPaymentFilter(array $row, string $paymentFilter): bool
   return $paymentFilter === 'all' || $state === $paymentFilter;
 }
 
-$visibleSponsors = array_values(array_filter($sponsors, function (array $row) use ($paymentFilter, $scopeFilter, $packageFilter): bool {
+$visibleSponsors = array_values(array_filter($sponsors, function (array $row) use ($paymentFilter, $scopeFilter, $packageFilters): bool {
   if (!sponsorMatchesPaymentFilter($row, $paymentFilter)) {
     return false;
   }
   if ($scopeFilter !== 'all' && empty($row['scope_counts'][$scopeFilter])) {
     return false;
   }
-  if ($packageFilter !== 0 && empty($row['package_ids'][$packageFilter])) {
+  if ($packageFilters !== [] && !array_intersect_key($row['package_ids'], array_flip($packageFilters))) {
     return false;
   }
   return true;
@@ -429,24 +459,46 @@ $visibleOutstanding = array_sum(array_map(
             <?php endforeach; ?>
           </select>
         </div>
-        <div class="col-6 col-lg-3">
-          <label for="packageFilter" class="form-label small text-muted mb-1">Package</label>
-          <select id="packageFilter" name="package" class="form-select">
-            <option value="0" <?= $packageFilter === 0 ? 'selected' : '' ?>>All packages</option>
-            <?php
-              $packageOptionsByCategory = [];
-              foreach ($packageOptions as $opt) {
-                $packageOptionsByCategory[$opt['category']][] = $opt;
-              }
-            ?>
-            <?php foreach ($packageOptionsByCategory as $category => $opts): ?>
-              <optgroup label="<?= h($category) ?>">
-                <?php foreach ($opts as $opt): ?>
-                  <option value="<?= (int)$opt['id'] ?>" <?= $packageFilter === (int)$opt['id'] ? 'selected' : '' ?>><?= h($opt['name']) ?></option>
-                <?php endforeach; ?>
-              </optgroup>
-            <?php endforeach; ?>
+        <div class="col-6 col-lg-2">
+          <label for="facebookFilter" class="form-label small text-muted mb-1">Facebook</label>
+          <select id="facebookFilter" name="facebook" class="form-select">
+            <option value="all" <?= $facebookFilter === 'all' ? 'selected' : '' ?>>All Facebook</option>
+            <option value="posted" <?= $facebookFilter === 'posted' ? 'selected' : '' ?>>Advertised</option>
+            <option value="not_posted" <?= $facebookFilter === 'not_posted' ? 'selected' : '' ?>>Not advertised</option>
           </select>
+        </div>
+        <div class="col-6 col-lg-3 hub-checkbox-dropdown-field">
+          <label class="form-label small text-muted mb-1" id="packageFilterLabel">Package</label>
+          <div class="dropdown hub-checkbox-dropdown">
+            <button type="button" class="form-select hub-checkbox-dropdown__toggle" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false" aria-labelledby="packageFilterLabel">
+              <span class="hub-checkbox-dropdown__summary" data-package-filter-summary><?= h($packageFilterSummary) ?></span>
+            </button>
+            <div class="dropdown-menu hub-checkbox-dropdown__menu" aria-label="Filter by package">
+              <?php
+                $packageOptionsByCategory = [];
+                foreach ($packageOptions as $opt) {
+                  $packageOptionsByCategory[$opt['category']][] = $opt;
+                }
+              ?>
+              <?php if ($packageOptionsByCategory === []): ?>
+                <span class="hub-checkbox-dropdown__empty">No packages available</span>
+              <?php else: ?>
+                <label class="hub-checkbox-dropdown__item hub-checkbox-dropdown__select-all">
+                  <input type="checkbox" data-package-select-all <?= $packageFilterIsAllSelected ? 'checked' : '' ?>>
+                  <span>Select all</span>
+                </label>
+              <?php endif; ?>
+              <?php foreach ($packageOptionsByCategory as $category => $opts): ?>
+                <span class="hub-checkbox-dropdown__group-label"><?= h($category) ?></span>
+                <?php foreach ($opts as $opt): ?>
+                  <label class="hub-checkbox-dropdown__item">
+                    <input type="checkbox" name="package[]" value="<?= (int)$opt['id'] ?>" <?= ($packageFilterIsAllSelected || in_array((int)$opt['id'], $packageFilters, true)) ? 'checked' : '' ?>>
+                    <span><?= h($opt['name']) ?></span>
+                  </label>
+                <?php endforeach; ?>
+              <?php endforeach; ?>
+            </div>
+          </div>
         </div>
         <div class="col-6 col-lg-2 d-flex align-items-center">
           <div class="form-check form-switch">
@@ -517,6 +569,7 @@ $visibleOutstanding = array_sum(array_map(
                   <span class="badge hub-status <?= h($state['badge']) ?>"><?= h($state['label']) ?></span>
                   <?php if (!(int)$s['is_active']): ?><span class="badge text-bg-secondary">Inactive record</span><?php endif; ?>
                   <?php if ((int)$s['is_main_sponsor']): ?><span class="badge text-bg-warning">Main sponsor</span><?php endif; ?>
+                  <?php if ((int)$s['facebook_spotlight_posted'] === 1): ?><span class="badge text-bg-primary">Facebook posted</span><?php endif; ?>
                 </div>
               </div>
             </div>
@@ -542,6 +595,19 @@ $visibleOutstanding = array_sum(array_map(
               <?php foreach ((array)$s['scope_counts'] as $scope => $count): ?><span><i class="fa-solid <?= $scope === 'player' ? 'fa-shirt' : ($scope === 'match' ? 'fa-futbol' : ($scope === 'team' ? 'fa-people-group' : 'fa-shield-halved')) ?>" aria-hidden="true"></i><?= h(ucfirst((string)$scope)) ?> <?= (int)$count ?></span><?php endforeach; ?>
             </div>
           <?php endif; ?>
+
+          <label class="form-check form-switch sponsor-facebook-toggle sponsor-facebook-toggle--mobile">
+            <input
+              class="form-check-input"
+              type="checkbox"
+              role="switch"
+              data-facebook-spotlight-toggle
+              data-sponsor-id="<?= (int)$s['id'] ?>"
+              aria-label="Advertised on Facebook for <?= h($s['name']) ?>"
+              <?= (int)$s['facebook_spotlight_posted'] === 1 ? 'checked' : '' ?>
+              <?= $seasonLocked ? 'disabled' : '' ?>>
+            <span>Advertised on Facebook</span>
+          </label>
 
           <div class="sponsors-mobile-metrics">
             <div class="sponsors-mobile-metric">
@@ -579,6 +645,7 @@ $visibleOutstanding = array_sum(array_map(
                 <th class="text-end">Value</th>
                 <th>Payment</th>
                 <th>Last payment</th>
+                <th class="text-center">Facebook</th>
                 <th class="text-center" data-export-ignore="1">Actions</th>
               </tr>
             </thead>
@@ -610,6 +677,19 @@ $visibleOutstanding = array_sum(array_map(
                   <td class="sponsor-ledger-date">
                     <?= !empty($s['last_payment']) ? h(date('d M Y', strtotime((string)$s['last_payment']))) : '<span class="text-muted">None recorded</span>' ?>
                   </td>
+                  <td class="text-center sponsor-facebook-cell">
+                    <label class="form-check form-switch sponsor-facebook-toggle" title="Mark sponsor spotlight advertised on Facebook">
+                      <input
+                        class="form-check-input"
+                        type="checkbox"
+                        role="switch"
+                        data-facebook-spotlight-toggle
+                        data-sponsor-id="<?= (int)$s['id'] ?>"
+                        aria-label="Advertised on Facebook for <?= h($s['name']) ?>"
+                        <?= (int)$s['facebook_spotlight_posted'] === 1 ? 'checked' : '' ?>
+                        <?= $seasonLocked ? 'disabled' : '' ?>>
+                    </label>
+                  </td>
                   <td class="text-center" data-export-ignore="1">
                     <div class="hub-row-actions hub-actions" role="group" aria-label="Sponsor actions">
                       <a href="/sponsor.php?id=<?= (int)$s['id'] ?>" class="btn btn-sm btn-outline-secondary" title="View sponsor" aria-label="View <?= h($s['name']) ?>">
@@ -630,9 +710,124 @@ $visibleOutstanding = array_sum(array_map(
   <?php endif; ?>
 </div>
 
+<style>
+  .sponsor-facebook-toggle {
+    align-items: center;
+    display: inline-flex;
+    gap: .45rem;
+    justify-content: center;
+    margin: 0;
+    min-width: 6rem;
+    padding-left: 0;
+    white-space: nowrap;
+  }
+  .sponsor-facebook-toggle .form-check-input {
+    float: none;
+    margin-left: 0;
+  }
+  .sponsor-facebook-toggle--mobile {
+    border-top: 1px solid rgba(0, 0, 0, .08);
+    justify-content: flex-start;
+    padding-top: .75rem;
+    width: 100%;
+  }
+  .sponsor-facebook-toggle--saving {
+    opacity: .65;
+  }
+</style>
+
 <script>
   $(function () {
     $('[data-bs-toggle="tooltip"]').tooltip();
+    var sponsorsCsrfToken = <?= json_encode((string)($_SESSION['csrf_token'] ?? ''), JSON_UNESCAPED_SLASHES) ?>;
+    var selectedSeasonId = <?= (int)$seasonId ?>;
+
+    var packageCheckboxes = Array.prototype.slice.call(document.querySelectorAll('input[name="package[]"]'));
+    var packageSelectAll = document.querySelector('[data-package-select-all]');
+    var packageFilterSummary = document.querySelector('[data-package-filter-summary]');
+    function updatePackageFilterSummary() {
+      if (!packageFilterSummary) return;
+      var checked = packageCheckboxes.filter(function (box) { return box.checked; });
+      if (checked.length === 0 || checked.length === packageCheckboxes.length) {
+        packageFilterSummary.textContent = 'All packages';
+      } else if (checked.length <= 2) {
+        packageFilterSummary.textContent = checked.map(function (box) {
+          var label = box.closest('.hub-checkbox-dropdown__item').querySelector('span');
+          return label ? label.textContent : box.value;
+        }).join(', ');
+      } else {
+        packageFilterSummary.textContent = checked.length + ' packages selected';
+      }
+    }
+    function syncPackageSelectAll() {
+      if (!packageSelectAll || !packageCheckboxes.length) return;
+      var checkedCount = packageCheckboxes.filter(function (box) { return box.checked; }).length;
+      packageSelectAll.checked = checkedCount === packageCheckboxes.length;
+      packageSelectAll.indeterminate = checkedCount > 0 && checkedCount < packageCheckboxes.length;
+    }
+    packageCheckboxes.forEach(function (box) {
+      box.addEventListener('change', function () {
+        updatePackageFilterSummary();
+        syncPackageSelectAll();
+      });
+    });
+    if (packageSelectAll) {
+      packageSelectAll.addEventListener('change', function () {
+        packageCheckboxes.forEach(function (box) { box.checked = packageSelectAll.checked; });
+        packageSelectAll.indeterminate = false;
+        updatePackageFilterSummary();
+      });
+      syncPackageSelectAll();
+    }
+
+    document.querySelectorAll('[data-facebook-spotlight-toggle]').forEach(function (toggle) {
+      toggle.addEventListener('change', function () {
+        var checked = toggle.checked;
+        var sponsorId = toggle.dataset.sponsorId || '';
+        var matchingSelector = '[data-facebook-spotlight-toggle][data-sponsor-id="' + sponsorId.replace(/"/g, '\\"') + '"]';
+        var label = toggle.closest('.sponsor-facebook-toggle');
+        var body = new URLSearchParams({
+          csrf_token: sponsorsCsrfToken,
+          season_id: String(selectedSeasonId),
+          sponsor_id: sponsorId,
+          posted: checked ? '1' : '0'
+        });
+
+        toggle.disabled = true;
+        if (label) label.classList.add('sponsor-facebook-toggle--saving');
+
+        fetch('/sponsor_facebook_spotlight_save.php', {
+          method: 'POST',
+          body: body,
+          credentials: 'same-origin',
+          headers: { 'Accept': 'application/json' }
+        })
+          .then(function (response) {
+            return response.json().then(function (data) {
+              if (!response.ok || !data.ok) {
+                throw new Error(data.error || 'Unable to save Facebook status.');
+              }
+              return data;
+            });
+          })
+          .then(function (data) {
+            document.querySelectorAll(matchingSelector).forEach(function (matchingToggle) {
+              matchingToggle.checked = !!data.posted;
+            });
+          })
+          .catch(function (error) {
+            toggle.checked = !checked;
+            alert(error.message || 'Unable to save Facebook status.');
+          })
+          .finally(function () {
+            document.querySelectorAll(matchingSelector).forEach(function (matchingToggle) {
+              matchingToggle.disabled = <?= $seasonLocked ? 'true' : 'false' ?>;
+              var matchingLabel = matchingToggle.closest('.sponsor-facebook-toggle');
+              if (matchingLabel) matchingLabel.classList.remove('sponsor-facebook-toggle--saving');
+            });
+          });
+      });
+    });
 
     function escapeCsv(value) {
       return '"' + String(value).replace(/"/g, '""').replace(/\s+/g, ' ').trim() + '"';

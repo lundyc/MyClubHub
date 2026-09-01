@@ -197,6 +197,8 @@ function ensureSponsorSeasonSchema(PDO $pdo): void
                                         joined_at DATE DEFAULT NULL,
                                         left_at DATE DEFAULT NULL,
                                         notes VARCHAR(255) DEFAULT NULL,
+                                        facebook_spotlight_posted TINYINT(1) NOT NULL DEFAULT 0,
+                                        facebook_spotlight_posted_at DATETIME DEFAULT NULL,
                                         created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
                                         PRIMARY KEY (id),
                                         UNIQUE KEY uq_sponsor_season (season_id, sponsor_id),
@@ -204,6 +206,19 @@ function ensureSponsorSeasonSchema(PDO $pdo): void
                                         KEY idx_sponsor_seasons_sponsor (sponsor_id)
                               ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
                     ");
+          }
+
+          $columns = [];
+          foreach ($pdo->query("SHOW COLUMNS FROM sponsor_seasons") as $row) {
+                    $columns[(string)$row['Field']] = true;
+          }
+          if (!isset($columns['facebook_spotlight_posted'])) {
+                    $pdo->exec("ALTER TABLE sponsor_seasons ADD COLUMN facebook_spotlight_posted TINYINT(1) NOT NULL DEFAULT 0 AFTER notes");
+                    $columns['facebook_spotlight_posted'] = true;
+          }
+          if (!isset($columns['facebook_spotlight_posted_at'])) {
+                    $afterColumn = isset($columns['facebook_spotlight_posted']) ? ' AFTER facebook_spotlight_posted' : ' AFTER notes';
+                    $pdo->exec("ALTER TABLE sponsor_seasons ADD COLUMN facebook_spotlight_posted_at DATETIME DEFAULT NULL" . $afterColumn);
           }
 }
 

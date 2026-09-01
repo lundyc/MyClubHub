@@ -4,15 +4,44 @@ declare(strict_types=1);
 require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/../lib/functions.php';
 require_once __DIR__ . '/../lib/pos.php';
+require_once __DIR__ . '/../lib/pos_trading_days.php';
 
 pos_ensure_schema($pdo);
+pos_trading_day_ensure_schema($pdo);
 $actor = pos_require_actor($pdo);
+$activeTradingDay = pos_trading_day_active($pdo);
+if (!$activeTradingDay) {
+    if (pos_actor_is_manager($pdo)) {
+        header('Location: /pos_overview.php?day_closed=1');
+        exit;
+    }
+    http_response_code(423);
+    exit('The POS day has not been opened. Ask a manager to open the POS day before using the till.');
+}
 $locations = pos_locations_for_actor($pdo, $actor);
-$locationId = (int) ($_GET['location_id'] ?? ($locations[0]['id'] ?? 0));
+$requestedLocationId = (int) ($_GET['location_id'] ?? 0);
+if ($requestedLocationId <= 0 && count($locations) > 1) {
+    header('Location: /pos_overview.php?select_till=1');
+    exit;
+}
+$locationId = $requestedLocationId > 0 ? $requestedLocationId : (int) ($locations[0]['id'] ?? 0);
 $location = pos_location($pdo, $locationId);
 if (!$location && $locations) {
+    if (count($locations) > 1) {
+        header('Location: /pos_overview.php?select_till=1');
+        exit;
+    }
     $location = $locations[0];
     $locationId = (int) $location['id'];
+}
+$activeTillSession = $locationId > 0 ? pos_till_session_active($pdo, (int) $activeTradingDay['id'], $locationId) : null;
+if ($locationId > 0 && !$activeTillSession) {
+    if (pos_actor_is_manager($pdo)) {
+        header('Location: /pos_overview.php?till_closed=1');
+        exit;
+    }
+    http_response_code(423);
+    exit('This till has not been opened for the current POS day.');
 }
 $products = $locationId > 0 ? pos_products_for_location($pdo, $locationId) : [];
 $categories = [];
@@ -49,11 +78,12 @@ $canViewFinancials = pos_actor_is_manager($pdo);
         .pos-menu__label { color:rgba(247,239,228,.68); font-size:.72rem; font-weight:900; letter-spacing:.08em; text-transform:uppercase; }
         .pos-menu__identity { display:flex; align-items:center; gap:.6rem; color:#f7efe4; font-weight:900; }
         .pos-menu__identity i { color:#e0b42a; }
-        .pos-location-select { display:grid; gap:.35rem; }
-        .pos-location-select select { width:100%; border:0; border-radius:.7rem; padding:.65rem .7rem; font-weight:850; background:#f7efe4; color:#21141a; }
+        .pos-location-select { display:grid; gap:.35rem; color:#f7efe4; font-weight:900; }
         .pos-manage { display:grid; gap:.45rem; }
         .pos-manage a, .pos-manage button { display:flex; align-items:center; justify-content:space-between; border:1px solid rgba(255,255,255,.08); background:rgba(255,255,255,.045); color:#f7efe4; border-radius:.75rem; padding:.65rem .75rem; font-weight:850; text-decoration:none; }
         .pos-manage a:hover, .pos-manage a:focus { color:#e0b42a; background:rgba(255,255,255,.08); }
+        .pos-manage button { width:100%; cursor:pointer; }
+        .pos-manage .danger { color:#ffd8df; border-color:rgba(255,216,223,.2); }
         .pos-layout { display:grid; grid-template-columns:minmax(0,1fr) 390px; gap:1rem; padding:1rem; align-items:start; }
         .pos-panel { background:#fff; border:1px solid rgba(75,8,24,.12); border-radius:1rem; box-shadow:0 14px 36px rgba(36,21,26,.08); overflow:hidden; }
         .pos-panel__head { display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:1rem; border-bottom:1px solid rgba(75,8,24,.1); }
@@ -132,6 +162,26 @@ $canViewFinancials = pos_actor_is_manager($pdo);
         .pos-cash-flow__actions button { border:0; border-radius:.8rem; padding:.75rem .85rem; font-weight:900; }
         .pos-cash-flow__actions .confirm { background:#0d7a4a; color:#fff; }
         .pos-cash-flow__actions .cancel { background:#fff; color:#4b0818; border:1px solid rgba(75,8,24,.18); }
+        .pos-close-till-flow { position:fixed; inset:0; z-index:65; display:none; place-items:center; padding:1rem; background:rgba(36,21,26,.58); }
+        .pos-close-till-flow.is-open { display:grid; }
+        .pos-close-till-flow__card { width:min(460px, calc(100vw - 2rem)); background:#fff; border-radius:1.1rem; overflow:hidden; box-shadow:0 30px 90px rgba(0,0,0,.32); }
+        .pos-close-till-flow__head { display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; padding:1rem 1.1rem; color:#fff; background:linear-gradient(135deg,var(--brand),var(--brand-2)); }
+        .pos-close-till-flow__head h2 { margin:0; font-size:1.15rem; font-weight:900; }
+        .pos-close-till-flow__head button { border:0; background:transparent; color:#fff; font-size:1.2rem; }
+        .pos-close-till-flow__body { padding:1.1rem; }
+        .pos-close-till-flow__body label { color:var(--brand); font-weight:900; }
+        .pos-close-till-flow__help { color:#6f6470; font-size:.86rem; font-weight:700; margin:.35rem 0 0; }
+        .pos-close-till-flow__actions { display:flex; justify-content:flex-end; gap:.65rem; padding:1rem 1.1rem; background:#fbf7f1; }
+        .pos-close-till-flow__actions button { border-radius:.85rem; padding:.7rem .95rem; font-weight:900; }
+        .pos-close-till-flow__primary { border:0; background:#4b0818; color:#fff; }
+        .pos-close-till-flow__danger { border:0; background:#b4233a; color:#fff; }
+        .pos-close-till-flow__secondary { border:1px solid rgba(75,8,24,.18); background:#fff; color:#4b0818; }
+        .pos-close-till-check { display:grid; gap:.35rem; min-height:8rem; padding:1.15rem; border-radius:.85rem; border:1px solid rgba(75,8,24,.12); align-content:center; }
+        .pos-close-till-check strong, .pos-close-till-check span { display:block; }
+        .pos-close-till-check strong { color:#24151a; font-weight:950; }
+        .pos-close-till-check span { color:#6f6470; font-size:.9rem; font-weight:750; }
+        .pos-close-till-check--balanced { border-color:rgba(13,122,74,.22); background:rgba(13,122,74,.07); }
+        .pos-close-till-check--variance { border-color:rgba(184,116,0,.26); background:rgba(255,190,92,.12); }
         @media (max-height:700px) {
             .pos-cash-flow { padding:.35rem; }
             .pos-cash-flow__card { max-height:calc(100dvh - .7rem); border-radius:.85rem; }
@@ -161,14 +211,10 @@ $canViewFinancials = pos_actor_is_manager($pdo);
             <div class="pos-brand__menu">
                 <button class="pos-brand__icon" type="button" id="posMenuToggle" aria-controls="posMenu" aria-expanded="false" aria-label="Open POS menu"><i class="fa-solid fa-cash-register" aria-hidden="true"></i></button>
                 <div class="pos-menu" id="posMenu">
-                    <form class="pos-location-select" method="get">
-                        <label class="pos-menu__label" for="location_id">Location</label>
-                        <select id="location_id" name="location_id" onchange="this.form.submit()">
-                            <?php foreach ($locations as $navLocation): ?>
-                                <option value="<?= (int) $navLocation['id'] ?>" <?= (int) $navLocation['id'] === $locationId ? 'selected' : '' ?>><?= h((string) $navLocation['name']) ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </form>
+                    <div class="pos-location-select">
+                        <div class="pos-menu__label">Location</div>
+                        <div><?= h((string) ($location['name'] ?? 'No location selected')) ?></div>
+                    </div>
                     <div>
                         <div class="pos-menu__label">Signed in as</div>
                         <div class="pos-menu__identity"><i class="fa-solid fa-user" aria-hidden="true"></i><span><?= h((string) $actor['name']) ?></span></div>
@@ -180,6 +226,8 @@ $canViewFinancials = pos_actor_is_manager($pdo);
                             <a href="/pos/products.php">Products</a>
                             <a href="/pos/operators.php">Operators</a>
                         <?php endif; ?>
+                        <button type="button" id="noSaleDrawer">No sale drawer</button>
+                        <button class="danger" type="button" id="closeTillOpen">Close this till</button>
                         <?php if (hub_auth_is_authenticated()): ?>
                             <a href="/">Hub</a>
                             <a href="/pos/switch_operator.php">Operator login</a>
@@ -316,6 +364,11 @@ $canViewFinancials = pos_actor_is_manager($pdo);
             <div class="pos-card-flow__note">
                 If your phone blocks the handoff, leave this page open, switch to Stripe manually, then return here after payment.
             </div>
+            <div class="mt-3">
+                <label class="form-label fw-bold" for="stripePaymentReference">Stripe reference</label>
+                <input class="form-control" id="stripePaymentReference" maxlength="120" placeholder="PaymentIntent, receipt, or Stripe app reference">
+                <div class="form-text">Enter the Stripe reference shown after payment. This is saved against the POS sale for reconciliation.</div>
+            </div>
         </div>
         <div class="pos-card-flow__actions">
             <button class="primary" type="button" id="tryOpenStripeApp">Try Open Stripe App</button>
@@ -363,6 +416,39 @@ $canViewFinancials = pos_actor_is_manager($pdo);
     </div>
 </div>
 
+<div class="pos-close-till-flow" id="closeTillFlow" aria-hidden="true">
+    <div class="pos-close-till-flow__card">
+        <div class="pos-close-till-flow__head">
+            <div>
+                <div class="small text-uppercase fw-bold opacity-75">Close till</div>
+                <h2><?= h((string) ($location['name'] ?? 'Current till')) ?></h2>
+            </div>
+            <button type="button" id="closeTillDismiss" aria-label="Cancel closing till"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+        </div>
+        <div class="pos-close-till-flow__body">
+            <div id="closeTillEntry">
+                <div class="mb-3">
+                    <label class="form-label" for="closeTillCountedCash">Cash counted in drawer</label>
+                    <input class="form-control form-control-lg" id="closeTillCountedCash" type="number" min="0" step="0.01" inputmode="decimal" required>
+                    <p class="pos-close-till-flow__help">Enter the actual cash physically counted in this till, including the opening float.</p>
+                </div>
+                <div>
+                    <label class="form-label" for="closeTillNotes">Closing notes</label>
+                    <textarea class="form-control" id="closeTillNotes" rows="3" maxlength="255" placeholder="Optional notes, for example who counted the till or why there is a shortage."></textarea>
+                    <p class="pos-close-till-flow__help">Notes are saved for audit. Leave blank if there is nothing to record.</p>
+                </div>
+            </div>
+            <div class="pos-close-till-check d-none" id="closeTillResult" role="status" aria-live="polite"></div>
+        </div>
+        <div class="pos-close-till-flow__actions">
+            <button class="pos-close-till-flow__secondary" type="button" id="closeTillCancel">Cancel</button>
+            <button class="pos-close-till-flow__primary" type="button" id="closeTillCheck">Close till</button>
+            <button class="pos-close-till-flow__secondary d-none" type="button" id="closeTillRecheck">Recheck cash</button>
+            <button class="pos-close-till-flow__danger d-none" type="button" id="closeTillAccept">Accept and close</button>
+        </div>
+    </div>
+</div>
+
 <div class="pos-toast" id="posToast" role="status" aria-live="polite">
     <div class="pos-toast__card">
         <div class="pos-toast__icon"><i class="fa-solid fa-check"></i></div>
@@ -396,6 +482,7 @@ $canViewFinancials = pos_actor_is_manager($pdo);
     const cardFlow = document.getElementById('cardFlow');
     const cardFlowRef = document.getElementById('cardFlowRef');
     const cardFlowAmount = document.getElementById('cardFlowAmount');
+    const stripePaymentReference = document.getElementById('stripePaymentReference');
     const stripeOpenStatus = document.getElementById('stripeOpenStatus');
     const posMenu = document.getElementById('posMenu');
     const posMenuToggle = document.getElementById('posMenuToggle');
@@ -404,6 +491,15 @@ $canViewFinancials = pos_actor_is_manager($pdo);
     const cashGivenDisplay = document.getElementById('cashGivenDisplay');
     const cashChangeDue = document.getElementById('cashChangeDue');
     const cashTenderedDisplay = document.getElementById('cashTenderedDisplay');
+    const closeTillFlow = document.getElementById('closeTillFlow');
+    const closeTillEntry = document.getElementById('closeTillEntry');
+    const closeTillResult = document.getElementById('closeTillResult');
+    const closeTillCountedCash = document.getElementById('closeTillCountedCash');
+    const closeTillNotes = document.getElementById('closeTillNotes');
+    const closeTillCheck = document.getElementById('closeTillCheck');
+    const closeTillAccept = document.getElementById('closeTillAccept');
+    const closeTillRecheck = document.getElementById('closeTillRecheck');
+    const closeTillCancel = document.getElementById('closeTillCancel');
     let cashTendered = '';
 
     function saveState() {
@@ -560,10 +656,53 @@ $canViewFinancials = pos_actor_is_manager($pdo);
         setTimeout(() => toast.classList.remove('show'), 1800);
     }
 
+    function resetCloseTillFlow() {
+        closeTillResult.className = 'pos-close-till-check d-none';
+        closeTillResult.textContent = '';
+        closeTillEntry.classList.remove('d-none');
+        closeTillCheck.classList.remove('d-none');
+        closeTillCancel.classList.remove('d-none');
+        closeTillAccept.classList.add('d-none');
+        closeTillRecheck.classList.add('d-none');
+    }
+
+    function openCloseTillFlow() {
+        if (cart.length) {
+            showToast(false, 'Basket active', 'Clear or complete the basket before closing this till.');
+            return;
+        }
+        if (pendingCardSale || pendingCashSale) {
+            showToast(false, 'Sale pending', 'Complete or cancel the pending sale before closing this till.');
+            return;
+        }
+        resetCloseTillFlow();
+        closeTillFlow.classList.add('is-open');
+        closeTillFlow.setAttribute('aria-hidden', 'false');
+        closeTillCountedCash.focus();
+    }
+
+    function closeCloseTillFlow() {
+        closeTillFlow.classList.remove('is-open');
+        closeTillFlow.setAttribute('aria-hidden', 'true');
+    }
+
+    function renderCloseTillResult(variance, balanced) {
+        closeTillResult.className = 'pos-close-till-check ' + (balanced ? 'pos-close-till-check--balanced' : 'pos-close-till-check--variance');
+        closeTillResult.innerHTML = balanced
+            ? '<strong>Till balances.</strong><span>No variance found. You can accept and close this till.</span>'
+            : '<strong>Variance found: ' + money(variance) + '</strong><span>Accept this variance if it is correct, or recheck the drawer and enter the cash count again.</span>';
+        closeTillEntry.classList.add('d-none');
+        closeTillCheck.classList.add('d-none');
+        closeTillCancel.classList.add('d-none');
+        closeTillAccept.classList.remove('d-none');
+        closeTillRecheck.classList.remove('d-none');
+    }
+
     function openCardFlow(sale, persist = true) {
         pendingCardSale = sale;
         cardFlowRef.textContent = sale.sale_ref;
         cardFlowAmount.textContent = money(sale.total);
+        stripePaymentReference.value = sale.payment_reference || '';
         stripeOpenStatus.textContent = '';
         cardFlow.classList.add('is-open');
         cardFlow.setAttribute('aria-hidden', 'false');
@@ -725,6 +864,17 @@ $canViewFinancials = pos_actor_is_manager($pdo);
         renderCart();
     });
 
+    document.getElementById('noSaleDrawer')?.addEventListener('click', async () => {
+        const reason = window.prompt('Reason for opening the drawer?', 'No sale drawer open');
+        if (reason === null) return;
+        try {
+            await api({ action: 'no_sale_drawer', location_id: locationId, reason });
+            showToast(true, 'Drawer event recorded', 'No-sale drawer opening has been added to audit.');
+        } catch (error) {
+            showToast(false, 'Could not record drawer event', error.message);
+        }
+    });
+
     document.getElementById('memberLookup').addEventListener('click', async () => {
         try {
             const input = document.getElementById('memberScan').value.trim();
@@ -806,7 +956,12 @@ $canViewFinancials = pos_actor_is_manager($pdo);
     document.getElementById('confirmStripePaid').addEventListener('click', async () => {
         if (!pendingCardSale) return;
         try {
-            const data = await api({ action: 'complete_card_pending', sale_id: pendingCardSale.sale_id });
+            if (!stripePaymentReference.value.trim()) {
+                stripePaymentReference.focus();
+                showToast(false, 'Reference required', 'Enter the Stripe reference before completing the card sale.');
+                return;
+            }
+            const data = await api({ action: 'complete_card_pending', sale_id: pendingCardSale.sale_id, payment_reference: stripePaymentReference.value.trim() });
             resetCompletedSale();
             showToast(true, 'Card sale complete', `${data.sale.sale_ref} · ${money(data.sale.total)}`);
         } catch (error) {
@@ -913,6 +1068,53 @@ $canViewFinancials = pos_actor_is_manager($pdo);
             showToast(true, 'Cash sale complete', `${data.sale.sale_ref} · Change ${money(change)}`);
         } catch (error) {
             showToast(false, 'Cash sale failed', error.message);
+        }
+    });
+
+    document.getElementById('closeTillOpen')?.addEventListener('click', openCloseTillFlow);
+    document.getElementById('closeTillDismiss')?.addEventListener('click', closeCloseTillFlow);
+    closeTillCancel?.addEventListener('click', closeCloseTillFlow);
+    closeTillRecheck?.addEventListener('click', () => {
+        resetCloseTillFlow();
+        closeTillCountedCash.focus();
+        closeTillCountedCash.select();
+    });
+    closeTillCountedCash?.addEventListener('input', resetCloseTillFlow);
+    closeTillCheck?.addEventListener('click', async () => {
+        if (!closeTillCountedCash.reportValidity()) return;
+        closeTillCheck.disabled = true;
+        try {
+            const data = await api({
+                action: 'audit_till_close_count',
+                location_id: locationId,
+                counted_cash: Number(closeTillCountedCash.value || 0),
+                closing_notes: closeTillNotes.value || ''
+            });
+            renderCloseTillResult(Number(data.variance || 0), Boolean(data.balanced));
+        } catch (error) {
+            closeTillResult.className = 'pos-close-till-check pos-close-till-check--variance';
+            closeTillResult.innerHTML = '<strong>Count check was not saved.</strong><span>' + escapeHtml(error.message) + '</span>';
+            closeTillEntry.classList.add('d-none');
+        } finally {
+            closeTillCheck.disabled = false;
+        }
+    });
+    closeTillAccept?.addEventListener('click', async () => {
+        closeTillAccept.disabled = true;
+        try {
+            const data = await api({
+                action: 'close_till',
+                location_id: locationId,
+                counted_cash: Number(closeTillCountedCash.value || 0),
+                closing_notes: closeTillNotes.value || ''
+            });
+            clearState();
+            showToast(true, 'Till closed', 'This till has been closed.');
+            window.setTimeout(() => { window.location.href = data.redirect || '/pos/logout.php'; }, 900);
+        } catch (error) {
+            closeTillResult.className = 'pos-close-till-check pos-close-till-check--variance';
+            closeTillResult.innerHTML = '<strong>Till was not closed.</strong><span>' + escapeHtml(error.message) + '</span>';
+            closeTillAccept.disabled = false;
         }
     });
 

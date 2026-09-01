@@ -74,7 +74,7 @@ try {
     echo json_encode([
         'ok' => true,
         'link' => [
-            'url' => (string) $result['session_url'],
+            'url' => (string) ($result['short_url'] ?? $result['session_url']),
             'total_amount' => (float) $result['total_amount'],
             'agreement_ids' => $result['agreement_ids'],
         ],

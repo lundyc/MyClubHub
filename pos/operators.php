@@ -64,21 +64,30 @@ $assigned = [];
 foreach ($pdo->query('SELECT operator_id, location_id FROM pos_operator_locations') as $row) {
     $assigned[(int) $row['operator_id']][] = (int) $row['location_id'];
 }
+$pageHero = [
+    'eyebrow' => 'Point of sale',
+    'title' => 'POS Operators',
+    'subtitle' => 'Manage operator access, roles, and assigned till locations.',
+];
+require_once __DIR__ . '/../header.php';
 ?>
-<!doctype html>
-<html lang="en">
-<head>
-    <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>POS Operators - Hub</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <style>body{background:#f7efe4;font-family:Inter,system-ui,sans-serif}.wrap{max-width:1100px;margin:0 auto;padding:1rem}.hero{background:linear-gradient(135deg,#4b0818,#8a1538);color:#fff}.cardx{background:#fff;border:1px solid rgba(75,8,24,.12);border-radius:1rem;box-shadow:0 14px 36px rgba(36,21,26,.08)}</style>
-</head>
-<body>
-<header class="hero"><div class="wrap d-flex justify-content-between align-items-center"><h1 class="h3 fw-bold mb-0">POS Operators</h1><nav class="d-flex gap-3"><a class="text-white fw-bold" href="/pos/">Till</a><a class="text-white fw-bold" href="/pos/products.php">Products</a></nav></div></header>
-<main class="wrap">
+<div class="pos-operators-page">
+    <nav class="hub-breadcrumb" aria-label="Breadcrumb"><a href="/pos_overview.php">POS Overview</a><i class="fa-solid fa-chevron-right" aria-hidden="true"></i><span aria-current="page">Operators</span></nav>
+    <section class="hub-section-commandbar" aria-labelledby="posOperatorsActionsTitle">
+        <div>
+            <h2 id="posOperatorsActionsTitle">Operator setup</h2>
+            <p>Assign each operator only to the tills they should use.</p>
+        </div>
+        <div class="hub-local-actions">
+            <a class="btn btn-outline-secondary btn-sm" href="/pos_overview.php"><i class="fa-solid fa-chart-line" aria-hidden="true"></i>Overview</a>
+            <a class="btn btn-outline-secondary btn-sm" href="/pos/reports.php"><i class="fa-solid fa-table-list" aria-hidden="true"></i>Daily report</a>
+            <a class="btn btn-outline-secondary btn-sm" href="/pos/products.php"><i class="fa-solid fa-box-open" aria-hidden="true"></i>Products</a>
+            <a class="btn btn-outline-secondary btn-sm" href="/pos/locations.php"><i class="fa-solid fa-location-dot" aria-hidden="true"></i>Locations</a>
+        </div>
+    </section>
     <?php if ($notice): ?><div class="alert alert-success"><?= h($notice) ?></div><?php endif; ?>
     <?php if ($error): ?><div class="alert alert-danger"><?= h($error) ?></div><?php endif; ?>
-    <section class="cardx p-3 mb-3">
+    <section class="card hub-panel p-3 mb-3">
         <h2 class="h5 fw-bold">Add operator</h2>
         <form method="post" class="row g-3">
             <?= csrf_field() ?><input type="hidden" name="action" value="save_operator">
@@ -90,12 +99,11 @@ foreach ($pdo->query('SELECT operator_id, location_id FROM pos_operator_location
             <div class="col-12"><button class="btn btn-dark" type="submit">Save operator</button></div>
         </form>
     </section>
-    <section class="cardx table-responsive">
+    <section class="card hub-panel table-responsive">
         <table class="table align-middle mb-0">
             <thead><tr><th>Name</th><th>Username</th><th>Role</th><th>Locations</th><th>Status</th></tr></thead>
             <tbody><?php foreach ($operators as $operator): ?><tr><td class="fw-bold"><?= h((string) $operator['name']) ?></td><td><?= h((string) $operator['username']) ?></td><td><?= h((string) $operator['role']) ?></td><td><?php $ids = $assigned[(int) $operator['id']] ?? []; echo h(implode(', ', array_map(static fn($l) => (string) $l['name'], array_filter($locations, static fn($l) => in_array((int) $l['id'], $ids, true))))); ?></td><td><?= (int) $operator['is_active'] === 1 ? 'Active' : 'Inactive' ?></td></tr><?php endforeach; ?></tbody>
         </table>
     </section>
-</main>
-</body>
-</html>
+</div>
+<?php require __DIR__ . '/../footer.php'; ?>

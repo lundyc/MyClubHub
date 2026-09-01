@@ -150,6 +150,25 @@ function syncAccountRoleForPerson(PDO $pdo, int $personId): void
     setAccountRole($pdo, (int) $account['id'], deriveAccountRoleForPerson($pdo, $personId, $isAdmin));
 }
 
+function updateAccountPasswordHash(PDO $pdo, int $accountId, string $passwordHash): void
+{
+    if ($passwordHash === '') {
+        throw new InvalidArgumentException('Password hash is required.');
+    }
+
+    $account = getAccount($pdo, $accountId);
+    if (!$account) {
+        throw new RuntimeException('Account not found.');
+    }
+
+    $pdo->prepare('UPDATE accounts SET password_hash = :hash WHERE id = :id')
+        ->execute([':hash' => $passwordHash, ':id' => $accountId]);
+    if (!empty($account['old_holder_id'])) {
+        $pdo->prepare('UPDATE season_ticket_holders SET password_hash = :hash WHERE id = :id')
+            ->execute([':hash' => $passwordHash, ':id' => (int) $account['old_holder_id']]);
+    }
+}
+
 /**
  * Admin sets a password directly, no reset link/email involved. Clears any
  * pending reset token so a stale link can't be used alongside the new

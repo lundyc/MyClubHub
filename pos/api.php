@@ -4,8 +4,9 @@ declare(strict_types=1);
 require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/../lib/functions.php';
 require_once __DIR__ . '/../lib/pos.php';
+require_once __DIR__ . '/../lib/pos_controls.php';
 
-pos_ensure_schema($pdo);
+pos_controls_ensure_schema($pdo);
 $actor = pos_require_actor($pdo);
 
 header('Content-Type: application/json');
@@ -41,6 +42,71 @@ try {
             pos_api_response(['ok' => false, 'error' => 'No season ticket holder or member was found.'], 404);
         }
         pos_api_response(['ok' => true, 'member' => $member]);
+    }
+
+    if ($action === 'no_sale_drawer') {
+        $locationId = (int) ($data['location_id'] ?? 0);
+        $allowed = array_map('intval', array_column(pos_locations_for_actor($pdo, $actor), 'id'));
+        if (!in_array($locationId, $allowed, true)) {
+            pos_api_response(['ok' => false, 'error' => 'You do not have access to this POS location.'], 403);
+        }
+        $activeTradingDay = pos_trading_day_require_open($pdo);
+        $session = pos_till_session_require_open($pdo, (int) $activeTradingDay['id'], $locationId);
+        $reason = trim((string) ($data['reason'] ?? 'No sale drawer open'));
+        pos_audit_event($pdo, 'pos_no_sale_drawer', $reason, [
+            'trading_day_id' => (int) $activeTradingDay['id'],
+            'till_session_id' => (int) $session['id'],
+            'location_id' => $locationId,
+            'operator_id' => pos_controls_actor_operator_id($actor),
+            'hub_account_id' => pos_controls_actor_account_id($actor),
+        ]);
+        pos_api_response(['ok' => true]);
+    }
+
+    if ($action === 'audit_till_close_count' || $action === 'close_till') {
+        $locationId = (int) ($data['location_id'] ?? 0);
+        $allowed = array_map('intval', array_column(pos_locations_for_actor($pdo, $actor), 'id'));
+        if (!in_array($locationId, $allowed, true)) {
+            pos_api_response(['ok' => false, 'error' => 'You do not have access to this POS location.'], 403);
+        }
+        $activeTradingDay = pos_trading_day_require_open($pdo);
+        $session = pos_till_session_require_open($pdo, (int) $activeTradingDay['id'], $locationId);
+        $location = pos_location($pdo, $locationId);
+        $countedCash = max(0, round((float) ($data['counted_cash'] ?? 0), 2));
+        $expectedCash = pos_till_session_expected_cash($pdo, (int) $session['id']);
+        $variance = round($countedCash - $expectedCash, 2);
+        $notes = trim((string) ($data['closing_notes'] ?? ''));
+
+        if ($action === 'audit_till_close_count') {
+            pos_audit_event(
+                $pdo,
+                'pos_till_close_count_checked',
+                'Checked ' . (string) ($location['name'] ?? 'POS') . ' till session #' . (int) $session['id'] . ' counted ' . gbp($countedCash) . ' variance ' . gbp($variance) . ($notes !== '' ? ' notes: ' . $notes : ''),
+                [
+                    'trading_day_id' => (int) $activeTradingDay['id'],
+                    'till_session_id' => (int) $session['id'],
+                    'location_id' => $locationId,
+                    'operator_id' => pos_controls_actor_operator_id($actor),
+                    'hub_account_id' => pos_controls_actor_account_id($actor),
+                    'amount' => $variance,
+                ]
+            );
+            pos_api_response(['ok' => true, 'variance' => $variance, 'balanced' => abs($variance) < 0.005]);
+        }
+
+        if (abs($variance) >= 0.005 && !pos_actor_is_manager($pdo)) {
+            pos_api_response(['ok' => false, 'error' => 'A manager must accept a cash variance before this till can be closed.'], 403);
+        }
+        pos_till_session_close($pdo, (int) $session['id'], $actor, $countedCash, $notes);
+        pos_audit_event($pdo, 'pos_till_closed', 'Closed POS till session #' . (int) $session['id'] . ' from POS screen', [
+            'trading_day_id' => (int) $activeTradingDay['id'],
+            'till_session_id' => (int) $session['id'],
+            'location_id' => $locationId,
+            'operator_id' => pos_controls_actor_operator_id($actor),
+            'hub_account_id' => pos_controls_actor_account_id($actor),
+            'amount' => $variance,
+        ]);
+        pos_api_response(['ok' => true, 'redirect' => hub_auth_is_authenticated() ? '/pos_overview.php' : '/pos/logout.php']);
     }
 
     if ($action === 'create_sale') {
@@ -100,22 +166,40 @@ try {
     }
 
     if ($action === 'complete_card_pending') {
-        $result = pos_complete_pending_card_sale($pdo, (int) ($data['sale_id'] ?? 0), $actor);
+        $result = pos_complete_pending_card_sale($pdo, (int) ($data['sale_id'] ?? 0), $actor, (string) ($data['payment_reference'] ?? ''));
+        pos_audit_event($pdo, 'pos_sale_completed', 'Completed pending card POS sale #' . (int) ($data['sale_id'] ?? 0), [
+            'operator_id' => pos_controls_actor_operator_id($actor),
+            'hub_account_id' => pos_controls_actor_account_id($actor),
+            'amount' => (float) ($result['total'] ?? 0),
+        ]);
         pos_api_response(['ok' => true, 'sale' => $result]);
     }
 
     if ($action === 'complete_cash_pending') {
         $result = pos_complete_pending_cash_sale($pdo, (int) ($data['sale_id'] ?? 0), $actor);
+        pos_audit_event($pdo, 'pos_sale_completed', 'Completed pending cash POS sale #' . (int) ($data['sale_id'] ?? 0), [
+            'operator_id' => pos_controls_actor_operator_id($actor),
+            'hub_account_id' => pos_controls_actor_account_id($actor),
+            'amount' => (float) ($result['total'] ?? 0),
+        ]);
         pos_api_response(['ok' => true, 'sale' => $result]);
     }
 
     if ($action === 'cancel_card_pending') {
         pos_cancel_pending_card_sale($pdo, (int) ($data['sale_id'] ?? 0), $actor);
+        pos_audit_event($pdo, 'pos_sale_cancelled', 'Cancelled pending card POS sale #' . (int) ($data['sale_id'] ?? 0), [
+            'operator_id' => pos_controls_actor_operator_id($actor),
+            'hub_account_id' => pos_controls_actor_account_id($actor),
+        ]);
         pos_api_response(['ok' => true]);
     }
 
     if ($action === 'cancel_cash_pending') {
         pos_cancel_pending_cash_sale($pdo, (int) ($data['sale_id'] ?? 0), $actor);
+        pos_audit_event($pdo, 'pos_sale_cancelled', 'Cancelled pending cash POS sale #' . (int) ($data['sale_id'] ?? 0), [
+            'operator_id' => pos_controls_actor_operator_id($actor),
+            'hub_account_id' => pos_controls_actor_account_id($actor),
+        ]);
         pos_api_response(['ok' => true]);
     }
 

@@ -43,6 +43,7 @@ require_once __DIR__ . '/lib/fixture_tabs.php';
 require_once __DIR__ . '/lib/match_overview.php';
 require_once __DIR__ . '/lib/match_sponsor_share.php';
 require_once __DIR__ . '/lib/match_checklist.php';
+require_once __DIR__ . '/lib/matchday_staffing.php';
 require_once __DIR__ . '/matches_lib.php';
 
 if ($action === 'new') {
@@ -170,6 +171,11 @@ $checklistSystemItems = !$isNew
           ? match_checklist_system_items($pdo, $fixture, $overviewEvents, $overviewStarters, $sponsorShareRows, $checklistOpponent)
           : [];
 $checklistItems = !$isNew ? match_checklist_build_list($pdo, (int)$fixture['id'], $checklistSystemItems) : [];
+$staffingAssignments = !$isNew ? matchday_staffing_assignments($pdo, (int)$fixture['id']) : [];
+$staffingSummary = matchday_staffing_summary($staffingAssignments);
+$staffingPeopleOptions = !$isNew ? matchday_staffing_people_options($pdo) : [];
+$staffingRoles = matchday_staffing_roles();
+$staffingStatuses = matchday_staffing_statuses();
 ?>
 
 <?php if ($useSharedHubLayout): ?><nav class="hub-breadcrumb" aria-label="Breadcrumb"><a href="/matches.php">Fixtures</a><i class="fa-solid fa-chevron-right" aria-hidden="true"></i><span aria-current="page"><?= $isNew ? 'Add fixture' : h((string)($fixture['opponent'] ?? 'Fixture')) ?></span></nav><?php endif; ?>

@@ -48,15 +48,23 @@ $(function () {
     $.post(playerViewUrl, {
       ajax_delete_payment: 1,
       payment_id: paymentId,
+      csrf_token: window.PLAYER_VIEW_CSRF || "",
     }, function (resp) {
-      if (resp.success) {
-        row.css("background-color", "#f8d7da").fadeOut(600, function () {
-          row.remove();
+      if (resp && resp.success) {
+        row.css("background-color", "#f8d7da").fadeOut(400, function () {
+          window.location.reload();
         });
       } else {
-        alert("Error deleting payment");
+        alert((resp && resp.error) ? resp.error : "Error deleting payment");
       }
-    }, "json");
+    }, "json").fail(function (xhr) {
+      let message = "Error deleting payment";
+      try {
+        const parsed = JSON.parse(xhr.responseText);
+        if (parsed && parsed.error) message = parsed.error;
+      } catch (e) {}
+      alert(message);
+    });
   });
 
   $("#addNoteForm").on("submit", function (e) {
