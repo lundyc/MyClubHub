@@ -37,6 +37,7 @@ function matchday_finance_ensure_schema(PDO $pdo): void
             cash_float_merch DECIMAL(10,2) NOT NULL DEFAULT 0,
             cash_close_merch DECIMAL(10,2) NOT NULL DEFAULT 0,
 
+            income_card_sales DECIMAL(10,2) NOT NULL DEFAULT 0,
             income_matchday_sponsorship DECIMAL(10,2) NOT NULL DEFAULT 0,
             income_matchball_sponsorship DECIMAL(10,2) NOT NULL DEFAULT 0,
             income_raffle DECIMAL(10,2) NOT NULL DEFAULT 0,
@@ -68,16 +69,19 @@ function matchday_finance_ensure_schema(PDO $pdo): void
 }
 
 /**
- * Income entered by hand — money that did NOT come out of a counted till
- * float. Gate / bar / catering / merchandise takings are not here: they are
- * derived from each area's (counted at close − starting float), so the
- * figure is only ever entered once (see matchday_finance_cash_areas()).
+ * Income entered by hand — money that was NOT counted as cash in a till
+ * float. Gate / bar / catering / merchandise *cash* takings are not here:
+ * they are derived from each area's (counted at close − starting float), so
+ * that figure is only ever entered once (see matchday_finance_cash_areas()).
+ * Card sales are one combined figure across every area, since the card
+ * reader's own report doesn't split by till.
  *
  * @return array<string, string> column => label
  */
 function matchday_finance_income_fields(): array
 {
     return [
+        'income_card_sales' => 'Card sales (all areas)',
         'income_matchday_sponsorship' => 'Matchday sponsorship',
         'income_matchball_sponsorship' => 'Match ball sponsorship',
         'income_raffle' => 'Raffle / fundraising',

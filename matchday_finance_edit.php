@@ -203,7 +203,7 @@ $moneyInput = static function (string $column, string $group, string $display, a
                 <div class="mf-card__head">
                     <h3 id="mfIncomeTitle">Other income</h3>
                     <span class="mf-card__total">Subtotal <strong id="mfOtherIncomeSubtotal"><?= h(gbp($totals['other_income'])) ?></strong></span>
-                    <span class="mf-card__hint">Money that didn't go through one of the tills above &mdash; sponsorship, raffle, donations.</span>
+                    <span class="mf-card__hint">Money not counted as cash in the tills above. <strong>Card sales</strong> is the one combined total from the card reader; then sponsorship, raffle, donations.</span>
                 </div>
                 <div class="mf-lines">
                     <?php foreach ($incomeFields as $column => $label): ?>
