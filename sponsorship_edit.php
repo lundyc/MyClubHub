@@ -84,6 +84,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 ?>
 
 <div>
+          <nav class="hub-breadcrumb" aria-label="Breadcrumb"><a href="player_edit.php?id=<?= (int) $sponsorship['player_id'] ?>"><?= htmlspecialchars((string) $sponsorship['player_name']) ?></a><i class="fa-solid fa-chevron-right" aria-hidden="true"></i><span aria-current="page">Edit sponsorship</span></nav>
           <h1 class="h3">Edit Sponsorship (<?= htmlspecialchars($sponsorship['player_name']) ?>)</h1>
 
           <?php if ($errors): ?>

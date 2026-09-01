@@ -55,6 +55,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 ?>
 
 <div>
+          <nav class="hub-breadcrumb" aria-label="Breadcrumb"><a href="player_view.php?id=<?= (int) $payment['player_id'] ?>">Player</a><i class="fa-solid fa-chevron-right" aria-hidden="true"></i><span aria-current="page">Edit payment</span></nav>
           <h1 class="h3">Edit Payment</h1>
 
           <?php if ($errors): ?>
