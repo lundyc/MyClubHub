@@ -2,13 +2,14 @@
 declare(strict_types=1);
 
 // matchday_finance_edit.php — the matchday balance sheet for one home
-// fixture: floats / cash reconciliation, income lines, outgoings lines and
-// sign-off. Mirrors the club's paper "Matchday Balance Sheet".
+// fixture. You enter each cash point's starting float and the cash counted
+// at close (takings = the difference), plus any non-till income and any
+// outgoings; the totals are worked out for you.
 
 $pageHero = [
     'eyebrow' => 'Match Day',
     'title' => 'Matchday balance sheet',
-    'subtitle' => 'Floats, income, outgoings and sign-off for one home game.',
+    'subtitle' => 'Floats in, cash counted, any outgoings — the totals work themselves out.',
     'actions' => [],
 ];
 $pageStyles = ['matchday-finance.css'];
@@ -100,26 +101,6 @@ $moneyInput = static function (string $column, string $group, string $display, a
         . ' data-mf-money data-mf-group="' . h($group) . '"' . $attrs . '>'
         . '</div>';
 };
-
-$reconIncomeMap = [];
-foreach ($cashAreas as $key => $area) {
-    $reconIncomeMap[$key] = $area['income'];
-}
-
-$floatTotal = 0.0;
-$closeTotal = 0.0;
-$declaredTotal = 0.0;
-foreach ($cashAreas as $key => $area) {
-    $floatTotal += (float) ($form[$area['float']] ?? 0);
-    $closeTotal += (float) ($form[$area['close']] ?? 0);
-    $declaredTotal += $totals['cash_by_area'][$key]['declared'];
-}
-$diffTotal = $totals['cash_taken_total'] - $declaredTotal;
-
-// Only flag a cash difference once both sides of it have been entered — a
-// half-filled sheet (floats in, income not yet) shouldn't light up amber.
-$reconFlag = static fn (float $taken, float $declared, float $variance): bool =>
-    abs($variance) >= 0.01 && abs($taken) >= 0.01 && abs($declared) >= 0.01;
 ?>
 
 <div class="matchday-finance-page">
@@ -178,11 +159,51 @@ $reconFlag = static fn (float $taken, float $declared, float $variance): bool =>
     <form method="post" action="matchday_finance_edit.php?fixture_id=<?= (int) $fixtureId ?>" class="mf-form" id="matchdayFinanceForm">
         <?= csrf_field() ?>
 
+        <section class="hub-section mf-card" aria-labelledby="mfTakingsTitle">
+            <div class="mf-card__head">
+                <h3 id="mfTakingsTitle">Takings on the day</h3>
+                <span class="mf-card__total">Total takings <strong id="mfTakingsTotal"><?= h(gbp($totals['takings_total'])) ?></strong></span>
+                <span class="mf-card__hint">For each point, enter the float you started with and the cash counted at the end. <strong>Takings = counted &minus; float.</strong></span>
+            </div>
+            <div class="table-responsive">
+                <table class="table mf-recon align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th scope="col">Cash point</th>
+                            <th scope="col" class="text-end">Starting float</th>
+                            <th scope="col" class="text-end">Counted at close</th>
+                            <th scope="col" class="text-end">Takings</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($cashAreas as $key => $area): ?>
+                            <?php $areaTotals = $totals['takings_by_area'][$key]; ?>
+                            <tr>
+                                <th scope="row"><?= h($area['label']) ?></th>
+                                <td class="text-end"><?= $moneyInput($area['float'], 'cash', $moneyValue($form, $area['float']), ['cash-float' => $key]) ?></td>
+                                <td class="text-end"><?= $moneyInput($area['close'], 'cash', $moneyValue($form, $area['close']), ['cash-close' => $key]) ?></td>
+                                <td class="text-end"><span class="mf-recon__derived" data-mf-takings="<?= h($key) ?>"><?= h(gbp($areaTotals['takings'])) ?></span></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <th scope="row">Total</th>
+                            <td class="text-end"><span class="mf-recon__derived" id="mfFloatTotal"><?= h(gbp($totals['float_total'])) ?></span></td>
+                            <td class="text-end"><span class="mf-recon__derived" id="mfCloseTotal"><?= h(gbp($totals['close_total'])) ?></span></td>
+                            <td class="text-end"><span class="mf-recon__derived" id="mfTakingsTotalFoot"><?= h(gbp($totals['takings_total'])) ?></span></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </section>
+
         <div class="mf-grid">
             <section class="hub-section mf-card" aria-labelledby="mfIncomeTitle">
                 <div class="mf-card__head">
-                    <h3 id="mfIncomeTitle">Income</h3>
-                    <span class="mf-card__total">Total income <strong id="mfIncomeSubtotal"><?= h(gbp($totals['income'])) ?></strong></span>
+                    <h3 id="mfIncomeTitle">Other income</h3>
+                    <span class="mf-card__total">Subtotal <strong id="mfOtherIncomeSubtotal"><?= h(gbp($totals['other_income'])) ?></strong></span>
+                    <span class="mf-card__hint">Money that didn't go through one of the tills above &mdash; sponsorship, raffle, donations.</span>
                 </div>
                 <div class="mf-lines">
                     <?php foreach ($incomeFields as $column => $label): ?>
@@ -198,6 +219,7 @@ $reconFlag = static fn (float $taken, float $declared, float $variance): bool =>
                 <div class="mf-card__head">
                     <h3 id="mfExpenseTitle">Outgoings</h3>
                     <span class="mf-card__total">Total outgoings <strong id="mfExpenseSubtotal"><?= h(gbp($totals['expenses'])) ?></strong></span>
+                    <span class="mf-card__hint">Anything paid out on the day &mdash; leave blank if not applicable.</span>
                 </div>
                 <div class="mf-lines">
                     <?php foreach ($expenseFields as $column => $label): ?>
@@ -216,6 +238,7 @@ $reconFlag = static fn (float $taken, float $declared, float $variance): bool =>
                 <div class="mf-balance__item">
                     <span class="mf-balance__label">Total income</span>
                     <span class="mf-balance__value" id="mfBalanceIncome"><?= h(gbp($totals['income'])) ?></span>
+                    <span class="mf-balance__hint" id="mfBalanceIncomeBreakdown">Takings <?= h(gbp($totals['takings_total'])) ?> &middot; other <?= h(gbp($totals['other_income'])) ?></span>
                 </div>
                 <div class="mf-balance__item">
                     <span class="mf-balance__label">Total outgoings</span>
@@ -225,50 +248,6 @@ $reconFlag = static fn (float $taken, float $declared, float $variance): bool =>
                     <span class="mf-balance__label">Matchday profit / (loss)</span>
                     <span class="mf-balance__value matchday-finance-net matchday-finance-net--<?= $totals['net'] >= 0 ? 'pos' : 'neg' ?>" id="mfBalanceNet"><?= h(gbp($totals['net'])) ?></span>
                 </div>
-            </div>
-        </section>
-
-        <section class="hub-section mf-card" aria-labelledby="mfReconTitle">
-            <div class="mf-card__head">
-                <h3 id="mfReconTitle">Floats &amp; cash reconciliation</h3>
-                <span class="mf-card__hint">Cash taken = counted at close &minus; starting float. Difference vs the declared income line is a check, not an error &mdash; card takings and change bags won't tie out exactly.</span>
-            </div>
-            <div class="table-responsive">
-                <table class="table mf-recon align-middle mb-0">
-                    <thead>
-                        <tr>
-                            <th scope="col">Area</th>
-                            <th scope="col" class="text-end">Starting float</th>
-                            <th scope="col" class="text-end">Counted at close</th>
-                            <th scope="col" class="text-end">Cash taken</th>
-                            <th scope="col" class="text-end">Declared income</th>
-                            <th scope="col" class="text-end">Difference</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach ($cashAreas as $key => $area): ?>
-                            <?php $areaTotals = $totals['cash_by_area'][$key]; ?>
-                            <tr>
-                                <th scope="row"><?= h($area['label']) ?></th>
-                                <td class="text-end"><?= $moneyInput($area['float'], 'cash', $moneyValue($form, $area['float']), ['cash-float' => $key]) ?></td>
-                                <td class="text-end"><?= $moneyInput($area['close'], 'cash', $moneyValue($form, $area['close']), ['cash-close' => $key]) ?></td>
-                                <td class="text-end"><span class="mf-recon__derived" data-mf-cash-taken="<?= h($key) ?>"><?= h(gbp($areaTotals['taken'])) ?></span></td>
-                                <td class="text-end"><span class="mf-recon__derived" data-mf-cash-declared="<?= h($key) ?>"><?= h(gbp($areaTotals['declared'])) ?></span></td>
-                                <td class="text-end"><span class="mf-recon__diff<?= $reconFlag($areaTotals['taken'], $areaTotals['declared'], $areaTotals['variance']) ? ' is-flagged' : '' ?>" data-mf-cash-diff="<?= h($key) ?>"><?= h(gbp($areaTotals['variance'])) ?></span></td>
-                            </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                    <tfoot>
-                        <tr>
-                            <th scope="row">Total</th>
-                            <td class="text-end"><span class="mf-recon__derived" id="mfReconFloatTotal"><?= h(gbp($floatTotal)) ?></span></td>
-                            <td class="text-end"><span class="mf-recon__derived" id="mfReconCloseTotal"><?= h(gbp($closeTotal)) ?></span></td>
-                            <td class="text-end"><span class="mf-recon__derived" id="mfReconTakenTotal"><?= h(gbp($totals['cash_taken_total'])) ?></span></td>
-                            <td class="text-end"><span class="mf-recon__derived" id="mfReconDeclaredTotal"><?= h(gbp($declaredTotal)) ?></span></td>
-                            <td class="text-end"><span class="mf-recon__diff<?= $reconFlag($totals['cash_taken_total'], $declaredTotal, $diffTotal) ? ' is-flagged' : '' ?>" id="mfReconDiffTotal"><?= h(gbp($diffTotal)) ?></span></td>
-                        </tr>
-                    </tfoot>
-                </table>
             </div>
         </section>
 
@@ -296,8 +275,8 @@ $reconFlag = static fn (float $taken, float $declared, float $variance): bool =>
                     </select>
                 </div>
                 <div class="col-12">
-                    <label for="mf_notes" class="form-label">Notes / variances</label>
-                    <textarea class="form-control" id="mf_notes" name="notes" rows="3" placeholder="Anything that explains a difference above, or a note for the treasurer."><?= h((string) ($form['notes'] ?? '')) ?></textarea>
+                    <label for="mf_notes" class="form-label">Notes</label>
+                    <textarea class="form-control" id="mf_notes" name="notes" rows="3" placeholder="Anything worth recording for the treasurer — a count that looked off, a cash payment still to bank, etc."><?= h((string) ($form['notes'] ?? '')) ?></textarea>
                 </div>
             </div>
         </section>
@@ -317,7 +296,7 @@ $reconFlag = static fn (float $taken, float $declared, float $variance): bool =>
         var form = document.getElementById('matchdayFinanceForm');
         if (!form) { return; }
 
-        var RECON = <?= json_encode($reconIncomeMap, JSON_UNESCAPED_SLASHES) ?>;
+        var AREAS = <?= json_encode(array_keys($cashAreas), JSON_UNESCAPED_SLASHES) ?>;
 
         function parseMoney(value) {
             var n = parseFloat(String(value == null ? '' : value).replace(/[£,\s]/g, ''));
@@ -344,58 +323,39 @@ $reconFlag = static fn (float $taken, float $declared, float $variance): bool =>
             el.classList.toggle('matchday-finance-net--pos', value >= 0);
             el.classList.toggle('matchday-finance-net--neg', value < 0);
         }
-        // Flag a cash difference only once both sides of it are entered.
-        function flagged(taken, declared, diff) {
-            return Math.abs(diff) >= 0.01 && Math.abs(taken) >= 0.01 && Math.abs(declared) >= 0.01;
-        }
 
         function recalc() {
-            var income = sumGroup('income');
+            var otherIncome = sumGroup('income');
             var expense = sumGroup('expense');
 
-            setText('mfIncomeSubtotal', money(income));
-            setText('mfExpenseSubtotal', money(expense));
-            setText('mfBalanceIncome', money(income));
-            setText('mfBalanceExpense', money(expense));
-            setNet(document.getElementById('mfBalanceNet'), income - expense);
-
-            var floatTotal = 0, closeTotal = 0, takenTotal = 0, declaredTotal = 0, diffTotal = 0;
-            Object.keys(RECON).forEach(function (area) {
+            var floatTotal = 0, closeTotal = 0, takingsTotal = 0;
+            AREAS.forEach(function (area) {
                 var floatEl = form.querySelector('[data-mf-cash-float="' + area + '"]');
                 var closeEl = form.querySelector('[data-mf-cash-close="' + area + '"]');
-                var incomeEl = document.getElementById('mf_' + RECON[area]);
                 var floatVal = parseMoney(floatEl && floatEl.value);
                 var closeVal = parseMoney(closeEl && closeEl.value);
-                var taken = closeVal - floatVal;
-                var declared = parseMoney(incomeEl && incomeEl.value);
-                var diff = taken - declared;
+                var takings = closeVal - floatVal;
 
-                var takenEl = form.querySelector('[data-mf-cash-taken="' + area + '"]');
-                var declaredEl = form.querySelector('[data-mf-cash-declared="' + area + '"]');
-                var diffEl = form.querySelector('[data-mf-cash-diff="' + area + '"]');
-                if (takenEl) { takenEl.textContent = money(taken); }
-                if (declaredEl) { declaredEl.textContent = money(declared); }
-                if (diffEl) {
-                    diffEl.textContent = money(diff);
-                    diffEl.classList.toggle('is-flagged', flagged(taken, declared, diff));
-                }
+                var takingsEl = form.querySelector('[data-mf-takings="' + area + '"]');
+                if (takingsEl) { takingsEl.textContent = money(takings); }
 
                 floatTotal += floatVal;
                 closeTotal += closeVal;
-                takenTotal += taken;
-                declaredTotal += declared;
-                diffTotal += diff;
+                takingsTotal += takings;
             });
 
-            setText('mfReconFloatTotal', money(floatTotal));
-            setText('mfReconCloseTotal', money(closeTotal));
-            setText('mfReconTakenTotal', money(takenTotal));
-            setText('mfReconDeclaredTotal', money(declaredTotal));
-            var diffTotalEl = document.getElementById('mfReconDiffTotal');
-            if (diffTotalEl) {
-                diffTotalEl.textContent = money(diffTotal);
-                diffTotalEl.classList.toggle('is-flagged', flagged(takenTotal, declaredTotal, diffTotal));
-            }
+            var income = takingsTotal + otherIncome;
+
+            setText('mfFloatTotal', money(floatTotal));
+            setText('mfCloseTotal', money(closeTotal));
+            setText('mfTakingsTotal', money(takingsTotal));
+            setText('mfTakingsTotalFoot', money(takingsTotal));
+            setText('mfOtherIncomeSubtotal', money(otherIncome));
+            setText('mfExpenseSubtotal', money(expense));
+            setText('mfBalanceIncome', money(income));
+            setText('mfBalanceExpense', money(expense));
+            setText('mfBalanceIncomeBreakdown', 'Takings ' + money(takingsTotal) + ' · other ' + money(otherIncome));
+            setNet(document.getElementById('mfBalanceNet'), income - expense);
         }
 
         form.addEventListener('input', function (ev) {

@@ -37,13 +37,9 @@ function matchday_finance_ensure_schema(PDO $pdo): void
             cash_float_merch DECIMAL(10,2) NOT NULL DEFAULT 0,
             cash_close_merch DECIMAL(10,2) NOT NULL DEFAULT 0,
 
-            income_gate DECIMAL(10,2) NOT NULL DEFAULT 0,
             income_matchday_sponsorship DECIMAL(10,2) NOT NULL DEFAULT 0,
             income_matchball_sponsorship DECIMAL(10,2) NOT NULL DEFAULT 0,
-            income_merchandise DECIMAL(10,2) NOT NULL DEFAULT 0,
             income_raffle DECIMAL(10,2) NOT NULL DEFAULT 0,
-            income_bar DECIMAL(10,2) NOT NULL DEFAULT 0,
-            income_catering DECIMAL(10,2) NOT NULL DEFAULT 0,
             income_other DECIMAL(10,2) NOT NULL DEFAULT 0,
 
             expense_officials DECIMAL(10,2) NOT NULL DEFAULT 0,
@@ -72,20 +68,19 @@ function matchday_finance_ensure_schema(PDO $pdo): void
 }
 
 /**
- * Income lines in sheet order.
+ * Income entered by hand — money that did NOT come out of a counted till
+ * float. Gate / bar / catering / merchandise takings are not here: they are
+ * derived from each area's (counted at close − starting float), so the
+ * figure is only ever entered once (see matchday_finance_cash_areas()).
  *
  * @return array<string, string> column => label
  */
 function matchday_finance_income_fields(): array
 {
     return [
-        'income_gate' => 'Gate / admissions',
         'income_matchday_sponsorship' => 'Matchday sponsorship',
         'income_matchball_sponsorship' => 'Match ball sponsorship',
-        'income_merchandise' => 'Merchandise',
         'income_raffle' => 'Raffle / fundraising',
-        'income_bar' => 'Bar',
-        'income_catering' => 'Catering',
         'income_other' => 'Other income',
     ];
 }
@@ -107,20 +102,19 @@ function matchday_finance_expense_fields(): array
 }
 
 /**
- * Cash-handling areas for the floats / reconciliation block. "Cash taken" is
- * always close count minus starting float; it is cross-checked against the
- * matching declared income line, but only as a soft flag — card takings and
- * change bags mean an exact match is the exception, not the rule.
+ * The four cash points on a matchday. You enter the starting float and the
+ * cash counted at close; takings for that area are the difference. This is
+ * the ONLY place gate / bar / catering / merch income is entered.
  *
- * @return array<string, array{label:string, float:string, close:string, income:string}>
+ * @return array<string, array{label:string, float:string, close:string}>
  */
 function matchday_finance_cash_areas(): array
 {
     return [
-        'gate' => ['label' => 'Gate', 'float' => 'cash_float_gate', 'close' => 'cash_close_gate', 'income' => 'income_gate'],
-        'bar' => ['label' => 'Bar', 'float' => 'cash_float_bar', 'close' => 'cash_close_bar', 'income' => 'income_bar'],
-        'catering' => ['label' => 'Catering', 'float' => 'cash_float_catering', 'close' => 'cash_close_catering', 'income' => 'income_catering'],
-        'merch' => ['label' => 'Merchandise', 'float' => 'cash_float_merch', 'close' => 'cash_close_merch', 'income' => 'income_merchandise'],
+        'gate' => ['label' => 'Gate', 'float' => 'cash_float_gate', 'close' => 'cash_close_gate'],
+        'bar' => ['label' => 'Bar', 'float' => 'cash_float_bar', 'close' => 'cash_close_bar'],
+        'catering' => ['label' => 'Catering', 'float' => 'cash_float_catering', 'close' => 'cash_close_catering'],
+        'merch' => ['label' => 'Merchandise', 'float' => 'cash_float_merch', 'close' => 'cash_close_merch'],
     ];
 }
 
@@ -195,16 +189,20 @@ function matchday_finance_get(PDO $pdo, int $fixtureId): ?array
 /**
  * Derived totals for one record (a stored row, a blank row, or POST data).
  *
+ * income = sum of area takings (counted at close − float) + hand-entered
+ * "other income" lines. Nothing is entered twice.
+ *
  * @return array{
- *     income: float, expenses: float, net: float, cash_taken_total: float,
- *     cash_by_area: array<string, array{label:string, float:float, close:float, taken:float, declared:float, variance:float}>
+ *     takings_by_area: array<string, array{label:string, float:float, close:float, takings:float}>,
+ *     takings_total: float, float_total: float, close_total: float,
+ *     other_income: float, income: float, expenses: float, net: float
  * }
  */
 function matchday_finance_totals(array $row): array
 {
-    $income = 0.0;
+    $otherIncome = 0.0;
     foreach (array_keys(matchday_finance_income_fields()) as $column) {
-        $income += (float) ($row[$column] ?? 0);
+        $otherIncome += (float) ($row[$column] ?? 0);
     }
 
     $expenses = 0.0;
@@ -212,30 +210,36 @@ function matchday_finance_totals(array $row): array
         $expenses += (float) ($row[$column] ?? 0);
     }
 
-    $cashByArea = [];
-    $cashTakenTotal = 0.0;
+    $takingsByArea = [];
+    $takingsTotal = 0.0;
+    $floatTotal = 0.0;
+    $closeTotal = 0.0;
     foreach (matchday_finance_cash_areas() as $key => $area) {
         $float = (float) ($row[$area['float']] ?? 0);
         $close = (float) ($row[$area['close']] ?? 0);
-        $taken = $close - $float;
-        $declared = (float) ($row[$area['income']] ?? 0);
-        $cashByArea[$key] = [
+        $takings = $close - $float;
+        $takingsByArea[$key] = [
             'label' => $area['label'],
             'float' => $float,
             'close' => $close,
-            'taken' => $taken,
-            'declared' => $declared,
-            'variance' => $taken - $declared,
+            'takings' => $takings,
         ];
-        $cashTakenTotal += $taken;
+        $takingsTotal += $takings;
+        $floatTotal += $float;
+        $closeTotal += $close;
     }
 
+    $income = $takingsTotal + $otherIncome;
+
     return [
+        'takings_by_area' => $takingsByArea,
+        'takings_total' => $takingsTotal,
+        'float_total' => $floatTotal,
+        'close_total' => $closeTotal,
+        'other_income' => $otherIncome,
         'income' => $income,
         'expenses' => $expenses,
         'net' => $income - $expenses,
-        'cash_taken_total' => $cashTakenTotal,
-        'cash_by_area' => $cashByArea,
     ];
 }
 

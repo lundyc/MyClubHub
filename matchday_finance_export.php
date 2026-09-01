@@ -35,6 +35,12 @@ $expenseFields = matchday_finance_expense_fields();
 $cashAreas = matchday_finance_cash_areas();
 
 $header = ['Date', 'Opponent', 'Competition', 'Recorded', 'Status', 'Attendance'];
+foreach ($cashAreas as $area) {
+    $header[] = $area['label'] . ' float';
+    $header[] = $area['label'] . ' counted';
+    $header[] = $area['label'] . ' takings';
+}
+$header[] = 'Total takings';
 foreach ($incomeFields as $label) {
     $header[] = $label;
 }
@@ -44,11 +50,6 @@ foreach ($expenseFields as $label) {
 }
 $header[] = 'Total outgoings';
 $header[] = 'Net';
-foreach ($cashAreas as $area) {
-    $header[] = $area['label'] . ' float';
-    $header[] = $area['label'] . ' counted';
-    $header[] = $area['label'] . ' cash taken';
-}
 $header[] = 'Completed by';
 $header[] = 'Checked by';
 
@@ -74,6 +75,12 @@ foreach ($rows as $row) {
         $recorded ? ucfirst((string) $row['finance_status']) : '',
         $recorded && $row['attendance'] !== null ? (string) (int) $row['attendance'] : '',
     ];
+    foreach ($cashAreas as $key => $area) {
+        $line[] = $money((float) ($row[$area['float']] ?? 0));
+        $line[] = $money((float) ($row[$area['close']] ?? 0));
+        $line[] = $money($totals['takings_by_area'][$key]['takings']);
+    }
+    $line[] = $money($totals['takings_total']);
     foreach (array_keys($incomeFields) as $column) {
         $line[] = $money((float) ($row[$column] ?? 0));
     }
@@ -83,11 +90,6 @@ foreach ($rows as $row) {
     }
     $line[] = $money($totals['expenses']);
     $line[] = $money($totals['net']);
-    foreach ($cashAreas as $key => $area) {
-        $line[] = $money((float) ($row[$area['float']] ?? 0));
-        $line[] = $money((float) ($row[$area['close']] ?? 0));
-        $line[] = $money($totals['cash_by_area'][$key]['taken']);
-    }
     $line[] = (string) ($row['completed_by'] ?? '');
     $line[] = (string) ($row['checked_by'] ?? '');
 
