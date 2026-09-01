@@ -623,9 +623,8 @@ $documentTitle = $documentTitle !== '' ? $documentTitle . ' – ' . APP_NAME : A
         <?php
         // Persistent working-season indicator + switcher. Shown on every Hub
         // page so it is impossible to be reading another season's figures on
-        // an inner page without noticing. index.php keeps its own richer
-        // context bar, so it opts out here.
-        if ($currentScript !== 'index.php' && ($seasonContext['seasons'] ?? []) !== []):
+        // an inner page without noticing.
+        if (($seasonContext['seasons'] ?? []) !== []):
             $activeSeasonRow = null;
             foreach ($seasonContext['seasons'] as $seasonRow) {
                 if ((int) $seasonRow['id'] === (int) ($seasonContext['season_id'] ?? 0)) {
