@@ -1,4 +1,4 @@
-@import url('player-sponsors-base.css?v=20260901-5');
+@import url('player-sponsors-base.css?v=20260901-6');
 
 .navbar-brand {
     display: flex;
@@ -6425,11 +6425,11 @@ a.player-slot__value--unpaid:focus {
     }
 
     .navbar .nav-account__identity {
-        color: var(--brand-darkest);
+        color: var(--brand-light);
     }
 
     .navbar .nav-account__identity small {
-        color: rgba(31, 26, 29, 0.62);
+        color: rgba(246, 236, 222, 0.62);
     }
 }
 
