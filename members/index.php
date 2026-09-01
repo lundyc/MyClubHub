@@ -41,6 +41,9 @@ function member_sponsorship_summary_line(array $agreement): string
     <?php if (isset($_GET['welcome'])): ?>
         <div class="alert alert-success">Welcome! Your account is ready — buy a season ticket any time to unlock the league table, announcements and more.</div>
     <?php endif; ?>
+    <?php if (isset($_GET['hub_login'])): ?>
+        <div class="alert alert-info">You're signed in to your supporter account. Club staff sign in to the Hub at <a href="/login.php">the staff login</a>.</div>
+    <?php endif; ?>
 
     <section class="member-hero">
         <div class="member-hero__content">

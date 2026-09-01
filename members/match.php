@@ -408,6 +408,12 @@ $topStats = member_match_top_stats($detail['events']);
             <div class="member-hero__eyebrow"><?= $isPlayed ? 'Match Result' : 'Upcoming Fixture' ?></div>
             <h1><?= $isHome ? 'Saltcoats Victoria vs ' . h((string) $fixture['opponent']) : h((string) $fixture['opponent']) . ' vs Saltcoats Victoria' ?></h1>
             <p><?= h(member_format_date((string) $fixture['match_date'])) ?><?= !empty($fixture['kickoff_time']) ? ' at ' . h(member_format_time((string) $fixture['kickoff_time'])) : '' ?><?= !empty($fixture['competition']) ? ' · ' . h((string) $fixture['competition']) : '' ?></p>
+            <?php if (!$isPlayed && $isHome): ?>
+            <div class="member-hero__actions">
+                <a class="btn btn-light fw-bold" href="/tickets?fixture_id=<?= (int) $fixture['id'] ?>">Buy match tickets</a>
+                <a class="btn btn-outline-light" href="/season-tickets">Season tickets</a>
+            </div>
+            <?php endif; ?>
         </div>
     </section>
 

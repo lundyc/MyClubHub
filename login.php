@@ -36,7 +36,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
         // supporter / season-ticket account — route them to the member
         // portal (its own separate session) instead of a misleading error.
         if (member_auth_attempt_login($email, $password)['ok']) {
-            header('Location: /members/index.php');
+            header('Location: /members/index.php?hub_login=1');
             exit;
         }
         $error = (string) ($result['error'] ?? 'Invalid email or password.');
