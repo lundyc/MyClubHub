@@ -1583,7 +1583,9 @@ main .small {
             width: 300px;
             height: 100vh;
             min-height: 0;
-            padding: 0.65rem 0.75rem;
+            /* Bottom slack so the last nav section (the account block) is
+               fully scrollable into view and not clipped by the fixed edge. */
+            padding: 0.65rem 0.75rem 3rem;
             border-bottom: 0 !important;
             border-right: 1px solid rgba(255, 255, 255, 0.08);
             box-shadow: 0 0 24px rgba(0, 0, 0, 0.14);
@@ -1591,6 +1593,8 @@ main .small {
             align-items: stretch;
             overflow-x: hidden;
             overflow-y: auto;
+            overscroll-behavior: contain;
+            scroll-padding-bottom: 3rem;
             transition: transform 0.25s ease;
       }
 

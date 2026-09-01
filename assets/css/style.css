@@ -5919,84 +5919,53 @@ a.player-slot__value--unpaid:focus {
     transform: translateY(0);
 }
 
-/* Persistent working-season bar — sits at the top of the content area on
-   every Hub page (rendered by header.php), light theme to match content. */
-.hub-season-bar {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.55rem 1rem;
-    margin-bottom: 1rem;
-    padding: 0.5rem 0.85rem;
-    border: 1px solid rgba(75, 8, 24, 0.1);
-    border-radius: var(--hub-radius, 0.85rem);
-    background: rgba(255, 253, 249, 0.85);
+.hub-season-switcher {
+    display: grid;
+    gap: 0.35rem;
+    width: 100%;
+    padding: 0.7rem;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 0.85rem;
+    background: rgba(255, 255, 255, 0.055);
 }
 
-.hub-season-bar__form {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.55rem;
-    margin: 0;
-}
-
-.hub-season-bar__form label {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    margin: 0;
-    color: var(--hub-muted, rgba(31, 26, 29, 0.62));
-    font-size: 0.7rem;
+.hub-season-switcher label {
+    color: rgba(246, 236, 222, 0.68);
+    font-size: 0.65rem;
     font-weight: 800;
-    letter-spacing: 0.09em;
+    letter-spacing: 0.1em;
     text-transform: uppercase;
 }
 
-.hub-season-bar__form label i {
-    color: var(--brand-primary, #6a2036);
+.hub-season-switcher__control {
+    position: relative;
 }
 
-.hub-season-bar__form select {
-    min-height: 2.25rem;
-    padding: 0.3rem 2rem 0.3rem 0.7rem;
-    border: 1px solid rgba(75, 8, 24, 0.18);
-    border-radius: 0.6rem;
-    background: #fff;
-    color: var(--hub-ink, #21141a);
-    font-weight: 650;
-    font-size: 0.86rem;
+.hub-season-switcher__control i,
+.hub-season-switcher__control svg {
+    position: absolute;
+    top: 50%;
+    left: 0.65rem;
+    z-index: 1;
+    color: var(--brand-warning);
+    transform: translateY(-50%);
+    pointer-events: none;
 }
 
-.hub-season-bar__form select:focus-visible {
-    outline: 3px solid rgba(224, 180, 42, 0.45);
-    outline-offset: 1px;
+.hub-season-switcher select {
+    width: 100%;
+    min-height: 2.65rem;
+    padding: 0.45rem 2rem 0.45rem 2rem;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 0.65rem;
+    background: #262526;
+    color: #fff;
+    font-weight: 600;
 }
 
-.hub-season-bar__flag {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-    padding: 0.2rem 0.55rem;
-    border-radius: 999px;
-    background: rgba(181, 129, 5, 0.14);
-    color: #7a5600;
-    font-size: 0.74rem;
-    font-weight: 800;
-}
-
-@media (max-width: 575.98px) {
-    .hub-season-bar {
-        padding: 0.5rem 0.7rem;
-    }
-
-    .hub-season-bar__form {
-        width: 100%;
-    }
-
-    .hub-season-bar__form select {
-        flex: 1;
-    }
+.hub-season-switcher select:focus-visible {
+    outline: 3px solid rgba(224, 180, 42, 0.5);
+    outline-offset: 2px;
 }
 
 .nav-section-toggle {
@@ -6425,8 +6394,20 @@ a.player-slot__value--unpaid:focus {
         gap: 0.25rem;
     }
 
+    .navbar .hub-season-switcher label,
     .navbar .nav-section-toggle {
         color: rgba(31, 26, 29, 0.68);
+    }
+
+    .navbar .hub-season-switcher {
+        border-color: rgba(75, 8, 24, 0.1);
+        background: rgba(75, 8, 24, 0.04);
+    }
+
+    .navbar .hub-season-switcher select {
+        border-color: rgba(75, 8, 24, 0.14);
+        background: #fff;
+        color: var(--brand-darkest);
     }
 
     .navbar .nav-submenu {
@@ -7768,8 +7749,18 @@ body.hub-shell #hubSideNavigation {
     font-size: 0.84rem;
 }
 
+.hub-season-switcher,
 .nav-account {
     border-radius: var(--hub-radius);
+}
+
+.hub-season-switcher {
+    padding: 0.62rem;
+}
+
+.hub-season-switcher select {
+    min-height: 2.35rem;
+    border-radius: var(--hub-radius-sm);
 }
 
 .hub-context-bar {
