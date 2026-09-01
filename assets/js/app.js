@@ -274,3 +274,48 @@ document.addEventListener("click", (e) => {
     collapse.hide();
   }
 });
+
+// Sidebar sections — remember each collapsible section's open/closed state per
+// browser. The section containing the current page is always shown by the
+// server and its state is never stored, so navigating never fights the
+// preference.
+(function () {
+  const KEY = "hubNavSections";
+  const toggles = document.querySelectorAll(".nav-section-toggle[data-nav-section]");
+  if (!toggles.length) return;
+
+  let store = {};
+  try {
+    store = JSON.parse(window.localStorage.getItem(KEY) || "{}") || {};
+  } catch (error) {
+    store = {};
+  }
+  const save = () => {
+    try {
+      window.localStorage.setItem(KEY, JSON.stringify(store));
+    } catch (error) {
+      /* storage unavailable (private mode) — state just won't persist */
+    }
+  };
+
+  toggles.forEach((btn) => {
+    const key = btn.getAttribute("data-nav-section");
+    const target = btn.getAttribute("data-bs-target");
+    const panel = target ? document.querySelector(target) : null;
+    if (!panel) return;
+
+    // Current section: leave exactly as the server rendered it, don't record.
+    if (panel.querySelector(".nav-link.active")) return;
+
+    if (Object.prototype.hasOwnProperty.call(store, key)) {
+      const wantOpen = store[key] === 1;
+      if (wantOpen !== panel.classList.contains("show")) {
+        panel.classList.toggle("show", wantOpen);
+        btn.setAttribute("aria-expanded", wantOpen ? "true" : "false");
+      }
+    }
+
+    panel.addEventListener("shown.bs.collapse", () => { store[key] = 1; save(); });
+    panel.addEventListener("hidden.bs.collapse", () => { store[key] = 0; save(); });
+  });
+})();

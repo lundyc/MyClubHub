@@ -500,8 +500,18 @@ $documentTitle = $documentTitle !== '' ? $documentTitle . ' – ' . APP_NAME : A
                     </section>
 
                     <section class="nav-section">
-                        <div class="nav-section-label">Match Day</div>
-                        <ul class="navbar-nav nav-main mb-0">
+                        <?php
+                        $matchdayPages = ['matches.php', 'match.php', 'match_starting_11.php', 'match_starting_11_graphic.php', 'match_next_match.php', 'match_graphics.php', 'match_poster.php', 'match_events.php', 'monthly_fixtures.php', 'match_fixtures_poster.php', 'match_media.php', 'players.php', 'player_add.php', 'player_edit.php', 'player_view.php', 'scan_overview.php', 'pos_overview.php'];
+                        $matchdayReqUri = (string) ($_SERVER['REQUEST_URI'] ?? '');
+                        $matchdayActive = (activeGroup($matchdayPages) === 'active' || str_starts_with($matchdayReqUri, '/scan') || str_starts_with($matchdayReqUri, '/pos')) ? 'active' : '';
+                        // Match Day is the daily driver — open on first visit; the
+                        // stored per-browser preference can still collapse it.
+                        $matchdayOpen = true;
+                        ?>
+                        <button class="nav-section-toggle <?= $matchdayActive ?>" type="button" data-bs-toggle="collapse" data-bs-target="#hubMatchdayNavigation" data-nav-section="matchday" aria-expanded="<?= $matchdayOpen ? 'true' : 'false' ?>" aria-controls="hubMatchdayNavigation">
+                            <span>Match Day</span><i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
+                        </button>
+                        <ul class="navbar-nav nav-main nav-submenu collapse <?= $matchdayOpen ? 'show' : '' ?> mb-0" id="hubMatchdayNavigation">
                             <li class="nav-item"><a class="nav-link <?= activeGroup(['matches.php', 'match.php', 'match_starting_11.php', 'match_starting_11_graphic.php', 'match_next_match.php', 'match_graphics.php', 'match_poster.php', 'match_events.php', 'monthly_fixtures.php', 'match_fixtures_poster.php', 'match_media.php']) ?>"<?= hub_nav_current(['matches.php', 'match.php', 'match_starting_11.php', 'match_starting_11_graphic.php', 'match_next_match.php', 'match_graphics.php', 'match_poster.php', 'match_events.php', 'monthly_fixtures.php', 'match_fixtures_poster.php']) ?> href="/matches.php"><i class="fa-solid fa-futbol me-1" aria-hidden="true"></i>Match day</a></li>
                             <li class="nav-item"><a class="nav-link <?= str_starts_with((string)($_SERVER['REQUEST_URI'] ?? ''), '/scan') ? 'active' : '' ?>"<?= str_starts_with((string)($_SERVER['REQUEST_URI'] ?? ''), '/scan') ? ' aria-current="page"' : '' ?> href="/scan_overview.php"><i class="fa-solid fa-qrcode me-1" aria-hidden="true"></i>Scan</a></li>
                             <li class="nav-item"><a class="nav-link <?= str_starts_with((string)($_SERVER['REQUEST_URI'] ?? ''), '/pos') ? 'active' : '' ?>"<?= str_starts_with((string)($_SERVER['REQUEST_URI'] ?? ''), '/pos') ? ' aria-current="page"' : '' ?> href="/pos_overview.php"><i class="fa-solid fa-cash-register me-1" aria-hidden="true"></i>POS</a></li>
@@ -510,8 +520,11 @@ $documentTitle = $documentTitle !== '' ? $documentTitle . ' – ' . APP_NAME : A
                     </section>
 
                     <section class="nav-section">
-                        <div class="nav-section-label">Sponsorship</div>
-                        <ul class="navbar-nav nav-main mb-0">
+                        <?php $sponsorshipActive = activeGroup(['sponsors.php', 'sponsor.php', 'sponsor_followups.php', 'sponsorship_agreements.php', 'sponsorship_agreement.php', 'sponsorship_bundles.php', 'sponsorship_bundle.php', 'sponsorship_packages.php', 'sponsorship_package.php', 'sponsorship_types.php', 'sponsorship_type.php']); ?>
+                        <button class="nav-section-toggle <?= $sponsorshipActive ?>" type="button" data-bs-toggle="collapse" data-bs-target="#hubSponsorshipNavigation" data-nav-section="sponsorship" aria-expanded="<?= $sponsorshipActive === 'active' ? 'true' : 'false' ?>" aria-controls="hubSponsorshipNavigation">
+                            <span>Sponsorship</span><i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
+                        </button>
+                        <ul class="navbar-nav nav-main nav-submenu collapse <?= $sponsorshipActive === 'active' ? 'show' : '' ?> mb-0" id="hubSponsorshipNavigation">
                             <li class="nav-item"><a class="nav-link <?= activeGroup(['sponsors.php','sponsor.php']) ?>"<?= hub_nav_current(['sponsors.php', 'sponsor.php']) ?> href="/sponsors.php"><i class="fa-solid fa-handshake me-1" aria-hidden="true"></i>Sponsors</a></li>
                             <li class="nav-item"><a class="nav-link <?= activePage('sponsor_followups.php') ?>"<?= hub_nav_current(['sponsor_followups.php']) ?> href="/sponsor_followups.php"><i class="fa-solid fa-phone-volume me-1" aria-hidden="true"></i>Follow-ups</a></li>
                             <li class="nav-item"><a class="nav-link <?= activeGroup(['sponsorship_agreements.php','sponsorship_agreement.php']) ?>"<?= hub_nav_current(['sponsorship_agreements.php', 'sponsorship_agreement.php']) ?> href="/sponsorship_agreements.php"><i class="fa-solid fa-file-signature me-1" aria-hidden="true"></i>Agreements</a></li>
@@ -521,8 +534,11 @@ $documentTitle = $documentTitle !== '' ? $documentTitle . ' – ' . APP_NAME : A
                     </section>
 
                     <section class="nav-section">
-                        <div class="nav-section-label">Fundraising</div>
-                        <ul class="navbar-nav nav-main mb-0">
+                        <?php $fundraisingActive = activeGroup(['hidden_team_games.php', 'hidden_team_game.php']); ?>
+                        <button class="nav-section-toggle <?= $fundraisingActive ?>" type="button" data-bs-toggle="collapse" data-bs-target="#hubFundraisingNavigation" data-nav-section="fundraising" aria-expanded="<?= $fundraisingActive === 'active' ? 'true' : 'false' ?>" aria-controls="hubFundraisingNavigation">
+                            <span>Fundraising</span><i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
+                        </button>
+                        <ul class="navbar-nav nav-main nav-submenu collapse <?= $fundraisingActive === 'active' ? 'show' : '' ?> mb-0" id="hubFundraisingNavigation">
                             <li class="nav-item"><a class="nav-link <?= activeGroup(['hidden_team_games.php', 'hidden_team_game.php']) ?>"<?= hub_nav_current(['hidden_team_games.php', 'hidden_team_game.php']) ?> href="/hidden_team_games.php"><i class="fa-solid fa-futbol me-1" aria-hidden="true"></i>Hidden Team</a></li>
                         </ul>
                     </section>
@@ -530,7 +546,7 @@ $documentTitle = $documentTitle !== '' ? $documentTitle . ' – ' . APP_NAME : A
                     <?php if ($isAdmin): ?>
                     <section class="nav-section">
                         <?php $shopActive = activeGroup(['shop_overview.php', 'shop_products.php', 'shop_product.php', 'shop_categories.php', 'shop_modifiers.php', 'shop_orders.php', 'shop_order.php', 'shop_settings.php']); ?>
-                        <button class="nav-section-toggle <?= $shopActive ?>" type="button" data-bs-toggle="collapse" data-bs-target="#hubShopNavigation" aria-expanded="<?= $shopActive === 'active' ? 'true' : 'false' ?>" aria-controls="hubShopNavigation">
+                        <button class="nav-section-toggle <?= $shopActive ?>" type="button" data-bs-toggle="collapse" data-bs-target="#hubShopNavigation" data-nav-section="shop" aria-expanded="<?= $shopActive === 'active' ? 'true' : 'false' ?>" aria-controls="hubShopNavigation">
                             <span>Shop</span><i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
                         </button>
                         <ul class="navbar-nav nav-main nav-submenu collapse <?= $shopActive === 'active' ? 'show' : '' ?> mb-0" id="hubShopNavigation">
@@ -547,7 +563,7 @@ $documentTitle = $documentTitle !== '' ? $documentTitle . ' – ' . APP_NAME : A
 
                     <section class="nav-section">
                         <?php $ticketingActive = activeGroup(['season_ticket_orders.php', 'season_ticket_order.php', 'fixture_tickets.php', 'ticket_orders.php', 'ticket_packages.php', 'season_ticket_renewals.php', 'season_ticket_free_codes.php', 'season_ticket_types.php', 'season_ticket_type.php']); ?>
-                        <button class="nav-section-toggle <?= $ticketingActive ?>" type="button" data-bs-toggle="collapse" data-bs-target="#hubTicketingNavigation" aria-expanded="<?= $ticketingActive === 'active' ? 'true' : 'false' ?>" aria-controls="hubTicketingNavigation">
+                        <button class="nav-section-toggle <?= $ticketingActive ?>" type="button" data-bs-toggle="collapse" data-bs-target="#hubTicketingNavigation" data-nav-section="ticketing" aria-expanded="<?= $ticketingActive === 'active' ? 'true' : 'false' ?>" aria-controls="hubTicketingNavigation">
                             <span>Ticketing</span><i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
                         </button>
                         <ul class="navbar-nav nav-main nav-submenu collapse <?= $ticketingActive === 'active' ? 'show' : '' ?> mb-0" id="hubTicketingNavigation">
@@ -563,7 +579,7 @@ $documentTitle = $documentTitle !== '' ? $documentTitle . ' – ' . APP_NAME : A
 
                     <section class="nav-section">
                         <?php $membersActive = activeGroup(['announcements.php', 'announcement.php', 'feedback.php', 'feedback_item.php', 'venue_reviews.php', 'motm.php']); ?>
-                        <button class="nav-section-toggle <?= $membersActive ?>" type="button" data-bs-toggle="collapse" data-bs-target="#hubMembersNavigation" aria-expanded="<?= $membersActive === 'active' ? 'true' : 'false' ?>" aria-controls="hubMembersNavigation">
+                        <button class="nav-section-toggle <?= $membersActive ?>" type="button" data-bs-toggle="collapse" data-bs-target="#hubMembersNavigation" data-nav-section="supporter" aria-expanded="<?= $membersActive === 'active' ? 'true' : 'false' ?>" aria-controls="hubMembersNavigation">
                             <span>Supporter content</span><i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
                         </button>
                         <ul class="navbar-nav nav-main nav-submenu collapse <?= $membersActive === 'active' ? 'show' : '' ?> mb-0" id="hubMembersNavigation">
@@ -575,16 +591,22 @@ $documentTitle = $documentTitle !== '' ? $documentTitle . ' – ' . APP_NAME : A
                     </section>
 
                     <section class="nav-section">
-                        <div class="nav-section-label">Finance</div>
-                        <ul class="navbar-nav nav-main mb-0">
+                        <?php $financeActive = activeGroup(['reports.php', 'stripe_dashboard.php']); ?>
+                        <button class="nav-section-toggle <?= $financeActive ?>" type="button" data-bs-toggle="collapse" data-bs-target="#hubFinanceNavigation" data-nav-section="finance" aria-expanded="<?= $financeActive === 'active' ? 'true' : 'false' ?>" aria-controls="hubFinanceNavigation">
+                            <span>Finance</span><i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
+                        </button>
+                        <ul class="navbar-nav nav-main nav-submenu collapse <?= $financeActive === 'active' ? 'show' : '' ?> mb-0" id="hubFinanceNavigation">
                             <li class="nav-item"><a class="nav-link <?= activePage('reports.php') ?>"<?= hub_nav_current(['reports.php']) ?> href="/reports.php"><i class="fa-solid fa-chart-column me-1" aria-hidden="true"></i>Reports</a></li>
                             <li class="nav-item"><a class="nav-link <?= activePage('stripe_dashboard.php') ?>"<?= hub_nav_current(['stripe_dashboard.php']) ?> href="/stripe_dashboard.php"><i class="fa-brands fa-stripe-s me-1" aria-hidden="true"></i>Stripe Dashboard</a></li>
                         </ul>
                     </section>
 
                     <section class="nav-section">
-                        <div class="nav-section-label">Secretary</div>
-                        <ul class="navbar-nav nav-main mb-0">
+                        <?php $secretaryActive = activeGroup(['secretary_dashboard.php', 'discipline_register.php', 'discipline_incident.php', 'discipline_incident_delete.php', 'player_registrations.php', 'player_registration_edit.php', 'secretary_tasks.php', 'secretary_task_edit.php', 'secretary_correspondence.php', 'secretary_correspondence_edit.php', 'fixture_change_requests.php', 'fixture_change_request_edit.php', 'committee_meetings.php', 'committee_meeting_edit.php', 'committee_meeting_delete.php', 'secretary_documents.php', 'secretary_document_delete.php', 'secretary_guide.php']); ?>
+                        <button class="nav-section-toggle <?= $secretaryActive ?>" type="button" data-bs-toggle="collapse" data-bs-target="#hubSecretaryNavigation" data-nav-section="secretary" aria-expanded="<?= $secretaryActive === 'active' ? 'true' : 'false' ?>" aria-controls="hubSecretaryNavigation">
+                            <span>Secretary</span><i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
+                        </button>
+                        <ul class="navbar-nav nav-main nav-submenu collapse <?= $secretaryActive === 'active' ? 'show' : '' ?> mb-0" id="hubSecretaryNavigation">
                             <li class="nav-item"><a class="nav-link <?= activePage('secretary_dashboard.php') ?>"<?= hub_nav_current(['secretary_dashboard.php']) ?> href="/secretary_dashboard.php"><i class="fa-solid fa-user-tie me-1" aria-hidden="true"></i>Dashboard</a></li>
                             <li class="nav-item"><a class="nav-link <?= activeGroup(['discipline_register.php', 'discipline_incident.php', 'discipline_incident_delete.php']) ?>"<?= hub_nav_current(['discipline_register.php', 'discipline_incident.php', 'discipline_incident_delete.php']) ?> href="/discipline_register.php"><i class="fa-solid fa-square-exclamation me-1" aria-hidden="true"></i>Discipline register</a></li>
                             <li class="nav-item"><a class="nav-link <?= activeGroup(['player_registrations.php', 'player_registration_edit.php']) ?>"<?= hub_nav_current(['player_registrations.php', 'player_registration_edit.php']) ?> href="/player_registrations.php"><i class="fa-solid fa-id-card-clip me-1" aria-hidden="true"></i>Player registrations</a></li>
@@ -599,7 +621,7 @@ $documentTitle = $documentTitle !== '' ? $documentTitle . ' – ' . APP_NAME : A
 
                     <section class="nav-section">
                         <?php $setupActive = activeGroup(['seasons.php', 'season.php', 'opponents.php', 'opponent.php', 'competitions.php', 'competition.php', 'venues.php', 'venue.php', 'facilities.php']); ?>
-                        <button class="nav-section-toggle <?= $setupActive ?>" type="button" data-bs-toggle="collapse" data-bs-target="#hubSetupNavigation" aria-expanded="<?= $setupActive === 'active' ? 'true' : 'false' ?>" aria-controls="hubSetupNavigation">
+                        <button class="nav-section-toggle <?= $setupActive ?>" type="button" data-bs-toggle="collapse" data-bs-target="#hubSetupNavigation" data-nav-section="clubsetup" aria-expanded="<?= $setupActive === 'active' ? 'true' : 'false' ?>" aria-controls="hubSetupNavigation">
                             <span>Club setup</span><i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
                         </button>
                         <ul class="navbar-nav nav-main nav-submenu collapse <?= $setupActive === 'active' ? 'show' : '' ?> mb-0" id="hubSetupNavigation">
@@ -612,8 +634,11 @@ $documentTitle = $documentTitle !== '' ? $documentTitle . ' – ' . APP_NAME : A
                     </section>
 
                     <section class="nav-section">
-                        <div class="nav-section-label">Publishing</div>
-                        <ul class="navbar-nav nav-main mb-0">
+                        <?php $publishingActive = activeGroup(['league_table.php', 'template_packs.php', 'template_pack.php', 'templates.php']); ?>
+                        <button class="nav-section-toggle <?= $publishingActive ?>" type="button" data-bs-toggle="collapse" data-bs-target="#hubPublishingNavigation" data-nav-section="publishing" aria-expanded="<?= $publishingActive === 'active' ? 'true' : 'false' ?>" aria-controls="hubPublishingNavigation">
+                            <span>Publishing</span><i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
+                        </button>
+                        <ul class="navbar-nav nav-main nav-submenu collapse <?= $publishingActive === 'active' ? 'show' : '' ?> mb-0" id="hubPublishingNavigation">
                             <li class="nav-item"><a class="nav-link <?= activePage('league_table.php') ?>"<?= hub_nav_current(['league_table.php']) ?> href="/league_table.php"><i class="fa-solid fa-table me-1" aria-hidden="true"></i>League table</a></li>
                             <?php if ($isAdmin): ?><li class="nav-item"><a class="nav-link <?= activeGroup(['template_packs.php', 'template_pack.php', 'templates.php']) ?>" href="/template_packs.php"><i class="fa-solid fa-layer-group me-1" aria-hidden="true"></i>Template packs</a></li><?php endif; ?>
                         </ul>
@@ -621,8 +646,11 @@ $documentTitle = $documentTitle !== '' ? $documentTitle . ' – ' . APP_NAME : A
 
                     <?php if ($isAdmin): ?>
                         <section class="nav-section">
-                            <div class="nav-section-label">Admin</div>
-                            <ul class="navbar-nav nav-main mb-0">
+                            <?php $adminActive = activeGroup(['match_photos.php', 'media.php', 'facebook_photo_import.php', 'people.php', 'settings.php', 'social_post_settings.php', 'club_people.php', 'club_person.php', 'positions.php']); ?>
+                            <button class="nav-section-toggle <?= $adminActive ?>" type="button" data-bs-toggle="collapse" data-bs-target="#hubAdminNavigation" data-nav-section="admin" aria-expanded="<?= $adminActive === 'active' ? 'true' : 'false' ?>" aria-controls="hubAdminNavigation">
+                                <span>Admin</span><i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
+                            </button>
+                            <ul class="navbar-nav nav-main nav-submenu collapse <?= $adminActive === 'active' ? 'show' : '' ?> mb-0" id="hubAdminNavigation">
                                 <li class="nav-item"><a class="nav-link <?= activeGroup(['match_photos.php', 'media.php', 'facebook_photo_import.php']) ?>"<?= hub_nav_current(['match_photos.php', 'media.php', 'facebook_photo_import.php']) ?> href="/match_photos.php"><i class="fa-solid fa-photo-film me-1" aria-hidden="true"></i>Media Library</a></li>
                                 <li class="nav-item"><a class="nav-link <?= activePage('people.php') ?>"<?= hub_nav_current(['people.php']) ?> href="/people.php"><i class="fa-solid fa-user-tag me-1" aria-hidden="true"></i>Photo tags</a></li>
                                 <li class="nav-item"><a class="nav-link <?= activeGroup(['settings.php', 'social_post_settings.php']) ?>"<?= hub_nav_current(['settings.php', 'social_post_settings.php']) ?> href="/settings.php"><i class="fa-solid fa-gear me-1" aria-hidden="true"></i>Settings</a></li>
