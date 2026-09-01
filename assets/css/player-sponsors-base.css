@@ -1583,9 +1583,7 @@ main .small {
             width: 300px;
             height: 100vh;
             min-height: 0;
-            /* Bottom slack so the last nav section (the account block) is
-               fully scrollable into view and not clipped by the fixed edge. */
-            padding: 0.65rem 0.75rem 3rem;
+            padding: 0.65rem 0.75rem;
             border-bottom: 0 !important;
             border-right: 1px solid rgba(255, 255, 255, 0.08);
             box-shadow: 0 0 24px rgba(0, 0, 0, 0.14);
@@ -1594,7 +1592,6 @@ main .small {
             overflow-x: hidden;
             overflow-y: auto;
             overscroll-behavior: contain;
-            scroll-padding-bottom: 3rem;
             transition: transform 0.25s ease;
       }
 
@@ -1695,6 +1692,11 @@ main .small {
 
       .nav-sections {
             gap: 0.55rem;
+            /* Slack below the last section (account + Log out) so it can be
+               scrolled fully clear of the fixed sidebar's bottom edge. Lives
+               on the content, not the scroll container: Chrome omits a flex
+               container's own padding-bottom from its scrollable height. */
+            padding-bottom: 4rem;
       }
 
       .nav-section {
