@@ -1699,11 +1699,10 @@ main .small {
 
       .nav-sections {
             gap: 0.55rem;
-            /* Slack below the last section (account + Log out) so it can be
-               scrolled fully clear of the fixed sidebar's bottom edge. Lives
-               on the content, not the scroll container: Chrome omits a flex
-               container's own padding-bottom from its scrollable height. */
-            padding-bottom: 4rem;
+            /* Small buffer so Log out isn't flush against the fixed bottom
+               edge. Lives on the content, not the scroll container: Chrome
+               omits a flex container's own padding-bottom from scroll height. */
+            padding-bottom: 1.25rem;
       }
 
       .nav-section {

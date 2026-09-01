@@ -1,4 +1,4 @@
-@import url('player-sponsors-base.css?v=20260901-3');
+@import url('player-sponsors-base.css?v=20260901-4');
 
 .navbar-brand {
     display: flex;
@@ -7752,6 +7752,22 @@ body.hub-shell #hubSideNavigation {
 .hub-season-switcher,
 .nav-account {
     border-radius: var(--hub-radius);
+}
+
+/* Log out — red, deepening on hover. Id beats the generic .nav-main .nav-link
+   rules; color needs !important to win player-sponsors-base's desktop rule. */
+#logoutBtn.nav-link {
+    background: var(--brand-danger, #8f1f2f);
+    border-color: rgba(255, 255, 255, 0.16);
+    color: #fff !important;
+}
+
+#logoutBtn.nav-link:hover,
+#logoutBtn.nav-link:focus,
+#logoutBtn.nav-link:focus-visible {
+    background: #661120;
+    border-color: rgba(255, 255, 255, 0.28);
+    color: #fff !important;
 }
 
 .hub-season-switcher {
