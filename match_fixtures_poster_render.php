@@ -177,6 +177,27 @@ if (!is_file($fontTitle) || !is_file($fontHeading) || !is_file($fontBody) || !is
 }
 
 $fixtures = getMatchFixtures($pdo, $seasonId);
+
+// Optional "show only these competitions" filter (?competitions[]=...).
+// Absent or empty = show everything. Fixtures with no competition set are
+// always kept, since there's no box for them.
+$competitionsFilter = $_GET['competitions'] ?? null;
+if (is_array($competitionsFilter)) {
+          $competitionsFilter = array_values(array_filter(
+                    array_map(static fn ($c): string => mb_strtolower(trim((string)$c)), $competitionsFilter),
+                    static fn (string $c): bool => $c !== ''
+          ));
+} else {
+          $competitionsFilter = [];
+}
+
+if ($competitionsFilter !== []) {
+          $fixtures = array_values(array_filter($fixtures, static function (array $fixture) use ($competitionsFilter): bool {
+                    $competition = mb_strtolower(trim((string)($fixture['competition'] ?? '')));
+                    return $competition === '' || in_array($competition, $competitionsFilter, true);
+          }));
+}
+
 $months = [];
 foreach ($fixtures as $fixture) {
           $ts = strtotime((string)$fixture['match_date']);

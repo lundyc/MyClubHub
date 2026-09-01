@@ -60,18 +60,45 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['background_image_fil
 
 $view = (($_GET['view'] ?? '') === 'results') ? 'results' : 'fixtures';
 
-$previewParams = [
-          'season_id' => $seasonId,
-          'background_image' => $backgroundImage,
-          'view' => $view,
-];
+$fixtures = getMatchFixtures($pdo, $seasonId);
+
+// Competitions present this season, for the "show only these" filter.
+$competitionOptions = [];
+foreach ($fixtures as $fixtureRow) {
+          $competition = trim((string)($fixtureRow['competition'] ?? ''));
+          if ($competition !== '') {
+                    $competitionOptions[$competition] = true;
+          }
+}
+$competitionOptions = array_keys($competitionOptions);
+sort($competitionOptions, SORT_NATURAL | SORT_FLAG_CASE);
+
+// null = show all. A subset is kept as-is; "all of them" and "none valid"
+// both collapse back to null so the URL stays clean and the poster never
+// comes back empty just because every box was unticked.
+$selectedCompetitions = $_GET['competitions'] ?? null;
+if (!is_array($selectedCompetitions)) {
+          $selectedCompetitions = null;
+} else {
+          $selectedCompetitions = array_values(array_intersect($competitionOptions, array_map('strval', $selectedCompetitions)));
+          if ($selectedCompetitions === [] || count($selectedCompetitions) === count($competitionOptions)) {
+                    $selectedCompetitions = null;
+          }
+}
+
+$commonParams = ['season_id' => $seasonId];
+if (isset($_GET['background_image'])) {
+          $commonParams['background_image'] = $backgroundImage;
+}
+if ($selectedCompetitions !== null) {
+          $commonParams['competitions'] = $selectedCompetitions;
+}
+
+$previewParams = $commonParams + ['view' => $view];
 $previewUrl = 'match_fixtures_poster_render.php?' . http_build_query($previewParams);
 
-// Keep the current background choice on the view-toggle links.
-$viewToggleBase = 'match_fixtures_poster.php?season_id=' . (int)$seasonId
-          . (isset($_GET['background_image']) ? '&background_image=' . urlencode($backgroundImage) : '');
-
-$fixtures = getMatchFixtures($pdo, $seasonId);
+// Base for the view-toggle links — keeps background + competition choices.
+$viewToggleBase = 'match_fixtures_poster.php?' . http_build_query($commonParams);
 ?>
 
 <div class="page-hero mb-4">
@@ -90,8 +117,50 @@ $fixtures = getMatchFixtures($pdo, $seasonId);
                     <a href="<?= h($viewToggleBase) ?>&amp;view=fixtures" class="btn btn-outline-secondary <?= $view === 'fixtures' ? 'active' : '' ?>"<?= $view === 'fixtures' ? ' aria-current="true"' : '' ?>>Fixtures</a>
                     <a href="<?= h($viewToggleBase) ?>&amp;view=results" class="btn btn-outline-secondary <?= $view === 'results' ? 'active' : '' ?>"<?= $view === 'results' ? ' aria-current="true"' : '' ?>>Fixtures &amp; results</a>
           </div>
+          <?php if ($competitionOptions): ?>
+          <div class="dropdown d-inline-block" id="posterCompetitionFilter">
+                    <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">
+                              <i class="fa-solid fa-filter me-1" aria-hidden="true"></i>Competitions<?php if ($selectedCompetitions !== null): ?> <span class="badge text-bg-secondary ms-1"><?= count($selectedCompetitions) ?>/<?= count($competitionOptions) ?></span><?php endif; ?>
+                    </button>
+                    <div class="dropdown-menu dropdown-menu-end p-3" style="min-width: 22rem; max-width: 90vw;">
+                              <form method="get">
+                                        <input type="hidden" name="season_id" value="<?= (int)$seasonId ?>">
+                                        <input type="hidden" name="view" value="<?= h($view) ?>">
+                                        <?php if (isset($_GET['background_image'])): ?><input type="hidden" name="background_image" value="<?= h($backgroundImage) ?>"><?php endif; ?>
+                                        <div class="d-flex justify-content-between align-items-center mb-2">
+                                                  <span class="fw-semibold small text-uppercase text-muted">Show these competitions</span>
+                                                  <button type="button" class="btn btn-link btn-sm p-0" data-poster-competitions-all>Select all</button>
+                                        </div>
+                                        <?php foreach ($competitionOptions as $competition): ?>
+                                                  <?php $checkboxId = 'posterComp_' . substr(md5($competition), 0, 10); ?>
+                                                  <div class="form-check">
+                                                            <input class="form-check-input" type="checkbox" name="competitions[]" value="<?= h($competition) ?>" id="<?= h($checkboxId) ?>" <?= ($selectedCompetitions === null || in_array($competition, $selectedCompetitions, true)) ? 'checked' : '' ?> data-poster-competition>
+                                                            <label class="form-check-label" for="<?= h($checkboxId) ?>"><?= h($competition) ?></label>
+                                                  </div>
+                                        <?php endforeach; ?>
+                                        <div class="d-grid mt-3">
+                                                  <button type="submit" class="btn btn-brand btn-sm">Apply</button>
+                                        </div>
+                              </form>
+                    </div>
+          </div>
+          <?php endif; ?>
           <a href="<?= h($previewUrl) ?>" class="btn btn-brand btn-sm" target="_blank"><i class="fa-solid fa-download me-1" aria-hidden="true"></i>Download PNG</a>
 </div></div>
+<?php if ($competitionOptions): ?>
+<script>
+          (function () {
+                    var wrap = document.getElementById('posterCompetitionFilter');
+                    if (!wrap) { return; }
+                    var selectAll = wrap.querySelector('[data-poster-competitions-all]');
+                    if (selectAll) {
+                              selectAll.addEventListener('click', function () {
+                                        wrap.querySelectorAll('[data-poster-competition]').forEach(function (box) { box.checked = true; });
+                              });
+                    }
+          })();
+</script>
+<?php endif; ?>
 
 <?php if (isset($_GET['uploaded'])): ?>
           <div class="alert alert-success">Background image uploaded.</div>
