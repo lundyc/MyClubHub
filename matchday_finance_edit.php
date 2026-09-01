@@ -108,10 +108,18 @@ foreach ($cashAreas as $key => $area) {
 
 $floatTotal = 0.0;
 $closeTotal = 0.0;
+$declaredTotal = 0.0;
 foreach ($cashAreas as $key => $area) {
     $floatTotal += (float) ($form[$area['float']] ?? 0);
     $closeTotal += (float) ($form[$area['close']] ?? 0);
+    $declaredTotal += $totals['cash_by_area'][$key]['declared'];
 }
+$diffTotal = $totals['cash_taken_total'] - $declaredTotal;
+
+// Only flag a cash difference once both sides of it have been entered — a
+// half-filled sheet (floats in, income not yet) shouldn't light up amber.
+$reconFlag = static fn (float $taken, float $declared, float $variance): bool =>
+    abs($variance) >= 0.01 && abs($taken) >= 0.01 && abs($declared) >= 0.01;
 ?>
 
 <div class="matchday-finance-page">
@@ -246,7 +254,7 @@ foreach ($cashAreas as $key => $area) {
                                 <td class="text-end"><?= $moneyInput($area['close'], 'cash', $moneyValue($form, $area['close']), ['cash-close' => $key]) ?></td>
                                 <td class="text-end"><span class="mf-recon__derived" data-mf-cash-taken="<?= h($key) ?>"><?= h(gbp($areaTotals['taken'])) ?></span></td>
                                 <td class="text-end"><span class="mf-recon__derived" data-mf-cash-declared="<?= h($key) ?>"><?= h(gbp($areaTotals['declared'])) ?></span></td>
-                                <td class="text-end"><span class="mf-recon__diff<?= abs($areaTotals['variance']) >= 0.01 ? ' is-flagged' : '' ?>" data-mf-cash-diff="<?= h($key) ?>"><?= h(gbp($areaTotals['variance'])) ?></span></td>
+                                <td class="text-end"><span class="mf-recon__diff<?= $reconFlag($areaTotals['taken'], $areaTotals['declared'], $areaTotals['variance']) ? ' is-flagged' : '' ?>" data-mf-cash-diff="<?= h($key) ?>"><?= h(gbp($areaTotals['variance'])) ?></span></td>
                             </tr>
                         <?php endforeach; ?>
                     </tbody>
@@ -256,8 +264,8 @@ foreach ($cashAreas as $key => $area) {
                             <td class="text-end"><span class="mf-recon__derived" id="mfReconFloatTotal"><?= h(gbp($floatTotal)) ?></span></td>
                             <td class="text-end"><span class="mf-recon__derived" id="mfReconCloseTotal"><?= h(gbp($closeTotal)) ?></span></td>
                             <td class="text-end"><span class="mf-recon__derived" id="mfReconTakenTotal"><?= h(gbp($totals['cash_taken_total'])) ?></span></td>
-                            <td class="text-end"><span class="mf-recon__derived" id="mfReconDeclaredTotal"><?= h(gbp($totals['cash_by_area']['gate']['declared'] + $totals['cash_by_area']['bar']['declared'] + $totals['cash_by_area']['catering']['declared'] + $totals['cash_by_area']['merch']['declared'])) ?></span></td>
-                            <td class="text-end"><span class="mf-recon__derived" id="mfReconDiffTotal"></span></td>
+                            <td class="text-end"><span class="mf-recon__derived" id="mfReconDeclaredTotal"><?= h(gbp($declaredTotal)) ?></span></td>
+                            <td class="text-end"><span class="mf-recon__diff<?= $reconFlag($totals['cash_taken_total'], $declaredTotal, $diffTotal) ? ' is-flagged' : '' ?>" id="mfReconDiffTotal"><?= h(gbp($diffTotal)) ?></span></td>
                         </tr>
                     </tfoot>
                 </table>
@@ -336,6 +344,10 @@ foreach ($cashAreas as $key => $area) {
             el.classList.toggle('matchday-finance-net--pos', value >= 0);
             el.classList.toggle('matchday-finance-net--neg', value < 0);
         }
+        // Flag a cash difference only once both sides of it are entered.
+        function flagged(taken, declared, diff) {
+            return Math.abs(diff) >= 0.01 && Math.abs(taken) >= 0.01 && Math.abs(declared) >= 0.01;
+        }
 
         function recalc() {
             var income = sumGroup('income');
@@ -365,7 +377,7 @@ foreach ($cashAreas as $key => $area) {
                 if (declaredEl) { declaredEl.textContent = money(declared); }
                 if (diffEl) {
                     diffEl.textContent = money(diff);
-                    diffEl.classList.toggle('is-flagged', Math.abs(diff) >= 0.01);
+                    diffEl.classList.toggle('is-flagged', flagged(taken, declared, diff));
                 }
 
                 floatTotal += floatVal;
@@ -382,7 +394,7 @@ foreach ($cashAreas as $key => $area) {
             var diffTotalEl = document.getElementById('mfReconDiffTotal');
             if (diffTotalEl) {
                 diffTotalEl.textContent = money(diffTotal);
-                diffTotalEl.classList.toggle('is-flagged', Math.abs(diffTotal) >= 0.01);
+                diffTotalEl.classList.toggle('is-flagged', flagged(takenTotal, declaredTotal, diffTotal));
             }
         }
 
