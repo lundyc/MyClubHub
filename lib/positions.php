@@ -57,6 +57,11 @@ const HUB_PAGE_CAPABILITIES = [
     'match.php' => ['football_ops'],
     'match_next_match.php' => ['football_ops'],
     'match_player_of_match.php' => ['football_ops'],
+    // Matchday balance sheet: recorded by the treasurer or the match
+    // secretary, so either capability grants access.
+    'matchday_finance.php' => ['finance', 'football_ops'],
+    'matchday_finance_edit.php' => ['finance', 'football_ops'],
+    'matchday_finance_export.php' => ['finance', 'football_ops'],
     'matches.php' => ['football_ops'],
     'monthly_fixtures.php' => ['football_ops'],
     'motm.php' => ['football_ops'],
