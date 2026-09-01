@@ -190,6 +190,7 @@ $packages = $fixture ? getFixtureTicketPackages($pdo, (int) $fixture['id'], true
         <div class="small text-uppercase fw-bold opacity-75">Saltcoats Victoria FC</div>
         <h1 class="display-5 fw-bold mb-2">Buy Match Tickets</h1>
         <p class="mb-0">Choose a home game, pick your tickets, and show your digital QR code at the gate.</p>
+        <p class="mt-2 mb-0"><a href="/members/matches.php" style="color:inherit;font-weight:700;">Fixtures &amp; results &rarr;</a></p>
     </section>
 
     <?php if (isset($_GET['cancelled'])): ?><div class="alert alert-warning">Payment was cancelled. No money was taken.</div><?php endif; ?>

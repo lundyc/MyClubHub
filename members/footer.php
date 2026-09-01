@@ -4,8 +4,8 @@
 const FEEDBACK_BAR_ENABLED = false;
 require_once __DIR__ . '/../lib/feedback.php';
 ensureFeedbackSchema($pdo);
-$feedbackPersonId = member_auth_current_person_id() ?? (int) ($currentHolder['person_id'] ?? 0);
-$feedbackLegacyHolderId = member_auth_current_legacy_holder_id() ?? (int) ($currentHolder['legacy_holder_id'] ?? $currentHolder['id'] ?? 0);
+$feedbackPersonId = member_auth_current_person_id() ?? (is_array($currentHolder) ? (int) ($currentHolder['person_id'] ?? 0) : 0);
+$feedbackLegacyHolderId = member_auth_current_legacy_holder_id() ?? (is_array($currentHolder) ? (int) ($currentHolder['legacy_holder_id'] ?? $currentHolder['id'] ?? 0) : 0);
 $hasSubmittedFeedback = $currentHolder && $feedbackPersonId > 0 ? personHasSubmittedFeedback($pdo, $feedbackPersonId, $feedbackLegacyHolderId) : true;
 $feedbackCsrf = $currentHolder ? member_auth_csrf_token() : '';
 $feedbackPage = basename($_SERVER['PHP_SELF'] ?? '');
@@ -13,6 +13,12 @@ $feedbackPage = basename($_SERVER['PHP_SELF'] ?? '');
 <?php if ($currentHolder): ?>
         </div>
     </main>
+<?php elseif (!empty($memberShowPublicChrome)): ?>
+        </div>
+    </main>
+    <footer class="member-public-footer">
+        <p>Season ticket holders also get a digital ticket, announcements and Man of the Match voting. <a href="/members/register.php">Create a free account</a> or <a href="/members/login.php">log in</a>.</p>
+    </footer>
 <?php else: ?>
     </div>
 <?php endif; ?>

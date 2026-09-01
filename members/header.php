@@ -22,11 +22,18 @@ ensureSeasonTicketSchema($pdo);
 $currentScript = basename($_SERVER['PHP_SELF'] ?? '');
 $memberIsPublicPage = in_array($currentScript, ['login.php', 'register.php', 'forgot_password.php', 'reset_password.php'], true);
 
+// Read-only club info anyone can see without an account. These render with a
+// slim public top bar (log in / create account) instead of the member portal
+// chrome; the interactive parts on them (MOTM vote, venue review) stay gated
+// to signed-in members.
+$memberPublicContentPages = ['matches.php', 'match.php', 'table.php'];
+$memberIsPublicContentPage = in_array($currentScript, $memberPublicContentPages, true);
+
 if (!member_auth_is_authenticated() && $staffUserForAutoLogin !== null) {
     member_auth_login_as_staff($pdo, $staffUserForAutoLogin);
 }
 
-if (!member_auth_is_authenticated() && !$memberIsPublicPage) {
+if (!member_auth_is_authenticated() && !$memberIsPublicPage && !$memberIsPublicContentPage) {
     header('Location: login.php');
     exit;
 }
@@ -70,12 +77,12 @@ function member_current_tier(?array $holder, bool $hasSeasonTicket): int
 $memberTier = member_current_tier($currentHolder, $memberHasSeasonTicket);
 $memberHasSeasonTicket = $memberTier >= MEMBER_TIER_SEASON_TICKET_HOLDER;
 
-// Per-page minimum tier. matches.php/orders.php/ticket.php/profile.php/
-// index.php aren't listed — they stay open to any registered account
-// (public tier), matches.php included, since "see the games" is baseline
+// Per-page minimum tier. matches.php/match.php/table.php/orders.php/
+// ticket.php/profile.php/index.php aren't listed — matches, results and the
+// league table are public (see $memberPublicContentPages above), and the
+// rest stay open to any registered account since "see the games" is baseline
 // access for anyone who's signed up, not just season ticket holders.
 $memberTierRequirements = [
-    'table.php' => MEMBER_TIER_SEASON_TICKET_HOLDER,
     'announcements.php' => MEMBER_TIER_SEASON_TICKET_HOLDER,
     'sponsor.php' => MEMBER_TIER_SEASON_TICKET_HOLDER,
     'player.php' => MEMBER_TIER_SEASON_TICKET_HOLDER,
@@ -155,6 +162,16 @@ function member_holder_address(array $holder): string
     $structured = trim(implode(', ', array_filter($parts, static fn(string $part): bool => $part !== '')));
     return $structured !== '' ? $structured : trim((string) ($holder['address'] ?? ''));
 }
+
+// True when an anonymous visitor is on one of the public content pages:
+// render the slim public top bar instead of the member portal nav.
+$memberShowPublicChrome = $memberIsPublicContentPage && !$currentHolder;
+
+$memberPageTitle = [
+    'matches.php' => 'Fixtures & Results',
+    'match.php' => 'Match Centre',
+    'table.php' => 'League Table',
+][$currentScript] ?? 'Members';
 ?>
 <!doctype html>
 <html lang="en">
@@ -163,7 +180,9 @@ function member_holder_address(array $holder): string
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="color-scheme" content="light">
     <meta name="theme-color" content="#4b0818">
-    <title>Members - <?= h(APP_NAME) ?></title>
+    <?php if (!$memberIsPublicContentPage): ?><meta name="robots" content="noindex">
+    <?php endif; ?>
+    <title><?= h($memberPageTitle) ?> &middot; Saltcoats Victoria FC</title>
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -253,9 +272,27 @@ function member_holder_address(array $holder): string
         }
         @media (max-width: 991.98px) { .member-grid--2,.member-grid--3,.member-grid--aside,.member-shop-layout { grid-template-columns:1fr; } .member-cart { position:static; } }
         @media (max-width: 575.98px) { .member-row,.member-product { align-items:flex-start; flex-direction:column; } .member-row > .text-end { text-align:left !important; } }
+
+        /* Slim public chrome for anonymous visitors on the read-only pages */
+        .member-public-topbar { display:flex; flex-wrap:wrap; align-items:center; gap:.75rem 1.25rem; padding:.85rem clamp(1rem,4vw,2rem); background:linear-gradient(135deg,#4b0818,#7a1730 70%); color:#fff; }
+        .member-public-topbar__brand { display:inline-flex; align-items:center; gap:.6rem; color:#fff; text-decoration:none; font-weight:800; letter-spacing:.01em; }
+        .member-public-topbar__brand img { height:34px; width:auto; }
+        .member-public-topbar__nav { display:flex; flex-wrap:wrap; gap:.35rem; margin-left:.25rem; }
+        .member-public-topbar__nav a { color:rgba(255,255,255,.82); text-decoration:none; font-weight:700; font-size:.92rem; padding:.35rem .7rem; border-radius:999px; }
+        .member-public-topbar__nav a:hover, .member-public-topbar__nav a:focus-visible { background:rgba(255,255,255,.12); color:#fff; }
+        .member-public-topbar__nav a.active { background:rgba(255,255,255,.16); color:#fff; }
+        .member-public-topbar__cta { display:flex; gap:.5rem; margin-left:auto; }
+        .member-public-topbar__cta .btn-outline-light { --bs-btn-color:#fff; --bs-btn-border-color:rgba(255,255,255,.6); --bs-btn-hover-bg:rgba(255,255,255,.14); --bs-btn-hover-border-color:#fff; --bs-btn-hover-color:#fff; }
+        .member-public-topbar__cta .btn-join { background:#e0b42a; border:1px solid #e0b42a; color:#3a2600; font-weight:800; }
+        .member-public-topbar__cta .btn-join:hover, .member-public-topbar__cta .btn-join:focus-visible { background:#efc75a; border-color:#efc75a; color:#3a2600; }
+        .member-public-main { padding:clamp(1.25rem,4vw,2.5rem) clamp(1rem,4vw,2rem) 4rem; }
+        .member-public-main__inner { max-width:1080px; margin:0 auto; }
+        .member-public-footer { border-top:1px solid var(--member-line,#eadfdf); padding:1.5rem; text-align:center; color:var(--member-muted,#6f6470); font-size:.92rem; }
+        .member-public-footer a { color:var(--member-maroon,#4b0818); font-weight:700; }
+        @media (max-width: 575.98px) { .member-public-topbar__cta { margin-left:0; width:100%; } .member-public-topbar__cta .btn { flex:1; } }
     </style>
 </head>
-<body<?= $currentHolder ? ' class="hub-shell"' : '' ?>>
+<body<?= $currentHolder ? ' class="hub-shell"' : ($memberShowPublicChrome ? ' class="member-page"' : '') ?>>
 <?php if ($currentHolder): ?>
     <a class="hub-skip-link" href="#hubMemberMainContent">Skip to main content</a>
     <nav class="navbar border-bottom shadow-sm navbar-dark" id="hubSideNavigation">
@@ -284,8 +321,8 @@ function member_holder_address(array $holder): string
                         <ul class="navbar-nav nav-main mb-0">
                             <li class="nav-item"><a class="nav-link <?= member_active_group(['matches.php', 'match.php']) ?>" href="/members/matches.php"><i class="fa-solid fa-futbol me-1" aria-hidden="true"></i>Matches</a></li>
                             <li class="nav-item"><a class="nav-link <?= member_active('orders.php') ?>" href="/members/orders.php"><i class="fa-solid fa-ticket me-1" aria-hidden="true"></i>Match Tickets</a></li>
+                            <li class="nav-item"><a class="nav-link <?= member_active('table.php') ?>" href="/members/table.php"><i class="fa-solid fa-table me-1" aria-hidden="true"></i>League Table</a></li>
                             <?php if ($memberHasSeasonTicket): ?>
-                                <li class="nav-item"><a class="nav-link <?= member_active('table.php') ?>" href="/members/table.php"><i class="fa-solid fa-table me-1" aria-hidden="true"></i>League Table</a></li>
                                 <li class="nav-item"><a class="nav-link <?= member_active('announcements.php') ?>" href="/members/announcements.php"><i class="fa-solid fa-bullhorn me-1" aria-hidden="true"></i>Announcements</a></li>
                                 <li class="nav-item"><a class="nav-link <?= member_active_group(['sponsor.php', 'player.php']) ?>" href="/members/sponsor.php"><i class="fa-solid fa-handshake me-1" aria-hidden="true"></i>Sponsor</a></li>
                             <?php if (!HIDDEN_TEAM_TEMPORARILY_DISABLED): ?>
@@ -317,6 +354,24 @@ function member_holder_address(array $holder): string
 
     <main class="hub-main" id="hubMemberMainContent" tabindex="-1">
         <div class="container-fluid" style="padding:1.5rem;">
+<?php elseif ($memberShowPublicChrome): ?>
+    <a class="hub-skip-link" href="#hubMemberMainContent">Skip to main content</a>
+    <header class="member-public-topbar">
+        <a class="member-public-topbar__brand" href="/members/matches.php">
+            <img src="/Saltcoats Victoria FC -White_Transparent.png" alt="Saltcoats Victoria FC" loading="eager">
+            <span>Saltcoats Victoria FC</span>
+        </a>
+        <nav class="member-public-topbar__nav" aria-label="Sections">
+            <a class="<?= member_active_group(['matches.php', 'match.php']) ?>" href="/members/matches.php">Fixtures &amp; Results</a>
+            <a class="<?= member_active('table.php') ?>" href="/members/table.php">League Table</a>
+        </nav>
+        <div class="member-public-topbar__cta">
+            <a class="btn btn-sm btn-outline-light" href="/members/login.php">Log in</a>
+            <a class="btn btn-sm btn-join" href="/members/register.php">Create account</a>
+        </div>
+    </header>
+    <main class="member-public-main" id="hubMemberMainContent" tabindex="-1">
+        <div class="member-public-main__inner">
 <?php else: ?>
     <div style="padding:24px 16px 64px;">
 <?php endif; ?>

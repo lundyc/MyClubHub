@@ -20,8 +20,8 @@ $isHome = (int) $fixture['is_home'] === 1;
 $isPlayed = (string) $fixture['status'] === 'played' || ($fixture['full_time_home_score'] !== null && $fixture['full_time_away_score'] !== null);
 $venueInfo = getVenueInfoForFixture($pdo, $fixture);
 $venueName = $venueInfo ? (string) $venueInfo['name'] : venueReviewFixtureName($fixture);
-$currentPersonId = member_auth_current_person_id() ?? (int) ($currentHolder['person_id'] ?? 0);
-$currentLegacyHolderId = member_auth_current_legacy_holder_id() ?? (int) ($currentHolder['legacy_holder_id'] ?? $currentHolder['id'] ?? 0);
+$currentPersonId = member_auth_current_person_id() ?? (is_array($currentHolder) ? (int) ($currentHolder['person_id'] ?? 0) : 0);
+$currentLegacyHolderId = member_auth_current_legacy_holder_id() ?? (is_array($currentHolder) ? (int) ($currentHolder['legacy_holder_id'] ?? $currentHolder['id'] ?? 0) : 0);
 $h2hMatches = member_match_head_to_head($pdo, $fixture);
 $h2hRecord = member_match_head_to_head_record($h2hMatches);
 
@@ -275,7 +275,7 @@ function member_match_player_event_icon(string $type): string
 }
 
 $reviewError = '';
-if ($isPlayed && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && isset($_POST['form_action']) && $_POST['form_action'] === 'venue_review') {
+if ($isPlayed && member_auth_is_authenticated() && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && isset($_POST['form_action']) && $_POST['form_action'] === 'venue_review') {
     if (!member_auth_verify_csrf_token((string) ($_POST['csrf_token'] ?? ''))) {
         $reviewError = 'Your session expired. Please try again.';
     } else {
@@ -297,7 +297,7 @@ $ratingSummary = getVenueRatingSummary($pdo, $venueName);
 $myReview = member_auth_is_authenticated() ? getMyVenueReview($pdo, $currentPersonId, $fixtureId, $currentLegacyHolderId) : null;
 
 $motmError = '';
-if ($isPlayed && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && isset($_POST['form_action']) && $_POST['form_action'] === 'motm_vote') {
+if ($isPlayed && member_auth_is_authenticated() && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && isset($_POST['form_action']) && $_POST['form_action'] === 'motm_vote') {
     if (!member_auth_verify_csrf_token((string) ($_POST['csrf_token'] ?? ''))) {
         $motmError = 'Your session expired. Please try again.';
     } else {
@@ -603,6 +603,7 @@ $topStats = member_match_top_stats($detail['events']);
                     <div class="member-card__header"><h2>Man of the Match</h2></div>
                     <div class="member-card__body">
                         <?php if ($motmError !== ''): ?><div class="alert alert-danger py-2"><?= h($motmError) ?></div><?php endif; ?>
+                        <?php if (member_auth_is_authenticated()): ?>
                         <form method="post" class="row g-2 align-items-end mb-3">
                             <input type="hidden" name="csrf_token" value="<?= h(member_auth_csrf_token()) ?>">
                             <input type="hidden" name="form_action" value="motm_vote">
@@ -616,6 +617,9 @@ $topStats = member_match_top_stats($detail['events']);
                             </div>
                             <div class="col-sm-4"><button type="submit" class="btn btn-brand w-100"><?= $myMotmVote ? 'Change Vote' : 'Vote' ?></button></div>
                         </form>
+                        <?php else: ?>
+                        <p class="text-muted small mb-3"><a href="/members/login.php">Log in</a> or <a href="/members/register.php">create a free account</a> to cast your vote.</p>
+                        <?php endif; ?>
                         <?php if ($motmResults): ?>
                             <?php $topVotes = (int) $motmResults[0]['votes']; ?>
                             <h3 class="h6 text-muted text-uppercase small">Results so far</h3>
@@ -649,6 +653,7 @@ $topStats = member_match_top_stats($detail['events']);
 
                     <?php if ($isPlayed): ?>
                         <hr>
+                        <?php if (member_auth_is_authenticated()): ?>
                         <h3 class="h6"><?= $myReview ? 'Update your review' : 'Rate the facilities and matchday experience' ?></h3>
                         <?php if ($reviewError !== ''): ?><div class="alert alert-danger py-2"><?= h($reviewError) ?></div><?php endif; ?>
                         <?php if ($myReview && !isset($_POST['form_action'])): ?>
@@ -679,6 +684,10 @@ $topStats = member_match_top_stats($detail['events']);
                                 stars.forEach((s) => { s.style.color = Number(s.dataset.value) <= Number(star.dataset.value) ? '#ffc107' : '#ccc'; });
                             }));
                         })();</script>
+                        <?php else: ?>
+                        <h3 class="h6">Rate the facilities and matchday experience</h3>
+                        <p class="text-muted small mb-0"><a href="/members/login.php">Log in</a> or <a href="/members/register.php">create a free account</a> to leave a review.</p>
+                        <?php endif; ?>
                     <?php else: ?>
                         <p class="text-muted small mb-0 mt-3">Venue reviews open once the match has been played.</p>
                     <?php endif; ?>

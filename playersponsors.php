@@ -171,6 +171,7 @@ function player_sponsorship_render_basket(array $basket, string $csrfFieldHtml):
     <img src="/Saltcoats Victoria FC -White_Transparent.png" alt="Saltcoats Victoria FC" class="ps-badge">
     <h1>Sponsor a Player<?= $currentSeason ? ' — ' . h((string) $currentSeason['name']) : '' ?></h1>
     <p class="mb-0">Choose a player's Home or Away kit to sponsor, add as many as you like, then check out.</p>
+    <p class="mt-2 mb-0"><a href="/members/matches.php" style="color:inherit;font-weight:700;">Fixtures &amp; results &rarr;</a></p>
 </div>
 
 <div class="ps-wrap">

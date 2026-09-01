@@ -92,6 +92,9 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
             <div class="text-center mt-2">
                 <a href="register.php">New here? Create an account</a>
             </div>
+            <div class="text-center mt-3 small">
+                <a href="matches.php">Browse fixtures, results &amp; the league table</a>
+            </div>
         </form>
     </div>
     <script>

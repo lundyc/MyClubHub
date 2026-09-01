@@ -258,6 +258,7 @@ function season_ticket_render_basket(array $basket, array $typesById, string $cs
     <img src="/Saltcoats Victoria FC -White_Transparent.png" alt="Saltcoats Victoria FC" class="st-badge">
     <h1>Season Tickets<?= $currentSeason ? ' ' . h((string) $currentSeason['name']) : '' ?></h1>
     <p class="mb-0">Add season tickets to your basket, then enter the holder details.</p>
+    <p class="mt-2 mb-0"><a href="/members/matches.php" style="color:inherit;font-weight:700;">Fixtures &amp; results &rarr;</a></p>
     <?php if ($sponsors): ?>
     <div class="st-sponsors">
         <div class="st-sponsors-label">This season's tickets are proudly sponsored by</div>
