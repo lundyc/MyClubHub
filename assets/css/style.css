@@ -1,4 +1,4 @@
-@import url('player-sponsors-base.css?v=20260901-4');
+@import url('player-sponsors-base.css?v=20260901-5');
 
 .navbar-brand {
     display: flex;
@@ -6394,9 +6394,19 @@ a.player-slot__value--unpaid:focus {
         gap: 0.25rem;
     }
 
-    .navbar .hub-season-switcher label,
+    /* The mobile nav panel is dark (player-sponsors-base.css), so these
+       labels need light / gold text, not the near-black they used to get. */
+    .navbar .hub-season-switcher label {
+        color: rgba(246, 236, 222, 0.66);
+    }
+
     .navbar .nav-section-toggle {
-        color: rgba(31, 26, 29, 0.68);
+        color: var(--brand-warning);
+    }
+
+    .navbar .nav-section-toggle i,
+    .navbar .nav-section-toggle svg {
+        color: var(--brand-warning);
     }
 
     .navbar .hub-season-switcher {
