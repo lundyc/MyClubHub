@@ -5,29 +5,36 @@ declare(strict_types=1);
 require_once __DIR__ . '/social_auth.php';
 require_once __DIR__ . '/lib/functions.php';
 
-/**
- * Escape output for HTML context.
- *
- * @param mixed $value
- */
-function safe($value): string
-{
-    return htmlspecialchars((string) ($value ?? ''), ENT_QUOTES, 'UTF-8');
+// safe() and app_format_uk_date() now live in lib/functions.php (required
+// above) so pages can use them without pulling in this file. The guards are
+// belt-and-braces in case this file is ever loaded before lib/functions.php.
+if (!function_exists('safe')) {
+    /**
+     * Escape output for HTML context.
+     *
+     * @param mixed $value
+     */
+    function safe($value): string
+    {
+        return htmlspecialchars((string) ($value ?? ''), ENT_QUOTES, 'UTF-8');
+    }
 }
 
-function app_format_uk_date(?string $value, string $fallback = 'Not set'): string
-{
-    $value = trim((string) $value);
-    if ($value === '') {
-        return $fallback;
-    }
+if (!function_exists('app_format_uk_date')) {
+    function app_format_uk_date(?string $value, string $fallback = 'Not set'): string
+    {
+        $value = trim((string) $value);
+        if ($value === '') {
+            return $fallback;
+        }
 
-    $date = DateTimeImmutable::createFromFormat('Y-m-d', $value);
-    if ($date === false) {
-        return $value;
-    }
+        $date = DateTimeImmutable::createFromFormat('Y-m-d', $value);
+        if ($date === false) {
+            return $value;
+        }
 
-    return $date->format('d/m/Y');
+        return $date->format('d/m/Y');
+    }
 }
 
 /**

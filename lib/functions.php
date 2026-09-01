@@ -374,3 +374,38 @@ function dd($var): void
               exit;
        }
 }
+
+/**
+ * Escape any value for HTML output. Kept alongside h() because a lot of the
+ * older publishing/graphics pages call safe() rather than h(); both now live
+ * here so those pages no longer need app_bootstrap.php just for this.
+ *
+ * @param mixed $value
+ */
+if (!function_exists('safe')) {
+       function safe($value): string
+       {
+              return htmlspecialchars((string) ($value ?? ''), ENT_QUOTES, 'UTF-8');
+       }
+}
+
+/**
+ * Format a Y-m-d date string as d/m/Y, passing through anything that is not a
+ * plain ISO date and using $fallback for empty values.
+ */
+if (!function_exists('app_format_uk_date')) {
+       function app_format_uk_date(?string $value, string $fallback = 'Not set'): string
+       {
+              $value = trim((string) $value);
+              if ($value === '') {
+                     return $fallback;
+              }
+
+              $date = DateTimeImmutable::createFromFormat('Y-m-d', $value);
+              if ($date === false) {
+                     return $value;
+              }
+
+              return $date->format('d/m/Y');
+       }
+}

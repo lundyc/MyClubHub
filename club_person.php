@@ -12,7 +12,6 @@ $pageHero = [
 ];
 
 require_once __DIR__ . '/header.php';
-require_once __DIR__ . '/app_bootstrap.php';
 require_once __DIR__ . '/lib/people.php';
 require_once __DIR__ . '/lib/accounts.php';
 require_once __DIR__ . '/lib/positions.php';

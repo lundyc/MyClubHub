@@ -9,17 +9,8 @@ if (!hub_auth_has_capability('content_social')) {
     http_response_code(403);
     exit('Access denied.');
 }
-require_once __DIR__ . '/app_bootstrap.php';
 require_once __DIR__ . '/matches_lib.php';
 require_once __DIR__ . '/render_lib.php';
-
-$app = app_bootstrap_state();
-if (!$app['isAuthenticated']) {
-    http_response_code(403);
-    header('Content-Type: text/plain; charset=UTF-8');
-    echo 'Authentication required.';
-    exit;
-}
 
 $socialBaseUrl = 'https://lundy.me.uk/hub';
 $matchId = isset($_GET['id']) && is_string($_GET['id']) ? trim($_GET['id']) : '';
