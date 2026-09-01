@@ -116,7 +116,12 @@
             var original = btn ? btn.innerHTML : '';
             if (btn) { btn.disabled = true; btn.innerHTML = 'Adding…'; }
 
-            fetch(form.action, {
+            // Use the attribute, not form.action: the form has a hidden
+            // <input name="action">, which shadows the .action property so it
+            // returns that element instead of the URL string.
+            var endpoint = form.getAttribute('action') || window.location.href;
+
+            fetch(endpoint, {
                 method: 'POST',
                 headers: { 'X-Requested-With': 'XMLHttpRequest' },
                 credentials: 'same-origin',
