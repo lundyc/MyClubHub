@@ -58,11 +58,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['background_image_fil
           }
 }
 
-$previewParams = array_merge([
+$view = (($_GET['view'] ?? '') === 'results') ? 'results' : 'fixtures';
+
+$previewParams = [
           'season_id' => $seasonId,
           'background_image' => $backgroundImage,
-]);
+          'view' => $view,
+];
 $previewUrl = 'match_fixtures_poster_render.php?' . http_build_query($previewParams);
+
+// Keep the current background choice on the view-toggle links.
+$viewToggleBase = 'match_fixtures_poster.php?season_id=' . (int)$seasonId
+          . (isset($_GET['background_image']) ? '&background_image=' . urlencode($backgroundImage) : '');
 
 $fixtures = getMatchFixtures($pdo, $seasonId);
 ?>
@@ -78,7 +85,13 @@ $fixtures = getMatchFixtures($pdo, $seasonId);
 </div>
 
 <nav class="hub-breadcrumb" aria-label="Breadcrumb"><a href="matches.php?season_id=<?= (int)$seasonId ?>">Fixtures</a><i class="fa-solid fa-chevron-right" aria-hidden="true"></i><span aria-current="page">Fixture poster</span></nav>
-<div class="hub-section-commandbar"><div><h2>Poster workspace</h2><p>Configure the season artwork and export the current fixture list.</p></div><div class="hub-local-actions"><a href="<?= h($previewUrl) ?>" class="btn btn-brand btn-sm" target="_blank"><i class="fa-solid fa-download me-1" aria-hidden="true"></i>Download PNG</a></div></div>
+<div class="hub-section-commandbar"><div><h2>Poster workspace</h2><p>Configure the season artwork and export the fixture list &mdash; or switch to results to show colour-coded W/L/D and scores.</p></div><div class="hub-local-actions">
+          <div class="btn-group btn-group-sm" role="group" aria-label="Poster contents">
+                    <a href="<?= h($viewToggleBase) ?>&amp;view=fixtures" class="btn btn-outline-secondary <?= $view === 'fixtures' ? 'active' : '' ?>"<?= $view === 'fixtures' ? ' aria-current="true"' : '' ?>>Fixtures</a>
+                    <a href="<?= h($viewToggleBase) ?>&amp;view=results" class="btn btn-outline-secondary <?= $view === 'results' ? 'active' : '' ?>"<?= $view === 'results' ? ' aria-current="true"' : '' ?>>Fixtures &amp; results</a>
+          </div>
+          <a href="<?= h($previewUrl) ?>" class="btn btn-brand btn-sm" target="_blank"><i class="fa-solid fa-download me-1" aria-hidden="true"></i>Download PNG</a>
+</div></div>
 
 <?php if (isset($_GET['uploaded'])): ?>
           <div class="alert alert-success">Background image uploaded.</div>
@@ -90,6 +103,7 @@ $fixtures = getMatchFixtures($pdo, $seasonId);
                               <div class="card-body">
                                         <form method="get" class="vstack gap-3 mb-3">
                                                   <?= csrf_field() ?>
+                                                  <input type="hidden" name="view" value="<?= h($view) ?>">
                                                   <div>
                                                             <label class="form-label">Season</label>
                                                             <select name="season_id" class="form-select">

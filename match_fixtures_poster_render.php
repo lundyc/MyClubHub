@@ -13,6 +13,11 @@ require_once __DIR__ . '/lib/match_sponsorship.php';
 $seasonId = (int)($_GET['season_id'] ?? getSelectedSeasonId($pdo));
 $backgroundImage = trim((string)($_GET['background_image'] ?? (matchPosterSeasonBackgroundImage($seasonId) ?? '../assets/images/background.png')));
 
+// 'fixtures' (default) draws the H/A letter; 'results' swaps in a colour-coded
+// W/L/D plus the score line for any fixture that has a full-time score, and
+// leaves upcoming fixtures showing H/A.
+$view = (($_GET['view'] ?? '') === 'results') ? 'results' : 'fixtures';
+
 function posterIntParam(string $key, int $default): int
 {
           return isset($_GET[$key]) ? (int)$_GET[$key] : $default;
@@ -157,6 +162,9 @@ $white = imagecolorallocate($im, 255, 255, 255);
 $softWhite = imagecolorallocate($im, 245, 246, 250);
 $line = imagecolorallocate($im, 245, 245, 245);
 $shadow = imagecolorallocatealpha($im, 0, 0, 0, 75);
+$resultWin = imagecolorallocate($im, 46, 204, 113);   // green  W
+$resultLoss = imagecolorallocate($im, 231, 76, 60);   // red    L
+$resultDraw = $white;                                  // white  D
 
 $fontTitle = __DIR__ . '/assets/fonts/Cinzel-Black.ttf';
 $fontHeading = __DIR__ . '/assets/fonts/Roboto-Bold.ttf';
@@ -210,12 +218,37 @@ foreach ($columnBlocks as $columnIndex => $monthsInColumn) {
                               $ts = strtotime((string)$fixture['match_date']);
                               $day = $ts ? date('d', $ts) : '--';
                               $opponent = strtoupper(trim((string)$fixture['opponent']));
-                              $venue = (int)$fixture['is_home'] === 1 ? 'H' : 'A';
-                              $opponentSize = posterFitText($fontBody, $opponent, 230, 22, 16);
-                              $rowWeight = ((int)$fixture['is_home'] === 1) ? $fontHeading : $fontBody;
+                              $isHome = (int)$fixture['is_home'] === 1;
+
+                              $showResult = $view === 'results'
+                                        && $fixture['full_time_home_score'] !== null
+                                        && $fixture['full_time_away_score'] !== null;
+
+                              $rightSlotX = $x + $columnWidth - 20;
+                              $opponentMax = 230;
+
                               posterDrawShadowedText($im, $fontMono, 22, $x, $y, $softWhite, $shadow, $day);
+
+                              if ($showResult) {
+                                        $homeScore = (int)$fixture['full_time_home_score'];
+                                        $awayScore = (int)$fixture['full_time_away_score'];
+                                        $ours = $isHome ? $homeScore : $awayScore;
+                                        $theirs = $isHome ? $awayScore : $homeScore;
+                                        $letter = $ours > $theirs ? 'W' : ($ours < $theirs ? 'L' : 'D');
+                                        $letterColour = $letter === 'W' ? $resultWin : ($letter === 'L' ? $resultLoss : $resultDraw);
+                                        $score = $homeScore . '-' . $awayScore;
+
+                                        $scoreWidth = posterTextWidth($fontMono, 20, $score);
+                                        $opponentMax = max(150, (int)round(($rightSlotX - 12 - $scoreWidth) - ($x + 74) - 6));
+                                        posterDrawShadowedText($im, $fontMono, 20, (int)round($rightSlotX - 12 - $scoreWidth), $y, $softWhite, $shadow, $score);
+                                        posterDrawShadowedText($im, $fontHeading, 22, $rightSlotX, $y, $letterColour, $shadow, $letter);
+                              } else {
+                                        posterDrawShadowedText($im, $fontHeading, 20, $rightSlotX, $y, $softWhite, $shadow, $isHome ? 'H' : 'A');
+                              }
+
+                              $opponentSize = posterFitText($fontBody, $opponent, $opponentMax, 22, 16);
+                              $rowWeight = $isHome ? $fontHeading : $fontBody;
                               posterDrawShadowedText($im, $rowWeight, $opponentSize, $x + 74, $y, $white, $shadow, $opponent);
-                              posterDrawShadowedText($im, $fontHeading, 20, $x + $columnWidth - 20, $y, $softWhite, $shadow, $venue);
                               $y += $rowSpacing;
                     }
 
