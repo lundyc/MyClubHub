@@ -14,7 +14,7 @@ $date = format_date($article['published_at'] ?? ($article['created_at'] ?? ''), 
   <a href="<?= e($href) ?>">
     <div class="newscard__media">
       <?php if ($hero !== ''): ?>
-        <img src="<?= e(uploads('news/' . $hero)) ?>" alt="" loading="lazy">
+        <img src="<?= e(news_image_url($hero)) ?>" alt="" loading="lazy">
       <?php endif; ?>
     </div>
     <div class="newscard__body">

@@ -12,7 +12,7 @@ $rest = array_slice($items, 1, 3);
 
 $card = static function (array $a, bool $large) {
     $hero = trim((string) ($a['hero_image_path'] ?? ''));
-    $img = $hero !== '' ? uploads('news/' . $hero) : '';
+    $img = $hero !== '' ? news_image_url($hero) : '';
     $href = url('news/' . $a['slug']);
     $style = $img !== ''
         ? 'style="background-image:linear-gradient(180deg,rgba(18,22,27,.1),rgba(18,22,27,.82)),url(\'' . e($img) . '\')"'
