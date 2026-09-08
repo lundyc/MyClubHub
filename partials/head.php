@@ -92,7 +92,8 @@ $utilityLinks = [
       </a>
 
       <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" aria-label="Menu">
-        <?= pub_icon('menu') ?>
+        <span class="nav-toggle__open"><?= pub_icon('menu') ?></span>
+        <span class="nav-toggle__close"><?= pub_icon('close') ?></span>
       </button>
 
       <?php partial('site_nav'); ?>

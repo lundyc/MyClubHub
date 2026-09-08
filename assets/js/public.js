@@ -14,40 +14,89 @@
     window.addEventListener("scroll", onScroll, { passive: true });
   }
 
-  /* Mobile nav drawer -----------------------------------------------------*/
+  /* Primary navigation --------------------------------------------------- */
   var toggle = doc.querySelector(".nav-toggle");
   var nav = doc.querySelector(".primary-nav");
+  var scrim = doc.querySelector(".nav-scrim");
+  var navClose = doc.querySelector(".primary-nav__close");
+  var deskMq = window.matchMedia("(min-width: 1025px)");
+  var scrimTimer;
+
+  var closePanels = function () {
+    Array.prototype.forEach.call(doc.querySelectorAll(".primary-nav .subnav.is-open"), function (sub) {
+      sub.classList.remove("is-open");
+      var b = sub.parentElement.querySelector(".nav-item__toggle");
+      if (b) b.setAttribute("aria-expanded", "false");
+    });
+  };
+
+  var openDrawer = function () {
+    if (scrim) { clearTimeout(scrimTimer); scrim.hidden = false; }
+    requestAnimationFrame(function () {
+      nav.classList.add("is-open");
+      doc.body.classList.add("nav-open");
+    });
+    if (toggle) toggle.setAttribute("aria-expanded", "true");
+  };
+
+  var closeDrawer = function () {
+    nav.classList.remove("is-open");
+    doc.body.classList.remove("nav-open");
+    if (toggle) toggle.setAttribute("aria-expanded", "false");
+    if (scrim) scrimTimer = setTimeout(function () { scrim.hidden = true; }, 300);
+    closePanels();
+  };
+
   if (toggle && nav) {
     toggle.addEventListener("click", function () {
-      var open = nav.classList.toggle("is-open");
-      toggle.setAttribute("aria-expanded", open ? "true" : "false");
-      doc.body.classList.toggle("nav-open", open);
+      if (nav.classList.contains("is-open")) closeDrawer(); else openDrawer();
     });
-    nav.addEventListener("click", function (e) {
-      if (e.target.closest("a")) {
-        nav.classList.remove("is-open");
-        doc.body.classList.remove("nav-open");
-        toggle.setAttribute("aria-expanded", "false");
-      }
-    });
-  }
+    if (navClose) navClose.addEventListener("click", closeDrawer);
+    if (scrim) scrim.addEventListener("click", closeDrawer);
 
-  /* Sub-menu toggles on narrow screens -------------------------------------
-     On desktop the CSS :hover / :focus-within handles this; the buttons only
-     do work when the viewport is in the mobile drawer layout. */
-  var mq = window.matchMedia("(max-width: 960px)");
-  Array.prototype.forEach.call(
-    doc.querySelectorAll(".primary-nav .navbtn"),
-    function (btn) {
-      btn.addEventListener("click", function () {
-        if (!mq.matches) return;
-        var sub = btn.parentElement.querySelector(".subnav");
+    /* tapping a real destination link closes the drawer */
+    nav.addEventListener("click", function (e) {
+      if (e.target.closest("a") && nav.classList.contains("is-open")) closeDrawer();
+    });
+
+    /* per-item sub-panel toggles — work in both layouts (desktop also has :hover) */
+    Array.prototype.forEach.call(doc.querySelectorAll(".nav-item__toggle"), function (btn) {
+      btn.addEventListener("click", function (e) {
+        e.preventDefault();
+        var item = btn.closest(".nav-item");
+        var sub = item && item.querySelector(".subnav");
         if (!sub) return;
-        var open = sub.classList.toggle("is-open");
-        btn.setAttribute("aria-expanded", open ? "true" : "false");
+        var willOpen = !sub.classList.contains("is-open");
+        if (willOpen && deskMq.matches) closePanels();
+        sub.classList.toggle("is-open", willOpen);
+        btn.setAttribute("aria-expanded", willOpen ? "true" : "false");
       });
-    }
-  );
+    });
+
+    /* desktop: click outside any nav item closes open panels */
+    doc.addEventListener("click", function (e) {
+      if (deskMq.matches && !e.target.closest(".nav-item")) closePanels();
+    });
+
+    /* Escape closes the drawer (mobile) or open panels (desktop) */
+    doc.addEventListener("keydown", function (e) {
+      if (e.key !== "Escape") return;
+      if (nav.classList.contains("is-open")) { closeDrawer(); if (toggle) toggle.focus(); }
+      else closePanels();
+    });
+
+    /* reset drawer state when the viewport grows past the breakpoint */
+    var onBpChange = function (ev) {
+      if (!ev.matches) return;
+      nav.classList.remove("is-open");
+      doc.body.classList.remove("nav-open");
+      if (toggle) toggle.setAttribute("aria-expanded", "false");
+      if (scrim) scrim.hidden = true;
+      closePanels();
+    };
+    if (deskMq.addEventListener) deskMq.addEventListener("change", onBpChange);
+    else if (deskMq.addListener) deskMq.addListener(onBpChange);
+  }
 
   /* Quantity steppers (shop product + basket + tickets) ------------------- */
   Array.prototype.forEach.call(doc.querySelectorAll("[data-stepper]"), function (stepper) {
