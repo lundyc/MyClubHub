@@ -231,7 +231,7 @@ $styleV = (int) (@filemtime(__DIR__ . '/assets/css/style.css') ?: time());
         </label>
 
         <div class="d-flex flex-wrap gap-2 mt-2 align-items-center">
-          <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#ngLibraryModal">
+          <button type="button" class="btn btn-outline-secondary btn-sm" data-ng-open-gallery>
             Choose from Media Library
           </button>
           <span class="small text-muted" data-ng-status></span>
@@ -289,12 +289,25 @@ $styleV = (int) (@filemtime(__DIR__ . '/assets/css/style.css') ?: time());
     <div class="card hub-section mt-4">
       <div class="card-body">
         <h2 class="h6">Hero image</h2>
+        <p class="text-muted small">The big image at the top of the article and on cards. Pick from the Media Library or drop a new photo in.</p>
+
         <div id="hero-preview" class="mb-2 <?= $data['hero_image_path'] === '' ? 'd-none' : '' ?>">
-          <img src="/uploads/news/<?= h((string) $data['hero_image_path']) ?>" alt="" style="width:100%;border-radius:8px;border:1px solid #ddd">
+          <img src="/uploads/news/<?= h((string) $data['hero_image_path']) ?>" alt="" style="width:100%;border-radius:8px;border:1px solid #d7d2c8">
         </div>
         <input type="hidden" id="hero_image_path" name="hero_image_path" value="<?= h((string) $data['hero_image_path']) ?>">
-        <input class="form-control form-control-sm mb-2" type="file" id="hero_file" accept="image/*">
-        <div id="hero-status" class="small text-muted"></div>
+
+        <label class="ng-drop" data-ng-hero-drop role="button" tabindex="0">
+          <input type="file" id="hero_file" accept="image/*" hidden>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V5m0 0l-4 4m4-4l4 4"/><path d="M5 19h14"/></svg>
+          <span><strong>Drag &amp; drop</strong> a hero image, or <u>browse</u></span>
+        </label>
+
+        <div class="d-flex flex-wrap gap-2 mt-2 align-items-center">
+          <button type="button" class="btn btn-outline-secondary btn-sm" data-ng-open-hero>Choose from Media Library</button>
+          <button type="button" class="btn btn-sm btn-link text-danger p-0 <?= $data['hero_image_path'] === '' ? 'd-none' : '' ?>" data-ng-hero-clear>Remove</button>
+          <span id="hero-status" class="small text-muted"></span>
+        </div>
+
         <label class="form-label mt-2" for="hero_caption">Caption / credit</label>
         <input class="form-control form-control-sm" id="hero_caption" name="hero_caption" value="<?= h((string) $data['hero_caption']) ?>">
       </div>
@@ -375,22 +388,58 @@ $styleV = (int) (@filemtime(__DIR__ . '/assets/css/style.css') ?: time());
     minHeight: '360px',
   });
 
-  // Hero image upload
+  // Hero image — drag-and-drop / browse / Media Library
   var heroFile = document.getElementById('hero_file');
-  heroFile.addEventListener('change', function () {
-    if (!this.files || !this.files[0]) return;
-    var status = document.getElementById('hero-status');
-    status.textContent = 'Uploading…';
-    uploadImage(this.files[0], function (url) {
-      // url is /uploads/news/<path>; store the path portion
-      var path = url.replace(/^\/uploads\/news\//, '');
-      document.getElementById('hero_image_path').value = path;
-      var wrap = document.getElementById('hero-preview');
-      wrap.querySelector('img').src = url;
-      wrap.classList.remove('d-none');
-      status.textContent = 'Uploaded.';
-    }, function (msg) { status.textContent = msg; });
-  });
+  var heroDrop = document.querySelector('[data-ng-hero-drop]');
+  var heroClear = document.querySelector('[data-ng-hero-clear]');
+  var heroStatus = document.getElementById('hero-status');
+  var heroPath = document.getElementById('hero_image_path');
+  var heroWrap = document.getElementById('hero-preview');
+
+  function heroSay(m) { if (heroStatus) heroStatus.textContent = m || ''; }
+  function setHero(url) {
+    heroPath.value = String(url).replace(/^\/uploads\/news\//, '');
+    heroWrap.querySelector('img').src = url;
+    heroWrap.classList.remove('d-none');
+    if (heroClear) heroClear.classList.remove('d-none');
+    heroSay('Set — save the article to keep it.');
+  }
+  function uploadHero(file) {
+    if (!file || !/^image\//.test(file.type)) return;
+    heroSay('Uploading ' + file.name + '…');
+    uploadImage(file, setHero, function (msg) { heroSay(msg); });
+  }
+
+  if (heroFile) {
+    heroFile.addEventListener('change', function () {
+      if (this.files && this.files[0]) uploadHero(this.files[0]);
+      this.value = '';
+    });
+  }
+  if (heroDrop && heroFile) {
+    heroDrop.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); heroFile.click(); }
+    });
+    ['dragenter', 'dragover'].forEach(function (ev) {
+      heroDrop.addEventListener(ev, function (e) { e.preventDefault(); heroDrop.classList.add('is-over'); });
+    });
+    ['dragleave', 'dragend', 'drop'].forEach(function (ev) {
+      heroDrop.addEventListener(ev, function () { heroDrop.classList.remove('is-over'); });
+    });
+    heroDrop.addEventListener('drop', function (e) {
+      e.preventDefault();
+      var f = (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]) || null;
+      if (f) uploadHero(f);
+    });
+  }
+  if (heroClear) {
+    heroClear.addEventListener('click', function () {
+      heroPath.value = '';
+      heroWrap.classList.add('d-none');
+      heroClear.classList.add('d-none');
+      heroSay('Removed — save to apply.');
+    });
+  }
 
   // Auto-slug from title while creating
   var slug = document.getElementById('slug');
@@ -469,12 +518,20 @@ $styleV = (int) (@filemtime(__DIR__ . '/assets/css/style.css') ?: time());
     var laddBtn = modalEl.querySelector('[data-ng-lib-add]');
     var catalogue = null;
     var selected = {};
+    var libMode = 'gallery';   // 'gallery' (multi) | 'hero' (single)
     var CAP = 300;
 
     function refreshSel() {
       var n = Object.keys(selected).length;
-      lsel.textContent = n ? (n + ' selected') : 'Nothing selected';
-      laddBtn.disabled = !n;
+      if (libMode === 'hero') {
+        lsel.textContent = n ? '1 image chosen' : 'Choose an image';
+        laddBtn.textContent = 'Use this image';
+        laddBtn.disabled = n !== 1;
+      } else {
+        lsel.textContent = n ? (n + ' selected') : 'Nothing selected';
+        laddBtn.textContent = 'Add selected';
+        laddBtn.disabled = !n;
+      }
     }
 
     function render() {
@@ -497,14 +554,34 @@ $styleV = (int) (@filemtime(__DIR__ . '/assets/css/style.css') ?: time());
         b.title = m.path;
         b.innerHTML = '<img loading="lazy" src="' + esc(m.url) + '" alt=""><span>' + esc(m.name) + '</span>';
         b.addEventListener('click', function () {
-          if (selected[m.path]) { delete selected[m.path]; b.classList.remove('is-sel'); }
-          else { selected[m.path] = m; b.classList.add('is-sel'); }
+          if (libMode === 'hero') {
+            var wasSel = !!selected[m.path];
+            grid.querySelectorAll('.ng-lib-tile.is-sel').forEach(function (t) { t.classList.remove('is-sel'); });
+            selected = {};
+            if (!wasSel) { selected[m.path] = m; b.classList.add('is-sel'); }
+          } else if (selected[m.path]) {
+            delete selected[m.path]; b.classList.remove('is-sel');
+          } else {
+            selected[m.path] = m; b.classList.add('is-sel');
+          }
           refreshSel();
         });
         frag.appendChild(b);
       });
       grid.appendChild(frag);
     }
+
+    function openLib(mode) {
+      libMode = mode;
+      selected = {};
+      refreshSel();
+      if (catalogue) render();
+      if (window.bootstrap) { bootstrap.Modal.getOrCreateInstance(modalEl).show(); }
+    }
+    var og = document.querySelector('[data-ng-open-gallery]');
+    var oh = document.querySelector('[data-ng-open-hero]');
+    if (og) og.addEventListener('click', function () { openLib('gallery'); });
+    if (oh) oh.addEventListener('click', function () { openLib('hero'); });
 
     function loadCatalogue() {
       if (catalogue) { render(); return; }
@@ -530,12 +607,36 @@ $styleV = (int) (@filemtime(__DIR__ . '/assets/css/style.css') ?: time());
     modalEl.addEventListener('shown.bs.modal', loadCatalogue);
     lsearch.addEventListener('input', render);
     lcat.addEventListener('change', render);
+    function closeLib() {
+      if (window.bootstrap) { bootstrap.Modal.getOrCreateInstance(modalEl).hide(); }
+    }
+
     laddBtn.addEventListener('click', function () {
       var keys = Object.keys(selected);
+      if (!keys.length) return;
+
+      if (libMode === 'hero') {
+        var m = selected[keys[0]];
+        heroSay('Copying ' + m.name + '…');
+        laddBtn.disabled = true;
+        var fd = new FormData();
+        fd.append('action', 'copy_from_library');
+        fd.append('source', m.path);
+        fd.append('csrf_token', csrf);
+        fetch('news_image_upload.php', { method: 'POST', body: fd, credentials: 'same-origin' })
+          .then(function (r) { return r.json(); })
+          .then(function (j) {
+            if (j && j.url) { setHero(j.url); closeLib(); }
+            else { heroSay((j && j.error) || 'Could not use that image.'); laddBtn.disabled = false; }
+          })
+          .catch(function () { heroSay('Could not use that image.'); laddBtn.disabled = false; });
+        return;
+      }
+
       keys.forEach(function (p) { addPendingTile('gallery_library[]', selected[p].path, selected[p].url); });
       galSay(keys.length + ' library image' + (keys.length === 1 ? '' : 's') + ' will be added when you save.');
       selected = {}; refreshSel(); render();
-      if (window.bootstrap) { bootstrap.Modal.getOrCreateInstance(modalEl).hide(); }
+      closeLib();
     });
   }
 })();

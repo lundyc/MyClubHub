@@ -26,8 +26,10 @@ if (!csrf_check()) {
     exit;
 }
 
-/* Media Library catalogue for the news-editor gallery picker. */
-if ((string) ($_POST['action'] ?? '') === 'catalogue') {
+$action = (string) ($_POST['action'] ?? '');
+
+/* Media Library catalogue for the news-editor picker (gallery + hero). */
+if ($action === 'catalogue') {
     require_once __DIR__ . '/lib/media_library.php';
     $items = [];
     foreach (hub_media_catalogue() as $m) {
@@ -42,6 +44,18 @@ if ((string) ($_POST['action'] ?? '') === 'catalogue') {
         ];
     }
     echo json_encode(['ok' => true, 'items' => $items], JSON_UNESCAPED_SLASHES);
+    exit;
+}
+
+/* Copy a chosen Media Library image into uploads/news/ (used by the hero picker). */
+if ($action === 'copy_from_library') {
+    $res = news_copy_library_image((string) ($_POST['source'] ?? ''));
+    if (!$res['ok']) {
+        http_response_code(422);
+        echo json_encode(['error' => $res['error']]);
+        exit;
+    }
+    echo json_encode(['url' => $res['url'], 'path' => $res['path']]);
     exit;
 }
 

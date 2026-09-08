@@ -451,13 +451,13 @@ function news_gallery_add(PDO $pdo, int $articleId, string $path, string $captio
 
 /**
  * Copy a file already in the Media Library (path relative to the Hub root,
- * e.g. "uploads/history/gallery/2016/x.jpg") into uploads/news/ and attach it
- * to an article's gallery. Keeps news_images.file_path uploads/news-relative so
- * the public renderer and existing tooling are unchanged.
+ * e.g. "uploads/history/gallery/2016/x.jpg") into uploads/news/YYYY/MM/. Keeps
+ * everything under uploads/news/ so news_images.file_path / hero_image_path and
+ * the public renderer are unchanged.
  *
- * @return array{ok:bool,path?:string,error?:string}
+ * @return array{ok:bool,path?:string,url?:string,error?:string}
  */
-function news_gallery_add_from_library(PDO $pdo, int $articleId, string $sourceRelPath, string $caption = ''): array
+function news_copy_library_image(string $sourceRelPath): array
 {
     require_once __DIR__ . '/media_library.php';
 
@@ -467,7 +467,7 @@ function news_gallery_add_from_library(PDO $pdo, int $articleId, string $sourceR
     }
     $ext = strtolower(pathinfo($abs, PATHINFO_EXTENSION));
     if (!in_array($ext, ['jpg', 'jpeg', 'png', 'webp', 'gif'], true)) {
-        return ['ok' => false, 'error' => 'Only JPG, PNG, WebP or GIF images can be added.'];
+        return ['ok' => false, 'error' => 'Only JPG, PNG, WebP or GIF images can be used.'];
     }
 
     $rel = date('Y/m');
@@ -487,8 +487,22 @@ function news_gallery_add_from_library(PDO $pdo, int $articleId, string $sourceR
     }
 
     $path = $rel . '/' . $name;
-    news_gallery_add($pdo, $articleId, $path, $caption);
-    return ['ok' => true, 'path' => $path];
+    return ['ok' => true, 'path' => $path, 'url' => '/uploads/news/' . $path];
+}
+
+/**
+ * Copy a Media Library image into uploads/news/ and attach it to an article's
+ * gallery.
+ *
+ * @return array{ok:bool,path?:string,error?:string}
+ */
+function news_gallery_add_from_library(PDO $pdo, int $articleId, string $sourceRelPath, string $caption = ''): array
+{
+    $res = news_copy_library_image($sourceRelPath);
+    if ($res['ok']) {
+        news_gallery_add($pdo, $articleId, $res['path'], $caption);
+    }
+    return $res;
 }
 
 function news_gallery_delete(PDO $pdo, int $imageId, ?int $articleId = null): void
