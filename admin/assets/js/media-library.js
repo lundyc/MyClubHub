@@ -7,7 +7,7 @@
 
     var csrf = config.dataset.csrf || '';
     var matchCsrf = config.dataset.matchCsrf || '';
-    var endpoint = config.dataset.endpoint || '/match_photos.php';
+    var endpoint = config.dataset.endpoint || '/admin/match_photos.php';
     var canManage = config.dataset.canManage === '1';
 
     var kitLabels = window.HUB_KIT_LABELS || {};

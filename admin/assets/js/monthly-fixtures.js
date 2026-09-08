@@ -481,8 +481,8 @@
                     if (xWindow) xWindow.location.href = 'https://x.com/intent/tweet?text=' + encodeURIComponent(caption);
                     downloadCanvas(canvas);
                     var record = new FormData();
-                    record.set('csrf_token', csrfToken); record.set('post_type', 'monthly_fixtures'); record.set('caption', caption); record.set('event_id', 'season:' + seasonId + ':' + month + ':' + layout); record.set('image_url', '/monthly_fixtures.php?season_id=' + seasonId + '&month=' + month + '&layout=' + layout);
-                    fetch('/record_manual_share.php', { method: 'POST', body: record }).catch(function () {});
+                    record.set('csrf_token', csrfToken); record.set('post_type', 'monthly_fixtures'); record.set('caption', caption); record.set('event_id', 'season:' + seasonId + ':' + month + ':' + layout); record.set('image_url', '/admin/monthly_fixtures.php?season_id=' + seasonId + '&month=' + month + '&layout=' + layout);
+                    fetch('/admin/record_manual_share.php', { method: 'POST', body: record }).catch(function () {});
                     setStatus(xWindow ? 'success' : 'warning', xWindow ? 'X composer opened and the PNG downloaded.' : 'The popup was blocked, but the PNG was downloaded.');
                 } else {
                     setStatus('success', await publishDirect(platform, caption, canvas));

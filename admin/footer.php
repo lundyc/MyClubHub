@@ -75,7 +75,7 @@ if (
 ?>
 <script>
     window.hubAnalyticsConfig = {
-        endpoint: "/analytics_track.php"
+        endpoint: "/admin/analytics_track.php"
     };
 </script>
 <script src="/admin/assets/js/hub_analytics.js?v=<?= (int)(@filemtime($hubAnalyticsScript) ?: time()) ?>" defer></script>

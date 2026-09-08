@@ -317,7 +317,7 @@
     data.append("csrf_token", csrf);
     data.append("action", action);
     Object.entries(extra || {}).forEach(([key, value]) => data.append(key, value));
-    const response = await fetch("/facebook_photo_import.php", { method: "POST", body: data, credentials: "same-origin" });
+    const response = await fetch("/admin/facebook_photo_import.php", { method: "POST", body: data, credentials: "same-origin" });
     const result = await response.json();
     if (!response.ok || !result.ok) {
       throw new Error(result.message || "Request failed.");
