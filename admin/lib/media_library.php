@@ -89,8 +89,12 @@ function hub_media_catalogue(): array
             $extension = strtolower($file->getExtension());
             if (!in_array($extension, $extensions, true)) continue;
             $absolute = str_replace('\\', '/', realpath($file->getPathname()) ?: $file->getPathname());
-            $hubRoot = str_replace('\\', '/', realpath(__DIR__ . '/..') ?: dirname(__DIR__));
-            $relative = ltrim(substr($absolute, strlen($hubRoot)), '/');
+            // Derive the relative path from the (already realpath'd) root, not
+            // from realpath(__DIR__.'/..'): after the admin/ restructure the
+            // media roots (uploads, badges) reach the web root through a
+            // symlink, so the file's real path is not under the admin dir.
+            $absoluteRootNorm = str_replace('\\', '/', $absoluteRoot);
+            $relative = $root['path'] . '/' . ltrim(substr($absolute, strlen($absoluteRootNorm)), '/');
             $info = @getimagesize($absolute);
             if (!is_array($info)) continue;
             $items[] = [

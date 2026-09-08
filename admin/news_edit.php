@@ -96,7 +96,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!$errors) {
             $newId = news_save($pdo, $id ?: null, $data, (int) ($currentUser['id'] ?? 0) ?: null);
 
-            // Gallery uploads (optional, multi)
+            // Gallery uploads — classic file input (no-JS fallback).
             if (!empty($_FILES['gallery']['name'][0])) {
                 $count = count($_FILES['gallery']['name']);
                 for ($i = 0; $i < $count; $i++) {
@@ -116,6 +116,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
 
+            // Gallery — photos dropped in and pre-uploaded this session via the
+            // drag-and-drop zone (news_image_upload.php returns uploads/news paths).
+            foreach ((array) ($_POST['gallery_new'] ?? []) as $rel) {
+                $rel = trim((string) $rel);
+                if ($rel !== ''
+                    && preg_match('#^\d{4}/\d{2}/[A-Za-z0-9._-]+\.(jpe?g|png|webp|gif)$#i', $rel)
+                    && is_file(news_uploads_dir() . '/' . $rel)) {
+                    news_gallery_add($pdo, $newId, $rel);
+                }
+            }
+
+            // Gallery — items chosen from the Media Library (copied into uploads/news/).
+            foreach ((array) ($_POST['gallery_library'] ?? []) as $src) {
+                $src = trim((string) $src);
+                if ($src === '') {
+                    continue;
+                }
+                $res = news_gallery_add_from_library($pdo, $newId, $src);
+                if (!$res['ok']) {
+                    $errors[] = 'Media Library image skipped: ' . $res['error'];
+                }
+            }
+
             auditLog($pdo, $id > 0 ? 'news_updated' : 'news_created', ($id > 0 ? 'Updated' : 'Created') . " news article '{$data['title']}'");
             if (!$errors) {
                 header('Location: news.php?saved=1');
@@ -131,6 +154,21 @@ $gallery = $id > 0 ? news_gallery($pdo, $id) : [];
 $styleV = (int) (@filemtime(__DIR__ . '/assets/css/style.css') ?: time());
 ?>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/easymde@2.18.0/dist/easymde.min.css">
+<style>
+  .ng-grid { display: flex; flex-wrap: wrap; gap: .6rem; }
+  .ng-tile { position: relative; margin: 0; width: 120px; }
+  .ng-tile img { width: 120px; height: 84px; object-fit: cover; border-radius: 6px; border: 1px solid #d7d2c8; display: block; background: #efe9df; }
+  .ng-tile--pending img { outline: 2px solid #6d2231; outline-offset: 1px; }
+  .ng-tile__x { position: absolute; top: -8px; right: -8px; width: 22px; height: 22px; border-radius: 50%; border: 0; background: #b23b3b; color: #fff; font-size: 15px; line-height: 22px; padding: 0; cursor: pointer; }
+  .ng-drop { display: flex; align-items: center; justify-content: center; gap: .55rem; padding: 1.1rem; border: 2px dashed #c9c2b4; border-radius: 8px; background: #faf7f1; color: #6c665c; text-align: center; cursor: pointer; transition: border-color .15s, background .15s, color .15s; }
+  .ng-drop.is-over { border-color: #6d2231; background: #f3e9ea; color: #4c1521; }
+  .ng-drop:focus-visible { outline: 2px solid #6d2231; outline-offset: 2px; }
+  .ng-lib-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); gap: .7rem; }
+  .ng-lib-tile { border: 1px solid #d7d2c8; border-radius: 8px; background: #fff; padding: 0; overflow: hidden; cursor: pointer; text-align: left; }
+  .ng-lib-tile img { width: 100%; height: 96px; object-fit: cover; display: block; background: #efe9df; }
+  .ng-lib-tile span { display: block; padding: .35rem .5rem; font-size: .72rem; color: #6c665c; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ng-lib-tile.is-sel { border-color: #6d2231; box-shadow: inset 0 0 0 2px #6d2231; }
+</style>
 
 <?php if ($errors): ?>
   <div class="alert alert-danger"><ul class="mb-0"><?php foreach ($errors as $e): ?><li><?= h($e) ?></li><?php endforeach; ?></ul></div>
@@ -166,28 +204,40 @@ $styleV = (int) (@filemtime(__DIR__ . '/assets/css/style.css') ?: time());
       </div>
     </div>
 
-    <?php if ($id > 0): ?>
     <div class="card hub-section mt-4">
       <div class="card-body">
         <h2 class="h6">Gallery</h2>
-        <p class="text-muted small">Extra photos shown below the article on the website.</p>
+        <p class="text-muted small">Extra photos shown below the article on the website — pick from the Media Library or drop new photos in. They’re added when you save.</p>
+
         <?php if ($gallery): ?>
-          <div class="d-flex flex-wrap gap-3 mb-3">
+          <div class="ng-grid mb-3">
             <?php foreach ($gallery as $img): ?>
-              <div class="text-center">
-                <img src="/uploads/news/<?= h((string) $img['file_path']) ?>" alt="" style="height:90px;width:120px;object-fit:cover;border-radius:6px;border:1px solid #ddd">
-                <div>
-                  <button class="btn btn-link btn-sm text-danger p-0" name="form_action" value="gallery_delete" formnovalidate onclick="this.form.image_id.value='<?= (int) $img['id'] ?>'">Remove</button>
-                </div>
-              </div>
+              <figure class="ng-tile">
+                <img src="/uploads/news/<?= h((string) $img['file_path']) ?>" alt="">
+                <button type="button" class="ng-tile__x" title="Remove" name="form_action" value="gallery_delete" formnovalidate
+                        onclick="this.form.image_id.value='<?= (int) $img['id'] ?>'">&times;</button>
+              </figure>
             <?php endforeach; ?>
           </div>
-          <input type="hidden" name="image_id" value="">
         <?php endif; ?>
-        <input class="form-control" type="file" name="gallery[]" accept="image/*" multiple>
+        <input type="hidden" name="image_id" value="">
+
+        <div class="ng-grid mb-2" data-ng-pending hidden></div>
+
+        <label class="ng-drop" data-ng-drop role="button" tabindex="0">
+          <input type="file" name="gallery[]" accept="image/*" multiple hidden data-ng-file>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V5m0 0l-4 4m4-4l4 4"/><path d="M5 19h14"/></svg>
+          <span><strong>Drag &amp; drop photos</strong> here, or <u>browse</u></span>
+        </label>
+
+        <div class="d-flex flex-wrap gap-2 mt-2 align-items-center">
+          <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#ngLibraryModal">
+            Choose from Media Library
+          </button>
+          <span class="small text-muted" data-ng-status></span>
+        </div>
       </div>
     </div>
-    <?php endif; ?>
   </div>
 
   <div class="col-lg-4">
@@ -270,6 +320,34 @@ $styleV = (int) (@filemtime(__DIR__ . '/assets/css/style.css') ?: time());
   </div>
 </form>
 
+<div class="modal fade" id="ngLibraryModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Media Library</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="d-flex flex-wrap gap-2 mb-3">
+          <input type="search" class="form-control form-control-sm" style="max-width:280px" placeholder="Search by name or folder…" data-ng-lib-search>
+          <select class="form-select form-select-sm" style="max-width:240px" data-ng-lib-cat>
+            <option value="">All categories</option>
+          </select>
+          <span class="small text-muted ms-auto align-self-center" data-ng-lib-count></span>
+        </div>
+        <div class="ng-lib-grid" data-ng-lib-grid>
+          <p class="text-muted small m-0">Opening the library…</p>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <span class="small text-muted me-auto" data-ng-lib-sel>Nothing selected</span>
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-brand" data-ng-lib-add disabled>Add selected</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/easymde@2.18.0/dist/easymde.min.js"></script>
 <script>
 (function () {
@@ -321,6 +399,143 @@ $styleV = (int) (@filemtime(__DIR__ . '/assets/css/style.css') ?: time());
     title.addEventListener('blur', function () {
       if (slug.value) return;
       slug.value = title.value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 180);
+    });
+  }
+
+  /* ---- Gallery: drag-and-drop uploader + Media Library picker ---------- */
+  var form = document.querySelector('form.row.g-4') || document.querySelector('form');
+  var pending = document.querySelector('[data-ng-pending]');
+  var galStatus = document.querySelector('[data-ng-status]');
+  var drop = document.querySelector('[data-ng-drop]');
+  var dropFile = document.querySelector('[data-ng-file]');
+  var esc = function (s) { return String(s).replace(/[<>&"]/g, function (c) { return { '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]; }); };
+  var galSay = function (m) { if (galStatus) galStatus.textContent = m || ''; };
+
+  function addPendingTile(fieldName, value, url) {
+    if (!pending) return;
+    pending.hidden = false;
+    var fig = document.createElement('figure');
+    fig.className = 'ng-tile ng-tile--pending';
+    fig.innerHTML = '<img src="' + esc(url) + '" alt=""><button type="button" class="ng-tile__x" title="Remove">&times;</button>';
+    var hidden = document.createElement('input');
+    hidden.type = 'hidden';
+    hidden.name = fieldName;
+    hidden.value = value;
+    fig.appendChild(hidden);
+    fig.querySelector('.ng-tile__x').addEventListener('click', function () {
+      fig.remove();
+      if (!pending.children.length) pending.hidden = true;
+    });
+    pending.appendChild(fig);
+  }
+
+  function uploadDropped(file) {
+    if (!/^image\//.test(file.type)) return;
+    galSay('Uploading ' + file.name + '…');
+    uploadImage(file, function (url) {
+      addPendingTile('gallery_new[]', String(url).replace(/^\/uploads\/news\//, ''), url);
+      galSay('Added — save the article to keep it.');
+    }, function (err) { galSay(file.name + ': ' + err); });
+  }
+
+  if (drop && dropFile) {
+    dropFile.addEventListener('change', function () {
+      Array.prototype.forEach.call(this.files || [], uploadDropped);
+      this.value = '';
+    });
+    drop.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); dropFile.click(); }
+    });
+    ['dragenter', 'dragover'].forEach(function (ev) {
+      drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.add('is-over'); });
+    });
+    ['dragleave', 'dragend', 'drop'].forEach(function (ev) {
+      drop.addEventListener(ev, function () { drop.classList.remove('is-over'); });
+    });
+    drop.addEventListener('drop', function (e) {
+      e.preventDefault();
+      var files = (e.dataTransfer && e.dataTransfer.files) || [];
+      Array.prototype.forEach.call(files, uploadDropped);
+    });
+  }
+
+  var modalEl = document.getElementById('ngLibraryModal');
+  if (modalEl) {
+    var grid = modalEl.querySelector('[data-ng-lib-grid]');
+    var lsearch = modalEl.querySelector('[data-ng-lib-search]');
+    var lcat = modalEl.querySelector('[data-ng-lib-cat]');
+    var lcount = modalEl.querySelector('[data-ng-lib-count]');
+    var lsel = modalEl.querySelector('[data-ng-lib-sel]');
+    var laddBtn = modalEl.querySelector('[data-ng-lib-add]');
+    var catalogue = null;
+    var selected = {};
+    var CAP = 300;
+
+    function refreshSel() {
+      var n = Object.keys(selected).length;
+      lsel.textContent = n ? (n + ' selected') : 'Nothing selected';
+      laddBtn.disabled = !n;
+    }
+
+    function render() {
+      if (!catalogue) return;
+      var q = (lsearch.value || '').trim().toLowerCase();
+      var cat = lcat.value;
+      var matches = catalogue.filter(function (m) {
+        if (cat && m.category !== cat) return false;
+        return !q || (m.name + ' ' + m.path).toLowerCase().indexOf(q) !== -1;
+      });
+      lcount.textContent = matches.length + ' image' + (matches.length === 1 ? '' : 's') +
+        (matches.length > CAP ? ' — showing first ' + CAP : '');
+      grid.innerHTML = '';
+      if (!matches.length) { grid.innerHTML = '<p class="text-muted small m-0">No images match.</p>'; return; }
+      var frag = document.createDocumentFragment();
+      matches.slice(0, CAP).forEach(function (m) {
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'ng-lib-tile' + (selected[m.path] ? ' is-sel' : '');
+        b.title = m.path;
+        b.innerHTML = '<img loading="lazy" src="' + esc(m.url) + '" alt=""><span>' + esc(m.name) + '</span>';
+        b.addEventListener('click', function () {
+          if (selected[m.path]) { delete selected[m.path]; b.classList.remove('is-sel'); }
+          else { selected[m.path] = m; b.classList.add('is-sel'); }
+          refreshSel();
+        });
+        frag.appendChild(b);
+      });
+      grid.appendChild(frag);
+    }
+
+    function loadCatalogue() {
+      if (catalogue) { render(); return; }
+      grid.innerHTML = '<p class="text-muted small m-0">Loading the library…</p>';
+      var fd = new FormData();
+      fd.append('action', 'catalogue');
+      fd.append('csrf_token', csrf);
+      fetch('news_image_upload.php', { method: 'POST', body: fd, credentials: 'same-origin' })
+        .then(function (r) { return r.json(); })
+        .then(function (j) {
+          if (!j || !j.ok) throw new Error((j && j.message) || 'Could not load the library.');
+          catalogue = j.items || [];
+          var cats = {};
+          catalogue.forEach(function (m) { cats[m.category] = 1; });
+          Object.keys(cats).sort().forEach(function (c) {
+            var o = document.createElement('option'); o.value = c; o.textContent = c; lcat.appendChild(o);
+          });
+          render();
+        })
+        .catch(function (e) { grid.innerHTML = '<p class="text-danger small m-0">' + esc(e.message) + '</p>'; });
+    }
+
+    modalEl.addEventListener('shown.bs.modal', loadCatalogue);
+    lsearch.addEventListener('input', render);
+    lcat.addEventListener('change', render);
+    laddBtn.addEventListener('click', function () {
+      var keys = Object.keys(selected);
+      keys.forEach(function (p) { addPendingTile('gallery_library[]', selected[p].path, selected[p].url); });
+      galSay(keys.length + ' library image' + (keys.length === 1 ? '' : 's') + ' will be added when you save.');
+      selected = {}; refreshSel(); render();
+      if (window.bootstrap) { bootstrap.Modal.getOrCreateInstance(modalEl).hide(); }
     });
   }
 })();

@@ -26,6 +26,25 @@ if (!csrf_check()) {
     exit;
 }
 
+/* Media Library catalogue for the news-editor gallery picker. */
+if ((string) ($_POST['action'] ?? '') === 'catalogue') {
+    require_once __DIR__ . '/lib/media_library.php';
+    $items = [];
+    foreach (hub_media_catalogue() as $m) {
+        if (str_contains(strtolower((string) $m['path']), '/thumb/')) {
+            continue;
+        }
+        $items[] = [
+            'path' => $m['path'],
+            'url' => $m['url'],
+            'name' => $m['name'],
+            'category' => $m['category'],
+        ];
+    }
+    echo json_encode(['ok' => true, 'items' => $items], JSON_UNESCAPED_SLASHES);
+    exit;
+}
+
 $file = $_FILES['image'] ?? null;
 if (!is_array($file)) {
     http_response_code(400);

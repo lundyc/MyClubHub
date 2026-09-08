@@ -449,6 +449,48 @@ function news_gallery_add(PDO $pdo, int $articleId, string $path, string $captio
     )->execute([':a' => $articleId, ':p' => $path, ':c' => $caption, ':o' => $order]);
 }
 
+/**
+ * Copy a file already in the Media Library (path relative to the Hub root,
+ * e.g. "uploads/history/gallery/2016/x.jpg") into uploads/news/ and attach it
+ * to an article's gallery. Keeps news_images.file_path uploads/news-relative so
+ * the public renderer and existing tooling are unchanged.
+ *
+ * @return array{ok:bool,path?:string,error?:string}
+ */
+function news_gallery_add_from_library(PDO $pdo, int $articleId, string $sourceRelPath, string $caption = ''): array
+{
+    require_once __DIR__ . '/media_library.php';
+
+    $abs = hub_media_resolve($sourceRelPath);
+    if ($abs === null || !is_file($abs)) {
+        return ['ok' => false, 'error' => 'That media item could not be found.'];
+    }
+    $ext = strtolower(pathinfo($abs, PATHINFO_EXTENSION));
+    if (!in_array($ext, ['jpg', 'jpeg', 'png', 'webp', 'gif'], true)) {
+        return ['ok' => false, 'error' => 'Only JPG, PNG, WebP or GIF images can be added.'];
+    }
+
+    $rel = date('Y/m');
+    $dir = news_uploads_dir() . '/' . $rel;
+    if (!is_dir($dir) && !mkdir($dir, 0775, true) && !is_dir($dir)) {
+        return ['ok' => false, 'error' => 'Could not prepare the news uploads folder.'];
+    }
+
+    $stem = preg_replace('/[^A-Za-z0-9_-]+/', '-', pathinfo($abs, PATHINFO_FILENAME)) ?: 'image';
+    try {
+        $name = substr(trim($stem, '-'), 0, 48) . '-' . bin2hex(random_bytes(4)) . '.' . ($ext === 'jpeg' ? 'jpg' : $ext);
+    } catch (Exception) {
+        return ['ok' => false, 'error' => 'Could not generate a filename.'];
+    }
+    if (!@copy($abs, $dir . '/' . $name)) {
+        return ['ok' => false, 'error' => 'Could not copy the image into the news folder.'];
+    }
+
+    $path = $rel . '/' . $name;
+    news_gallery_add($pdo, $articleId, $path, $caption);
+    return ['ok' => true, 'path' => $path];
+}
+
 function news_gallery_delete(PDO $pdo, int $imageId, ?int $articleId = null): void
 {
     news_ensure_schema($pdo);
