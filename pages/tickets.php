@@ -270,49 +270,74 @@ set_meta(['title' => 'Match tickets', 'description' => 'Buy tickets for ' . club
 
           <div>
             <h2 class="tkt-h">Choose your tickets</h2>
-            <ul class="tkt-lines">
-              <?php foreach ($packages as $package): ?>
-                <?php
-                $remaining = (int) $package['allocation'] > 0
-                    ? max(0, (int) $package['allocation'] - (int) $package['sold_qty'])
-                    : 999;
-                $soldOut = $remaining <= 0;
-                $lowStock = !$soldOut && (int) $package['allocation'] > 0 && $remaining <= 10;
-                $cap = min(20, $soldOut ? 0 : $remaining);
-                $val = (int) ($cart[(int) $package['id']] ?? 0);
+            <?php
+            /* Group packages by their package_group (set per template in the Hub).
+               "General" always leads, "Hospitality" next, anything else after. */
+            $groups = [];
+            foreach ($packages as $pk) {
+                $gk = trim((string) ($pk['package_group'] ?? '')) ?: 'General';
+                $groups[$gk][] = $pk;
+            }
+            $groupOrder = array_values(array_unique(array_merge(['General', 'Hospitality'], array_keys($groups))));
+            $groupLabels = [
+                'General'     => 'General admission',
+                'Hospitality' => 'Hospitality &amp; matchday packages',
+            ];
+            $multiGroup = count($groups) > 1;
+            foreach ($groupOrder as $gname):
+                if (empty($groups[$gname])) {
+                    continue;
+                }
                 ?>
-                <li class="tkt-line<?= $soldOut ? ' is-soldout' : '' ?>"
-                    data-name="<?= e((string) $package['name']) ?>"
-                    data-price="<?= e(number_format((float) $package['price'], 2, '.', '')) ?>">
-                  <div class="tkt-line__info">
-                    <span class="tkt-line__name"><?= e((string) $package['name']) ?></span>
-                    <?php if (($package['description'] ?? '') !== ''): ?>
-                      <span class="tkt-line__desc"><?= e((string) $package['description']) ?></span>
-                    <?php endif; ?>
-                    <?php if ($soldOut): ?>
-                      <span class="tkt-line__stock is-out">Sold out</span>
-                    <?php elseif ($lowStock): ?>
-                      <span class="tkt-line__stock is-low">Only <?= (int) $remaining ?> left</span>
-                    <?php endif; ?>
-                  </div>
-                  <div class="tkt-line__price"><?= e(gbp((float) $package['price'])) ?></div>
-                  <div class="tkt-line__qty">
-                    <?php if ($soldOut): ?>
-                      <span class="tkt-line__soldtag">Sold out</span>
-                      <input type="hidden" name="qty[<?= (int) $package['id'] ?>]" value="0">
-                    <?php else: ?>
-                      <div class="stepper" data-stepper>
-                        <button type="button" data-step="-1" aria-label="Fewer <?= e((string) $package['name']) ?>">−</button>
-                        <input class="tkt-qty" type="number" inputmode="numeric" min="0" max="<?= $cap ?>"
-                               name="qty[<?= (int) $package['id'] ?>]" value="<?= $val ?>"
-                               aria-label="Quantity — <?= e((string) $package['name']) ?>">
-                        <button type="button" data-step="1" aria-label="More <?= e((string) $package['name']) ?>">+</button>
-                      </div>
-                    <?php endif; ?>
-                  </div>
-                </li>
-              <?php endforeach; ?>
-            </ul>
+                <section class="tkt-group<?= $gname !== 'General' ? ' tkt-group--feature' : '' ?>">
+                  <?php if ($multiGroup): ?>
+                    <h3 class="tkt-grouph"><?= $groupLabels[$gname] ?? e($gname) ?></h3>
+                  <?php endif; ?>
+                  <ul class="tkt-lines">
+                    <?php foreach ($groups[$gname] as $package): ?>
+                      <?php
+                      $remaining = (int) $package['allocation'] > 0
+                          ? max(0, (int) $package['allocation'] - (int) $package['sold_qty'])
+                          : 999;
+                      $soldOut = $remaining <= 0;
+                      $lowStock = !$soldOut && (int) $package['allocation'] > 0 && $remaining <= 10;
+                      $cap = min(20, $soldOut ? 0 : $remaining);
+                      $val = (int) ($cart[(int) $package['id']] ?? 0);
+                      ?>
+                      <li class="tkt-line<?= $soldOut ? ' is-soldout' : '' ?>"
+                          data-name="<?= e((string) $package['name']) ?>"
+                          data-price="<?= e(number_format((float) $package['price'], 2, '.', '')) ?>">
+                        <div class="tkt-line__info">
+                          <span class="tkt-line__name"><?= e((string) $package['name']) ?></span>
+                          <?php if (($package['description'] ?? '') !== ''): ?>
+                            <span class="tkt-line__desc"><?= e((string) $package['description']) ?></span>
+                          <?php endif; ?>
+                          <?php if ($soldOut): ?>
+                            <span class="tkt-line__stock is-out">Sold out</span>
+                          <?php elseif ($lowStock): ?>
+                            <span class="tkt-line__stock is-low">Only <?= (int) $remaining ?> left</span>
+                          <?php endif; ?>
+                        </div>
+                        <div class="tkt-line__price"><?= e(gbp((float) $package['price'])) ?></div>
+                        <div class="tkt-line__qty">
+                          <?php if ($soldOut): ?>
+                            <span class="tkt-line__soldtag">Sold out</span>
+                            <input type="hidden" name="qty[<?= (int) $package['id'] ?>]" value="0">
+                          <?php else: ?>
+                            <div class="stepper" data-stepper>
+                              <button type="button" data-step="-1" aria-label="Fewer <?= e((string) $package['name']) ?>">−</button>
+                              <input class="tkt-qty" type="number" inputmode="numeric" min="0" max="<?= $cap ?>"
+                                     name="qty[<?= (int) $package['id'] ?>]" value="<?= $val ?>"
+                                     aria-label="Quantity — <?= e((string) $package['name']) ?>">
+                              <button type="button" data-step="1" aria-label="More <?= e((string) $package['name']) ?>">+</button>
+                            </div>
+                          <?php endif; ?>
+                        </div>
+                      </li>
+                    <?php endforeach; ?>
+                  </ul>
+                </section>
+            <?php endforeach; ?>
           </div>
 
           <aside class="osummary tkt-summary">

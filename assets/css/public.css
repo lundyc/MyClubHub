@@ -5319,6 +5319,32 @@ a.pp-sponsor:hover {
 }
 
 /* -- ticket lines -- */
+.tkt-group + .tkt-group {
+  margin-top: 1.8rem;
+}
+
+.tkt-grouph {
+  font-family: var(--font-head);
+  font-weight: 800;
+  font-size: .78rem;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--club-accent-ink);
+  margin: 0 0 .7rem;
+  padding-bottom: .35rem;
+  border-bottom: 2px solid var(--line);
+}
+
+.tkt-group--feature .tkt-grouph {
+  color: var(--club-primary-ink);
+  border-bottom-color: var(--club-accent);
+}
+
+.tkt-group--feature .tkt-line {
+  border-left: 3px solid var(--club-accent);
+  background: color-mix(in srgb, var(--club-accent) 5%, var(--paper));
+}
+
 .tkt-lines {
   list-style: none;
   margin: 0;
