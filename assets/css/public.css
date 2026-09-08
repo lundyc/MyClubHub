@@ -604,8 +604,12 @@ body.nav-open {
     cursor: pointer;
   }
 
-  .nav-toggle span {
+  .nav-toggle__open {
     display: inline-flex;
+  }
+
+  .nav-toggle__close {
+    display: none;
   }
 
   .nav-toggle svg {
