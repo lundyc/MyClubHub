@@ -352,14 +352,20 @@ function news_purify(string $html): string
             @mkdir($cacheDir, 0775, true);
         }
         $config->set('Cache.SerializerPath', is_dir($cacheDir) && is_writable($cacheDir) ? $cacheDir : null);
-        // Kept to what Parsedown emits + a controlled link/image/table set. No
+        // A controlled rich-text set — what the TinyMCE editor can emit. Inline
+        // CSS is limited to a short, safe property list (align + colour). No
         // <figure>/loading — not in HTMLPurifier's default (XHTML 1.0) doctype.
         $config->set('HTML.Allowed',
-            'p,br,strong,em,u,s,blockquote,pre,code,hr,'
-            . 'h2,h3,h4,ul,ol,li,'
+            'p[style|class],br,strong,em,u,s,span[style],blockquote[style],pre,code,hr,'
+            . 'h2[style],h3[style],h4[style],'
+            . 'ul,ol,li[style],'
             . 'a[href|title|rel|target],'
-            . 'img[src|alt|title|width|height],'
-            . 'table,thead,tbody,tr,th,td');
+            . 'img[src|alt|title|width|height|style|class],'
+            . 'table,thead,tbody,tr,th[style|colspan|rowspan],td[style|colspan|rowspan]');
+        $config->set('CSS.AllowedProperties', [
+            'text-align', 'color', 'background-color',
+            'float', 'margin-left', 'margin-right', 'width', 'height',
+        ]);
         $config->set('HTML.TargetBlank', true);
         $config->set('Attr.AllowedRel', ['noopener', 'noreferrer', 'nofollow']);
         $config->set('AutoFormat.RemoveEmpty', true);

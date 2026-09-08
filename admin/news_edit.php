@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 /**
  * News — create / edit / delete an article for the public website.
- * Markdown body via EasyMDE; images upload through news_image_upload.php.
+ * Rich-text (HTML) body via TinyMCE; images upload through news_image_upload.php.
+ * Legacy markdown bodies are converted to HTML on first edit.
  */
 
 $id = (int) ($_GET['id'] ?? 0);
@@ -60,6 +61,12 @@ if (!empty($article['published_at'])) {
     $data['published_at'] = date('Y-m-d\TH:i', strtotime((string) $article['published_at']));
 }
 
+// The editor is WYSIWYG (HTML). Any legacy markdown body is converted to HTML
+// for editing and will be saved back as HTML.
+$bodyForEditor = (($data['body_format'] ?? 'html') === 'markdown' && trim((string) $data['body']) !== '')
+    ? news_render_markdown((string) $data['body'])
+    : (string) $data['body'];
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!csrf_check()) {
         $errors[] = 'Your session expired. Please try again.';
@@ -85,6 +92,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         $data['is_featured'] = isset($_POST['is_featured']) ? 1 : 0;
         $data['fixture_id'] = (int) ($_POST['fixture_id'] ?? 0) ?: null;
+        $data['body_format'] = 'html';
+        $bodyForEditor = (string) $data['body'];
 
         if ($data['title'] === '') {
             $errors[] = 'A title is required.';
@@ -153,7 +162,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $gallery = $id > 0 ? news_gallery($pdo, $id) : [];
 $styleV = (int) (@filemtime(__DIR__ . '/assets/css/style.css') ?: time());
 ?>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/easymde@2.18.0/dist/easymde.min.css">
 <style>
   .ng-grid { display: flex; flex-wrap: wrap; gap: .6rem; }
   .ng-tile { position: relative; margin: 0; width: 120px; }
@@ -198,8 +206,8 @@ $styleV = (int) (@filemtime(__DIR__ . '/assets/css/style.css') ?: time());
         </div>
         <div class="mb-2">
           <label class="form-label" for="body">Article</label>
-          <textarea id="body" name="body"><?= h((string) $data['body']) ?></textarea>
-          <input type="hidden" name="body_format" value="markdown">
+          <textarea id="body" name="body"><?= h($bodyForEditor) ?></textarea>
+          <input type="hidden" name="body_format" value="html">
         </div>
       </div>
     </div>
@@ -361,7 +369,7 @@ $styleV = (int) (@filemtime(__DIR__ . '/assets/css/style.css') ?: time());
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/easymde@2.18.0/dist/easymde.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tinymce@7.6.1/tinymce.min.js" referrerpolicy="origin"></script>
 <script>
 (function () {
   var csrf = document.querySelector('input[name="csrf_token"]').value;
@@ -376,16 +384,52 @@ $styleV = (int) (@filemtime(__DIR__ . '/assets/css/style.css') ?: time());
       .catch(function () { onError('Upload failed'); });
   }
 
-  var easymde = new EasyMDE({
-    element: document.getElementById('body'),
-    spellChecker: false,
-    autoDownloadFontAwesome: true,
-    uploadImage: true,
-    imageUploadFunction: uploadImage,
-    toolbar: ['bold', 'italic', 'heading', '|', 'quote', 'unordered-list', 'ordered-list', '|',
-              'link', 'image', 'table', '|', 'preview', 'side-by-side', 'guide'],
-    status: ['lines', 'words'],
-    minHeight: '360px',
+  tinymce.init({
+    selector: '#body',
+    license_key: 'gpl',
+    menubar: 'edit format table',
+    plugins: 'autolink autoresize lists advlist link image table code fullscreen wordcount visualblocks charmap searchreplace nonbreaking help',
+    toolbar: [
+      'undo redo | blocks | bold italic underline strikethrough | forecolor backcolor | removeformat',
+      'alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | blockquote link image table hr | visualblocks code fullscreen'
+    ],
+    toolbar_mode: 'wrap',
+    block_formats: 'Paragraph=p; Heading 2=h2; Heading 3=h3; Heading 4=h4; Quote=blockquote',
+    color_map: [
+      '6d2231', 'Club maroon', 'e0b42a', 'Club gold', '2e2c2d', 'Ink',
+      '7c7178', 'Muted grey', 'ffffff', 'White',
+      '1b8a4b', 'Green', 'b23b3b', 'Red', '2f6f9f', 'Blue'
+    ],
+    custom_colors: false,
+    branding: false,
+    promotion: false,
+    resize: true,
+    min_height: 480,
+    autoresize_bottom_margin: 28,
+    skin: 'oxide',
+    content_css: 'default',
+    content_style: [
+      "body{font-family:Georgia,'Times New Roman',serif;font-size:17px;line-height:1.75;color:#2e2c2d;max-width:46rem;margin:1.6rem auto;padding:0 1.25rem;}",
+      "h1,h2,h3,h4{font-family:-apple-system,'Segoe UI',Roboto,sans-serif;font-weight:800;line-height:1.2;margin:1.7rem 0 .6rem;}",
+      "h1{font-size:1.9rem} h2{font-size:1.5rem} h3{font-size:1.25rem} h4{font-size:1.05rem}",
+      "p{margin:0 0 1rem} a{color:#6d2231}",
+      "img{max-width:100%;height:auto;border-radius:6px}",
+      "blockquote{border-left:3px solid #6d2231;margin:1.2rem 0;padding:.25rem 0 .25rem 1.1rem;color:#5c5560;font-style:italic}",
+      "table{border-collapse:collapse;width:100%;margin:1rem 0} td,th{border:1px solid #cfc8bb;padding:.45rem .7rem} th{background:#f4efe6}",
+      "hr{border:0;border-top:2px solid #e7dccb;margin:1.6rem 0}"
+    ].join(''),
+    automatic_uploads: true,
+    images_upload_credentials: true,
+    file_picker_types: 'image',
+    images_upload_handler: function (blobInfo) {
+      return new Promise(function (resolve, reject) {
+        uploadImage(blobInfo.blob(), resolve, function (msg) { reject({ message: msg, remove: true }); });
+      });
+    },
+    setup: function (ed) {
+      // keep the underlying <textarea> in sync for normal form submits
+      ed.on('change input undo redo', function () { ed.save(); });
+    }
   });
 
   // Hero image — drag-and-drop / browse / Media Library
