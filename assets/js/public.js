@@ -155,6 +155,56 @@
     });
   }
 
+  /* Match-ticket order summary ------------------------------------------- */
+  var tktForm = doc.querySelector("[data-ticket-form]");
+  if (tktForm) {
+    var tktItems = tktForm.querySelector(".js-tkt-items");
+    var tktTotalEl = tktForm.querySelector(".js-tkt-total");
+    var tktBtn = tktForm.querySelector(".js-tkt-submit");
+    var tktLines = Array.prototype.slice.call(tktForm.querySelectorAll(".tkt-line"));
+    var money = function (n) { return "£" + n.toFixed(2); };
+
+    var tktRender = function () {
+      var total = 0, count = 0, rows = "";
+      tktLines.forEach(function (line) {
+        var input = line.querySelector(".tkt-qty");
+        if (!input) return;
+        var qty = parseInt(input.value || "0", 10);
+        if (isNaN(qty) || qty < 0) qty = 0;
+        var price = parseFloat(line.getAttribute("data-price") || "0");
+        if (qty > 0) {
+          total += qty * price;
+          count += qty;
+          var name = line.getAttribute("data-name") || "Ticket";
+          rows += '<div class="tkt-si"><span><b>' + qty + '×</b>' +
+                  name.replace(/[&<>"]/g, function (c) {
+                    return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c];
+                  }) +
+                  '</span><span>' + money(qty * price) + "</span></div>";
+        }
+      });
+      if (tktItems) {
+        tktItems.innerHTML = rows ||
+          '<p class="tkt-summary__empty">No tickets selected yet.</p>';
+      }
+      if (tktTotalEl) tktTotalEl.textContent = money(total);
+      if (tktBtn) {
+        tktBtn.disabled = count === 0;
+        tktBtn.textContent = count === 0
+          ? "Continue to payment"
+          : "Continue to payment · " + money(total);
+      }
+    };
+
+    tktForm.addEventListener("input", function (e) {
+      if (e.target.classList.contains("tkt-qty")) tktRender();
+    });
+    tktForm.addEventListener("change", function (e) {
+      if (e.target.classList.contains("tkt-qty")) tktRender();
+    });
+    tktRender();
+  }
+
   /* Product image gallery ------------------------------------------------- */
   var galleryMain = doc.querySelector("[data-gallery-main]");
   if (galleryMain) {
