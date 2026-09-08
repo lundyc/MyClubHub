@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/env.php';
+require_once __DIR__ . '/lib/mailer.php';
 
 const USERS_DATA_FILE = __DIR__ . '/data/users.json';
 const USERS_RESET_TOKEN_TTL = 3600;
@@ -249,12 +250,12 @@ function users_mail_host(): string
 
 function users_mail_from_address(): string
 {
-    return 'no-reply@' . users_mail_host();
+    return hub_mail_from_address();
 }
 
 function users_mail_from_name(): string
 {
-    return 'Lundy Socials';
+    return hub_mail_from_name();
 }
 
 function users_app_base_url(): string
@@ -282,12 +283,6 @@ function users_send_password_reset_email(array $user, string $resetUrl): bool
     $subject = 'Reset your password';
     $fromName = users_mail_from_name();
     $fromAddress = users_mail_from_address();
-    $headers = implode("\r\n", [
-        'MIME-Version: 1.0',
-        'Content-Type: text/plain; charset=UTF-8',
-        'From: ' . $fromName . ' <' . $fromAddress . '>',
-        'Reply-To: ' . $fromName . ' <' . $fromAddress . '>',
-    ]);
     $message = implode("\n", [
         'You requested a password reset for your account.',
         '',
@@ -299,7 +294,7 @@ function users_send_password_reset_email(array $user, string $resetUrl): bool
         'If you did not request this reset, you can ignore this email.',
     ]);
 
-    return mail($to, $subject, $message, $headers, '-f' . $fromAddress);
+    return hub_send_mail($to, $subject, $message, false, $fromAddress);
 }
 
 /**

@@ -70,6 +70,17 @@ if (!hub_auth_is_developer()) {
                               </div>
                     </div>
 
+                    <!-- Product Analytics -->
+                    <div class="col">
+                              <div class="card h-100 shadow-sm">
+                                        <div class="card-body">
+                                                  <h5 class="card-title"><i class="fas fa-chart-line me-2"></i> Product Analytics</h5>
+                                                  <p class="card-text">See page usage, feature clicks, journeys, devices, engagement, and click maps across the Hub.</p>
+                                                  <a href="developer_analytics.php" class="btn btn-brand">Open</a>
+                                        </div>
+                              </div>
+                    </div>
+
           </div>
 </div>
 

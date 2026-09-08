@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/stripe.php';
+require_once __DIR__ . '/mailer.php';
 require_once __DIR__ . '/season_tickets.php';
 require_once __DIR__ . '/admissions.php';
 
@@ -1177,7 +1178,6 @@ function sendMatchTicketConfirmationEmail(PDO $pdo, int $orderId, bool $force = 
     $items = getMatchTicketOrderItems($pdo, $orderId);
     $tickets = getMatchTicketsForOrder($pdo, $orderId);
     $host = preg_replace('/^www\./', '', preg_replace('/:\d+$/', '', strtolower((string) ($_SERVER['HTTP_HOST'] ?? 'lundy.me.uk'))));
-    $fromAddress = 'no-reply@' . ($host !== '' ? $host : 'lundy.me.uk');
     $subject = 'Your Saltcoats Victoria FC match ticket';
     $fixtureDate = date('D j M Y', strtotime((string) $order['match_date']));
     $kickoff = !empty($order['kickoff_time']) ? ' at ' . date('H:i', strtotime((string) $order['kickoff_time'])) : '';
@@ -1258,13 +1258,7 @@ function sendMatchTicketConfirmationEmail(PDO $pdo, int $orderId, bool $force = 
         </table>
     </body></html>';
 
-    $headers = implode("\r\n", [
-        'MIME-Version: 1.0',
-        'Content-Type: text/html; charset=UTF-8',
-        'From: Saltcoats Victoria FC <' . $fromAddress . '>',
-    ]);
-
-    $sent = (bool) @mail($email, $subject, $message, $headers, '-f' . $fromAddress);
+    $sent = hub_send_mail($email, $subject, $message, true);
     if ($sent) {
         $pdo->prepare('UPDATE orders SET confirmation_email_sent_at = NOW() WHERE id = :id')->execute([':id' => $orderId]);
     }
@@ -1333,6 +1327,18 @@ function match_ticket_stripe_handle_checkout_completed(PDO $pdo, array $session)
     if ($orderId > 0) {
         markMatchTicketOrderPaid($pdo, $orderId, 'stripe');
         sendMatchTicketConfirmationEmail($pdo, $orderId);
+        $order = getMatchTicketOrder($pdo, $orderId);
+        if ($order) {
+            stripe_send_payment_notification(
+                $pdo,
+                'Match tickets',
+                (string) ($order['buyer_name'] ?? $order['customer_name'] ?? ''),
+                (string) ($order['buyer_email'] ?? $order['customer_email'] ?? ''),
+                (float) ($order['total_amount'] ?? 0),
+                'Match ticket order #' . $orderId . (!empty($order['opponent']) ? ' vs ' . (string) $order['opponent'] : ''),
+                stripe_public_base_url() . '/ticket_orders.php?id=' . $orderId
+            );
+        }
     }
 }
 

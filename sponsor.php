@@ -1730,7 +1730,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
       }
 
-      header('Location: sponsor.php?id=' . $id . '&saved=1');
+      header('Location: ' . ($action === 'edit' ? 'sponsors.php?saved=1' : 'sponsor.php?id=' . $id . '&saved=1'));
       exit;
     } catch (Throwable $e) {
       $pdo->rollBack();

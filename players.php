@@ -504,6 +504,11 @@ $statusMeta = [
                         title="Edit player">
                         <i class="fa-regular fa-pen-to-square"></i>
                       </a>
+                      <a href="player_website.php?id=<?= $pl['id'] ?>"
+                        class="btn btn-sm btn-action btn-edit"
+                        title="Website profile">
+                        <i class="fa-solid fa-globe"></i>
+                      </a>
                     </div>
                   </td>
                 </tr>

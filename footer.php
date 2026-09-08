@@ -62,6 +62,25 @@ if ($showMobileNav):
 </div>
 <?php endif; ?>
 
+<?php
+$hubAnalyticsScript = __DIR__ . '/assets/js/hub_analytics.js';
+$hubAnalyticsDisabledPages = ['login.php', 'forgot_password.php', 'reset_password.php', 'analytics_track.php'];
+if (
+    $showMobileNav
+    && function_exists('hub_auth_is_authenticated')
+    && hub_auth_is_authenticated()
+    && !in_array($currentScript, $hubAnalyticsDisabledPages, true)
+    && is_file($hubAnalyticsScript)
+):
+?>
+<script>
+    window.hubAnalyticsConfig = {
+        endpoint: "/analytics_track.php"
+    };
+</script>
+<script src="/assets/js/hub_analytics.js?v=<?= (int)(@filemtime($hubAnalyticsScript) ?: time()) ?>" defer></script>
+<?php endif; ?>
+
 <?php ob_end_flush(); ?>
 </body>
 

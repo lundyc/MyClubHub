@@ -5,12 +5,16 @@ declare(strict_types=1);
  * Public short-link resolver for Stripe payment links.
  *
  * A sponsor is handed https://myclubhub.co.uk/p/<slug> (rewritten to pay.php?c=<slug>
- * by .htaccess). This looks the slug up in stripe_payment_links and 302-redirects to
- * the real Stripe Checkout URL while the link is still open and unexpired. No auth,
- * no writes — sponsors are not logged in.
+ * by .htaccess). The public Hub link can live longer than Stripe's 24-hour
+ * Checkout Session limit; when the sponsor clicks an otherwise-valid Hub link
+ * after the underlying Checkout Session has expired, a fresh Session is created
+ * and saved against the same Hub link row before redirecting.
  */
 
 require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/lib/stripe.php';
+
+ensureStripeSchema($pdo);
 
 $slug = preg_replace('/[^A-Za-z0-9]/', '', (string) ($_GET['c'] ?? ''));
 
@@ -27,14 +31,27 @@ if ($slug !== '' && strlen($slug) <= 24) {
     }
 }
 
-$isLive = $link
+$publicLinkIsLive = $link && stripe_payment_link_public_expires_at($link) > time();
+$stripeSessionIsLive = $link
     && (string) $link['status'] === 'open'
     && !empty($link['url'])
     && (empty($link['expires_at']) || strtotime((string) $link['expires_at']) > time());
 
-if ($isLive) {
+if ($stripeSessionIsLive) {
     header('Location: ' . (string) $link['url'], true, 302);
     exit;
+}
+
+if ($publicLinkIsLive && $link && in_array((string) $link['status'], ['open', 'expired'], true)) {
+    try {
+        $link = stripe_refresh_payment_link_checkout_session($pdo, $link);
+        if ((string) $link['status'] === 'open' && !empty($link['url'])) {
+            header('Location: ' . (string) $link['url'], true, 302);
+            exit;
+        }
+    } catch (Throwable $e) {
+        error_log('[stripe] Could not refresh public payment link ' . $slug . ': ' . $e->getMessage());
+    }
 }
 
 $status = $link ? (string) $link['status'] : '';

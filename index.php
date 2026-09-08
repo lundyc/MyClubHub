@@ -20,6 +20,7 @@ require_once __DIR__ . '/lib/facility_maintenance.php';
 require_once __DIR__ . '/lib/sponsor_followups.php';
 require_once __DIR__ . '/lib/pos.php';
 require_once __DIR__ . '/lib/pos_reconciliation.php';
+require_once __DIR__ . '/lib/stripe.php';
 
 function hub_index_load_json_array(string $path): array
 {
@@ -150,7 +151,7 @@ try {
         $playerTotals['active'] = (int) $pdo->query("SELECT COUNT(*) FROM players WHERE status IN ('current', 'trialist') AND active = 1")->fetchColumn();
         $playerTotals['former'] = (int) $pdo->query("SELECT COUNT(*) FROM players WHERE status NOT IN ('current', 'trialist') OR active = 0")->fetchColumn();
         $playerTotals['total'] = $playerTotals['active'] + $playerTotals['former'];
-        $nextBirthdays = players_all_birthdays($pdo);
+        $nextBirthdays = players_all_birthdays($pdo, 3);
 
         $fixtureCountStmt = $pdo->prepare("
             SELECT
@@ -272,6 +273,8 @@ try {
 
 $seasonTicketTotals = ['holders' => 0, 'collected' => 0.0, 'outstanding' => 0.0];
 $sponsorshipTotals = ['agreed' => 0.0, 'paid' => 0.0, 'outstanding' => 0.0];
+$stripeOverviewTotals = ['collected' => 0.0, 'refunded' => 0.0, 'payments' => 0];
+$recentStripeOrders = [];
 $announcementsPublished = 0;
 $publishingCounts = ['draft' => 0, 'queued' => 0, 'published' => 0, 'failed' => 0, 'prepared' => 0];
 
@@ -310,6 +313,11 @@ try {
             $sponsorshipTotals['paid'] += (float) $agreement['total_paid'];
         }
         $sponsorshipTotals['outstanding'] = max(0.0, $sponsorshipTotals['agreed'] - $sponsorshipTotals['paid']);
+
+        if (hub_auth_has_capability('finance')) {
+            $stripeOverviewTotals = stripe_all_payments_summary($pdo);
+            $recentStripeOrders = stripe_get_all_transactions($pdo, ['limit' => 5]);
+        }
 
         $announcementsPublished = count(getAnnouncements($pdo, true));
         $publishingCounts = array_merge($publishingCounts, hub_publishing_history_counts($pdo));
@@ -357,6 +365,45 @@ if ($leagueSnapshot !== null) {
         <div><i class="fa-solid fa-calendar-days" aria-hidden="true"></i><span>Showing <strong><?= htmlspecialchars((string) ($selectedSeason['name'] ?? 'the selected season'), ENT_QUOTES, 'UTF-8') ?></strong></span><?php if (!empty($selectedSeason['is_locked'])): ?><span class="badge text-bg-secondary">Locked</span><?php endif; ?></div>
         <span>Change season from the navigation menu.</span>
     </div>
+
+    <?php if (hub_auth_has_capability('finance')): ?>
+        <section class="hub-index-section" aria-labelledby="recentOrdersTitle">
+            <div class="hub-index-section__header">
+                <p class="page-kicker mb-1">Orders & payments</p>
+                <h2 id="recentOrdersTitle" class="h4 mb-0">Latest Stripe activity</h2>
+            </div>
+
+            <?php hub_render_metric_grid([
+                ['label' => 'Stripe collected', 'value' => gbp((float) $stripeOverviewTotals['collected']), 'meta' => (int) $stripeOverviewTotals['payments'] . ' payment' . ((int) $stripeOverviewTotals['payments'] === 1 ? '' : 's') . ' across all sources', 'icon' => 'fa-credit-card', 'tone' => 'success', 'href' => 'stripe_dashboard.php'],
+                ['label' => 'Stripe refunded', 'value' => gbp((float) $stripeOverviewTotals['refunded']), 'meta' => 'Across all Stripe sources', 'icon' => 'fa-rotate-left', 'tone' => ((float) $stripeOverviewTotals['refunded'] > 0 ? 'warning' : 'neutral'), 'href' => 'stripe_dashboard.php'],
+            ], 'Stripe order summary'); ?>
+
+            <div class="card shadow-sm border-0 hub-panel mt-3">
+                <div class="card-body p-0">
+                    <?php if ($recentStripeOrders === []): ?>
+                        <div class="hub-empty-state p-4">No Stripe payments have been recorded yet.</div>
+                    <?php else: ?>
+                        <div class="list-group list-group-flush">
+                            <?php foreach ($recentStripeOrders as $order): ?>
+                                <a class="list-group-item list-group-item-action px-4 py-3" href="<?= h((string) ($order['manage_url'] ?? 'stripe_dashboard.php')) ?>">
+                                    <div class="d-flex flex-column flex-md-row justify-content-between gap-2">
+                                        <div>
+                                            <div class="fw-semibold"><?= h((string) $order['customer_name']) ?></div>
+                                            <div class="text-muted small"><?= h((string) $order['source']) ?> &middot; <?= h((string) $order['description']) ?></div>
+                                        </div>
+                                        <div class="text-md-end">
+                                            <div class="fw-bold"><?= gbp((float) $order['amount']) ?></div>
+                                            <div class="text-muted small"><?= h(date('d/m/Y H:i', strtotime((string) $order['created_at']))) ?></div>
+                                        </div>
+                                    </div>
+                                </a>
+                            <?php endforeach; ?>
+                        </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </section>
+    <?php endif; ?>
 
     <section class="dashboard-command-centre" aria-labelledby="dashboardCommandTitle">
         <div class="dashboard-command-centre__main">
@@ -629,8 +676,8 @@ if ($leagueSnapshot !== null) {
                 <div class="card-body p-4">
                     <div class="d-flex justify-content-between align-items-center gap-2 mb-3">
                         <div>
-                            <p class="page-kicker mb-1">Squad birthdays</p>
-                            <h3 class="h5 mb-0">All birthdays</h3>
+                            <p class="page-kicker mb-1">Club birthdays</p>
+                            <h3 class="h5 mb-0">Next birthdays</h3>
                         </div>
                         <a href="/club_people.php" class="btn btn-outline-secondary btn-sm">Open people</a>
                     </div>
@@ -645,7 +692,7 @@ if ($leagueSnapshot !== null) {
                                         <small><?= (int) $birthday['days_until'] === 0 ? 'Today' : ((int) $birthday['days_until'] === 1 ? 'day' : 'days') ?></small>
                                     </span>
                                     <span class="dashboard-birthdays__info">
-                                        <span class="dashboard-birthdays__name"><?= h($birthday['name']) ?> - <?= h((string) ($birthday['role_label'] ?? 'person')) ?></span>
+                                        <span class="dashboard-birthdays__name"><?= h($birthday['name']) ?> - <?= h((string) ($birthday['role_label'] ?? 'supporter')) ?></span>
                                         <small>Turns <?= (int) $birthday['age_turning'] ?> &middot; <?= h(date('d M', strtotime($birthday['next_birthday']))) ?></small>
                                     </span>
                                 </a>
@@ -684,7 +731,7 @@ if ($leagueSnapshot !== null) {
 <link rel="stylesheet" href="/assets/css/index.css">
 
 <?php if ($revenueSources !== [] || $formChartData !== null): ?>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js"></script>
 <script>
 (() => {
     const brandFont = getComputedStyle(document.body).fontFamily;

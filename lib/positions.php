@@ -163,11 +163,11 @@ const HUB_PAGE_CAPABILITIES = [
     // HUB_PAGE_GATE_EXEMPT below.
     //
     // Not listed (deliberately): club_people.php, club_person.php,
-    // developer*.php, positions.php, settings.php, user_delete.php,
-    // user_edit.php stay hub_auth_is_admin()-only, not a delegable
-    // capability — header.php's blanket gate below still correctly denies
-    // volunteer/staff on these (just via the generic message rather than
-    // each page's own admin-only message), so no exemption is needed.
+    // positions.php, settings.php, user_delete.php, user_edit.php stay
+    // hub_auth_is_admin()-only, not a delegable capability — header.php's
+    // blanket gate below still correctly denies volunteer/staff on these
+    // (just via the generic message rather than each page's own admin-only
+    // message), so no exemption is needed.
 ];
 
 /**
@@ -187,6 +187,9 @@ const HUB_PAGE_CAPABILITIES = [
  *   ticket-ops baseline (tickets.scan, pos.use, ...) independent of
  *   committee position. Without this exemption the blanket gate would deny
  *   them before that check ever runs.
+ * - developer*.php pages gate themselves with hub_auth_is_developer(), which
+ *   is stricter than admin and resolves to the configured Colin/developer
+ *   email only. The blanket capability gate must not run first.
  *
  * @var list<string>
  */
@@ -199,6 +202,13 @@ const HUB_PAGE_GATE_EXEMPT = [
     'season_pass_rules.php',
     'season_ticket_orders.php',
     'ticket_orders.php',
+    'developer.php',
+    'developer_analytics.php',
+    'developer_audit.php',
+    'developer_db.php',
+    'developer_errors.php',
+    'developer_roles.php',
+    'developer_sponsorships.php',
 ];
 
 /**

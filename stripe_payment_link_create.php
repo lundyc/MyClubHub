@@ -70,7 +70,7 @@ try {
             'id' => (int) $link['id'],
             'url' => stripe_payment_link_public_url($link),
             'amount' => (float) $link['amount'],
-            'expires_at' => (string) $link['expires_at'],
+            'expires_at' => date('Y-m-d H:i:s', stripe_payment_link_public_expires_at($link)),
             'sponsor_contact_email' => (string) ($agreement['sponsor_contact_email'] ?? ''),
             'message' => stripe_build_payment_message((string) ($agreement['sponsor_name'] ?? ''), $agreement, $link),
         ],

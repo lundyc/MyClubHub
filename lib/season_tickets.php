@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/mailer.php';
+
 function ensureSeasonTicketSchema(PDO $pdo): void
 {
     static $done = false;
@@ -325,13 +327,6 @@ function seasonTicketSendRenewalReminder(array $holder, string $signupUrl): bool
     }
 
     $subject = 'Time to renew your Saltcoats Victoria FC season ticket';
-    $host = preg_replace('/^www\./', '', preg_replace('/:\d+$/', '', strtolower((string) ($_SERVER['HTTP_HOST'] ?? 'lundy.me.uk'))));
-    $fromAddress = 'no-reply@' . $host;
-    $headers = implode("\r\n", [
-        'MIME-Version: 1.0',
-        'Content-Type: text/plain; charset=UTF-8',
-        'From: Saltcoats Victoria FC <' . $fromAddress . '>',
-    ]);
     $message = implode("\n", [
         'Hi ' . (string) $holder['name'] . ',',
         '',
@@ -343,7 +338,7 @@ function seasonTicketSendRenewalReminder(array $holder, string $signupUrl): bool
         'Saltcoats Victoria FC',
     ]);
 
-    return (bool) @mail($to, $subject, $message, $headers, '-f' . $fromAddress);
+    return hub_send_mail($to, $subject, $message, false);
 }
 
 function markSeasonTicketRenewalReminderSent(PDO $pdo, int $holderId): void
@@ -842,7 +837,6 @@ function seasonTicketSendConfirmationEmail(string $toEmail, string $buyerName, a
     }
 
     $host = preg_replace('/^www\./', '', preg_replace('/:\d+$/', '', strtolower((string) ($_SERVER['HTTP_HOST'] ?? 'lundy.me.uk'))));
-    $fromAddress = 'no-reply@' . $host;
     $subject = 'Your Saltcoats Victoria FC season ticket order';
 
     $lineRows = [];
@@ -912,13 +906,7 @@ function seasonTicketSendConfirmationEmail(string $toEmail, string $buyerName, a
         </table>
     </body></html>';
 
-    $headers = implode("\r\n", [
-        'MIME-Version: 1.0',
-        'Content-Type: text/html; charset=UTF-8',
-        'From: Saltcoats Victoria FC <' . $fromAddress . '>',
-    ]);
-
-    return (bool) @mail($toEmail, $subject, $message, $headers, '-f' . $fromAddress);
+    return hub_send_mail($toEmail, $subject, $message, true);
 }
 
 /**

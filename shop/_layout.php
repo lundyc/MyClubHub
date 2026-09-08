@@ -7,11 +7,12 @@ declare(strict_types=1);
 // staff login) — this keeps that markup in one place.
 
 require_once __DIR__ . '/../lib/functions.php';
+require_once __DIR__ . '/../lib/stripe.php';
 
 /**
  * @param array{
  *   title?:string, description?:string, active?:string, basket_count?:int,
- *   settings?:array<string,string>, canonical?:string, product_image?:string
+ *   settings?:array<string,string>, canonical?:string, product_image?:string, image_alt?:string
  * } $opts
  */
 function shop_layout_top(array $opts = []): void
@@ -21,6 +22,20 @@ function shop_layout_top(array $opts = []): void
     $description = (string) ($opts['description'] ?? 'Official Saltcoats Victoria FC merchandise. Pre-order the 2026/27 home and away kit.');
     $active = (string) ($opts['active'] ?? '');
     $basketCount = (int) ($opts['basket_count'] ?? 0);
+    $baseUrl = rtrim(stripe_public_base_url(), '/');
+    $canonical = trim((string) ($opts['canonical'] ?? '')) ?: $baseUrl . '/shop/';
+    $image = trim((string) ($opts['product_image'] ?? ''));
+    $imageAlt = trim((string) ($opts['image_alt'] ?? $fullTitle));
+    if ($image === '') {
+        $image = '/assets/images/Saltcoats%20Victoria%20FC.png';
+        $imageAlt = 'Saltcoats Victoria FC crest';
+    }
+    if (str_starts_with($image, '//')) {
+        $image = 'https:' . $image;
+    } elseif (!preg_match('~^https?://~i', $image)) {
+        $image = $baseUrl . '/' . ltrim($image, '/');
+    }
+    $image = str_replace(' ', '%20', $image);
     $cssVersion = (int) (@filemtime(__DIR__ . '/assets/shop.css') ?: time());
     ?>
 <!doctype html>
@@ -34,7 +49,16 @@ function shop_layout_top(array $opts = []): void
     <meta property="og:title" content="<?= h($fullTitle) ?>">
     <meta property="og:description" content="<?= h($description) ?>">
     <meta property="og:type" content="website">
-    <?php if (!empty($opts['canonical'])): ?><link rel="canonical" href="<?= h((string) $opts['canonical']) ?>"><?php endif; ?>
+    <meta property="og:site_name" content="Saltcoats Victoria FC Club Shop">
+    <meta property="og:url" content="<?= h($canonical) ?>">
+    <meta property="og:image" content="<?= h($image) ?>">
+    <meta property="og:image:alt" content="<?= h($imageAlt) ?>">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="<?= h($fullTitle) ?>">
+    <meta name="twitter:description" content="<?= h($description) ?>">
+    <meta name="twitter:image" content="<?= h($image) ?>">
+    <meta name="twitter:image:alt" content="<?= h($imageAlt) ?>">
+    <link rel="canonical" href="<?= h($canonical) ?>">
     <link rel="icon" href="/Saltcoats Victoria FC -White_Transparent.png">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/all.min.css" rel="stylesheet">

@@ -14,6 +14,7 @@ declare(strict_types=1);
 // Admin:                /shop_*.php      (hub admin, "Shop" nav section)
 
 require_once __DIR__ . '/functions.php';
+require_once __DIR__ . '/mailer.php';
 require_once __DIR__ . '/stripe.php';
 
 const SHOP_CURRENCY = 'gbp';
@@ -230,6 +231,20 @@ function shop_ensure_schema(PDO $pdo): void
         CONSTRAINT fk_shop_order_items_product FOREIGN KEY (product_id) REFERENCES shop_products (id) ON DELETE SET NULL
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 
+    // Delivery (added after shop_orders shipped — off by default, toggled in
+    // shop_settings). fulfilment_method/collection_point already existed but
+    // were never actually set to anything but 'collection'.
+    $orderColumns = [];
+    foreach ($pdo->query('SHOW COLUMNS FROM shop_orders') as $row) {
+        $orderColumns[(string) $row['Field']] = true;
+    }
+    if (!isset($orderColumns['delivery_fee'])) {
+        $pdo->exec("ALTER TABLE shop_orders ADD COLUMN delivery_fee DECIMAL(10,2) NOT NULL DEFAULT 0.00 AFTER collection_point");
+    }
+    if (!isset($orderColumns['delivery_address'])) {
+        $pdo->exec("ALTER TABLE shop_orders ADD COLUMN delivery_address TEXT NULL AFTER delivery_fee");
+    }
+
     shop_seed_defaults($pdo);
 }
 
@@ -243,6 +258,8 @@ function shop_seed_defaults(PDO $pdo): void
         'collection_point'    => SHOP_COLLECTION_POINT_DEFAULT,
         'collection_details'  => 'You will be emailed as soon as your order is ready to collect from Campbell Park. Please bring your order confirmation.',
         'delivery_note'       => 'Collection only — there is no delivery option for this shop. All orders are collected from ' . SHOP_COLLECTION_POINT_DEFAULT . '.',
+        'delivery_enabled'    => '0',
+        'delivery_fee'        => '3.50',
         'lead_time'           => SHOP_LEAD_TIME_DEFAULT,
         'preorder_close_at'   => SHOP_PREORDER_CLOSE_DEFAULT,
         'preorder_intro'      => 'Pre-order now and pay today. Orders close on 14 September 2026, after which the full order is placed with VSN. '
@@ -388,6 +405,16 @@ function shop_save_setting(PDO $pdo, string $key, string $value): void
 function shop_is_enabled(PDO $pdo): bool
 {
     return shop_setting($pdo, 'shop_enabled', '1') === '1';
+}
+
+function shop_delivery_enabled(PDO $pdo): bool
+{
+    return shop_setting($pdo, 'delivery_enabled', '0') === '1';
+}
+
+function shop_delivery_fee(PDO $pdo): float
+{
+    return max(0.0, round((float) shop_setting($pdo, 'delivery_fee', '0.00'), 2));
 }
 
 /* -------------------------------------------------------------------------
@@ -1145,13 +1172,26 @@ function shop_create_order(PDO $pdo, array $customer, array $lines, array $meta 
 
     $discount = shop_validate_discount($pdo, (string) ($meta['discount_code'] ?? ''), $subtotal);
     $discountAmount = $discount['ok'] ? $discount['amount'] : 0.0;
-    $total = round(max(0.0, $subtotal - $discountAmount), 2);
+
+    // Delivery only ever applies if the setting is actually on — even if a
+    // stale/tampered form posts fulfilment_method=delivery while it's off,
+    // the order is still created as a collection with no fee.
+    $wantsDelivery = (string) ($meta['fulfilment_method'] ?? 'collection') === 'delivery';
+    $fulfilmentMethod = $wantsDelivery && shop_delivery_enabled($pdo) ? 'delivery' : 'collection';
+    $deliveryAddress = $fulfilmentMethod === 'delivery' ? trim((string) ($meta['delivery_address'] ?? '')) : '';
+    if ($fulfilmentMethod === 'delivery' && $deliveryAddress === '') {
+        throw new RuntimeException('A delivery address is required.');
+    }
+    $deliveryFee = $fulfilmentMethod === 'delivery' ? shop_delivery_fee($pdo) : 0.0;
+
+    $total = round(max(0.0, $subtotal - $discountAmount) + $deliveryFee, 2);
 
     $collectionPoint = shop_setting($pdo, 'collection_point', SHOP_COLLECTION_POINT_DEFAULT);
     $lead = shop_setting($pdo, 'lead_time', SHOP_LEAD_TIME_DEFAULT);
+    $fulfilmentNote = $fulfilmentMethod === 'delivery' ? 'Deliver to customer address.' : 'Collect from ' . $collectionPoint . '.';
     $batchNote = $isPreorder
-        ? 'Pre-order — placed with VSN after orders close 14 September 2026, then allow ' . $lead . '. Collect from ' . $collectionPoint . '.'
-        : 'Collect from ' . $collectionPoint . '.';
+        ? 'Pre-order — placed with VSN after orders close 14 September 2026, then allow ' . $lead . '. ' . $fulfilmentNote
+        : $fulfilmentNote;
 
     $pdo->beginTransaction();
     try {
@@ -1160,11 +1200,11 @@ function shop_create_order(PDO $pdo, array $customer, array $lines, array $meta 
         $pdo->prepare('INSERT INTO shop_orders
             (order_ref, access_token, customer_name, customer_email, customer_phone, status, subtotal,
              discount_code, discount_total, total, currency, is_preorder, fulfilment_method, collection_point,
-             batch_note, customer_note, marketing_opt_in, terms_accepted_at)
+             delivery_fee, delivery_address, batch_note, customer_note, marketing_opt_in, terms_accepted_at)
             VALUES
             (:ref, :token, :name, :email, :phone, \'pending_payment\', :subtotal,
-             :discount_code, :discount_total, :total, \'GBP\', :is_preorder, \'collection\', :collection_point,
-             :batch_note, :note, :marketing, :terms_at)')
+             :discount_code, :discount_total, :total, \'GBP\', :is_preorder, :fulfilment_method, :collection_point,
+             :delivery_fee, :delivery_address, :batch_note, :note, :marketing, :terms_at)')
             ->execute([
                 ':ref' => $ref,
                 ':token' => $token,
@@ -1176,7 +1216,10 @@ function shop_create_order(PDO $pdo, array $customer, array $lines, array $meta 
                 ':discount_total' => $discountAmount,
                 ':total' => $total,
                 ':is_preorder' => $isPreorder ? 1 : 0,
+                ':fulfilment_method' => $fulfilmentMethod,
                 ':collection_point' => $collectionPoint,
+                ':delivery_fee' => $deliveryFee,
+                ':delivery_address' => $deliveryAddress !== '' ? $deliveryAddress : null,
                 ':batch_note' => $batchNote,
                 ':note' => trim((string) ($customer['note'] ?? '')) ?: null,
                 ':marketing' => !empty($customer['marketing_opt_in']) ? 1 : 0,
@@ -1200,6 +1243,21 @@ function shop_create_order(PDO $pdo, array $customer, array $lines, array $meta 
                 ':quantity' => $qty,
                 ':line_total' => round((float) $line['unit_price'] * $qty, 2),
                 ':is_preorder' => !empty($line['is_preorder']) ? 1 : 0,
+            ]);
+        }
+
+        if ($deliveryFee > 0) {
+            $itemStmt->execute([
+                ':order_id' => $orderId,
+                ':product_id' => null,
+                ':product_name' => 'Delivery',
+                ':options_label' => '',
+                ':options_json' => '[]',
+                ':base_price' => $deliveryFee,
+                ':unit_price' => $deliveryFee,
+                ':quantity' => 1,
+                ':line_total' => $deliveryFee,
+                ':is_preorder' => 0,
             ]);
         }
 
@@ -1568,14 +1626,7 @@ function shop_send_mail(string $toEmail, string $subject, string $html): bool
     if (!filter_var($toEmail, FILTER_VALIDATE_EMAIL)) {
         return false;
     }
-    $host = preg_replace('/^www\./', '', preg_replace('/:\d+$/', '', strtolower((string) ($_SERVER['HTTP_HOST'] ?? 'myclubhub.co.uk'))));
-    $fromAddress = 'no-reply@' . ($host !== '' ? $host : 'myclubhub.co.uk');
-    $headers = implode("\r\n", [
-        'MIME-Version: 1.0',
-        'Content-Type: text/html; charset=UTF-8',
-        'From: Saltcoats Victoria FC Club Shop <' . $fromAddress . '>',
-    ]);
-    return (bool) @mail($toEmail, $subject, $html, $headers, '-f' . $fromAddress);
+    return hub_send_mail($toEmail, $subject, $html, true);
 }
 
 function shop_order_items_email_rows(array $items): string
@@ -1622,23 +1673,32 @@ function shop_send_confirmation_email(PDO $pdo, int $orderId, bool $force = fals
 
     $timeline = '';
     if ((int) $order['is_preorder'] === 1) {
+        $preorderFulfilmentLine = (string) ($order['fulfilment_method'] ?? 'collection') === 'delivery'
+            ? 'Your order will be delivered once ready.'
+            : 'All orders are collected from <strong>' . h($collectionPoint) . '</strong> — there is no delivery option.';
         $timeline = '<div style="margin:18px 0;padding:16px 18px;border-radius:12px;background:#fff4e5;color:#7a4a06;font-size:14px;line-height:1.6;">
             <strong>This is a pre-order.</strong><br>
             Kit pre-orders close on <strong>14 September 2026</strong>. After that date the full club order is placed with VSN.
             VSN manufacturing then typically takes <strong>' . h($lead) . '</strong>.<br>
-            All orders are collected from <strong>' . h($collectionPoint) . '</strong> — there is no delivery option.
-            We will email you as soon as your order is ready to collect.
+            ' . $preorderFulfilmentLine . '
+            We will email you as soon as your order is ready.
         </div>';
     }
+
+    $isDelivery = (string) ($order['fulfilment_method'] ?? 'collection') === 'delivery';
+    $fulfilmentBlock = $isDelivery
+        ? '<div style="margin:18px 0 0;padding:16px 18px;border-radius:12px;background:#f6ecde;color:#3c2f34;font-size:14px;line-height:1.6;">
+            <strong>Delivery</strong><br>' . nl2br(h((string) ($order['delivery_address'] ?? ''))) . '</div>'
+        : '<div style="margin:18px 0 0;padding:16px 18px;border-radius:12px;background:#f6ecde;color:#3c2f34;font-size:14px;line-height:1.6;">
+            <strong>Collection</strong><br>' . h($collectionPoint)
+        . ($collectionDetails !== '' ? '<br>' . h($collectionDetails) : '') . '</div>';
 
     $body = '<p style="margin:0 0 16px;font-size:16px;line-height:1.55;">Hi ' . h((string) $order['customer_name']) . ',</p>'
         . '<p style="margin:0 0 20px;font-size:16px;line-height:1.55;color:#4a4046;">Thanks for your order. We\'ve received your payment in full. Here are the details for <strong>' . h((string) $order['order_ref']) . '</strong>.</p>'
         . '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;margin:0 0 12px;">' . $summaryRows . '</table>'
         . '<p style="margin:0 0 4px;color:#4b0818;font-size:18px;font-weight:900;">Total paid: ' . h(gbp((float) $order['total'])) . '</p>'
         . $timeline
-        . '<div style="margin:18px 0 0;padding:16px 18px;border-radius:12px;background:#f6ecde;color:#3c2f34;font-size:14px;line-height:1.6;">
-            <strong>Collection</strong><br>' . h($collectionPoint)
-        . ($collectionDetails !== '' ? '<br>' . h($collectionDetails) : '') . '</div>';
+        . $fulfilmentBlock;
 
     $subject = 'Your Saltcoats Victoria FC Club Shop order ' . (string) $order['order_ref'];
     $html = shop_email_wrapper($subject, 'Your Club Shop order confirmation.', 'Order confirmed', (string) $order['order_ref'], $body);
@@ -1652,8 +1712,8 @@ function shop_send_confirmation_email(PDO $pdo, int $orderId, bool $force = fals
 
 function shop_send_admin_notification(PDO $pdo, int $orderId): void
 {
-    $to = trim(shop_setting($pdo, 'contact_email', ''));
-    if ($to === '' || !filter_var($to, FILTER_VALIDATE_EMAIL)) {
+    $recipients = function_exists('stripe_notification_recipients') ? stripe_notification_recipients($pdo) : [];
+    if ($recipients === []) {
         return;
     }
     $order = shop_get_order($pdo, $orderId);
@@ -1661,13 +1721,21 @@ function shop_send_admin_notification(PDO $pdo, int $orderId): void
         return;
     }
     $items = shop_order_items($pdo, $orderId);
+    $isDelivery = (string) ($order['fulfilment_method'] ?? 'collection') === 'delivery';
+    $deliveryLine = $isDelivery
+        ? '<p style="margin:0 0 12px;font-size:14px;color:#7a4a06;font-weight:700;">Deliver to: ' . nl2br(h((string) ($order['delivery_address'] ?? ''))) . '</p>'
+        : '';
     $body = '<p style="margin:0 0 12px;font-size:15px;">New paid Club Shop order <strong>' . h((string) $order['order_ref']) . '</strong>.</p>'
         . '<p style="margin:0 0 12px;font-size:14px;color:#4a4046;">'
         . h((string) $order['customer_name']) . ' &middot; ' . h((string) $order['customer_email'])
         . ($order['customer_phone'] ? ' &middot; ' . h((string) $order['customer_phone']) : '') . '</p>'
+        . $deliveryLine
         . '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;">'
         . shop_order_items_email_rows($items) . '</table>'
         . '<p style="margin:12px 0 0;font-weight:900;color:#4b0818;">Total paid: ' . h(gbp((float) $order['total'])) . '</p>';
     $subject = '[Club Shop] New order ' . (string) $order['order_ref'] . ' — ' . gbp((float) $order['total']);
-    shop_send_mail($to, $subject, shop_email_wrapper($subject, 'New Club Shop order.', 'New order', (string) $order['order_ref'], $body));
+    $html = shop_email_wrapper($subject, 'New Club Shop order.', 'New order', (string) $order['order_ref'], $body);
+    foreach ($recipients as $to) {
+        shop_send_mail($to, $subject, $html);
+    }
 }

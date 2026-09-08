@@ -165,8 +165,13 @@ function shop_status_badge(string $status): string
                 <p class="mb-1"><?= h((string) $order['customer_phone']) ?></p>
                 <p class="mb-0 small text-muted">Marketing opt-in: <?= (int) $order['marketing_opt_in'] === 1 ? 'yes' : 'no' ?></p>
                 <hr>
-                <p class="mb-1 small"><strong>Fulfilment:</strong> Collection only</p>
-                <p class="mb-0 small"><strong>Collection point:</strong> <?= h((string) $order['collection_point']) ?></p>
+                <?php if ((string) ($order['fulfilment_method'] ?? 'collection') === 'delivery'): ?>
+                    <p class="mb-1 small"><strong>Fulfilment:</strong> <span class="badge bg-info text-dark">Delivery</span> — fee charged: £<?= h(number_format((float) ($order['delivery_fee'] ?? 0), 2)) ?></p>
+                    <p class="mb-0 small"><strong>Delivery address:</strong><br><span style="white-space:pre-line"><?= h((string) ($order['delivery_address'] ?? '')) ?></span></p>
+                <?php else: ?>
+                    <p class="mb-1 small"><strong>Fulfilment:</strong> Collection only</p>
+                    <p class="mb-0 small"><strong>Collection point:</strong> <?= h((string) $order['collection_point']) ?></p>
+                <?php endif; ?>
                 <?php if (($order['batch_note'] ?? '') !== ''): ?><p class="mb-0 small text-muted mt-1"><?= h((string) $order['batch_note']) ?></p><?php endif; ?>
                 <p class="mt-2 mb-0 small"><a href="/shop/order/<?= h((string) $order['access_token']) ?>" target="_blank" rel="noopener">Customer confirmation page ↗</a></p>
             </section>

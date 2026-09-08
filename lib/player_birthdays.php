@@ -78,7 +78,7 @@ function players_birthday_role_label(?string $roleCodes, ?string $positionNames)
         }
     }
 
-    return 'person';
+    return 'supporter';
 }
 
 function players_birthdays_table_exists(PDO $pdo, string $table): bool
@@ -137,7 +137,7 @@ function players_all_birthdays(PDO $pdo, int $limit = 0): array
             WHERE p.is_active = 1
               AND p.date_of_birth IS NOT NULL
               AND p.date_of_birth <> '0000-00-00'
-            GROUP BY p.id
+            GROUP BY p.id, p.display_name, p.date_of_birth
             ORDER BY p.display_name ASC
         ");
 

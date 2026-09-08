@@ -71,6 +71,15 @@ $statusKey = isset($_GET['status']) && is_string($_GET['status']) ? $_GET['statu
 $statusMessage = $statusMessages[$statusKey] ?? '';
 
 $positions = getHubPositions($pdo);
+$positionsByDepartment = array_fill_keys(array_keys(HUB_POSITION_DEPARTMENTS), []);
+foreach ($positions as $position) {
+    $department = (string) ($position['department'] ?? 'other');
+    if (!array_key_exists($department, HUB_POSITION_DEPARTMENTS)) {
+        $department = 'other';
+    }
+    $positionsByDepartment[$department][] = $position;
+}
+
 $holderCounts = [];
 foreach ($pdo->query('SELECT position_id, COUNT(*) AS c FROM person_positions GROUP BY position_id') as $row) {
     $holderCounts[(int) $row['position_id']] = (int) $row['c'];
@@ -97,64 +106,77 @@ foreach ($pdo->query('SELECT position_id, COUNT(*) AS c FROM person_positions GR
         <div class="hub-local-actions"><button class="btn btn-brand" type="button" id="addPositionBtn" data-bs-toggle="modal" data-bs-target="#positionEditorModal"><i class="fa-solid fa-plus me-1" aria-hidden="true"></i>Add position</button></div>
     </div>
 
-    <div class="card shadow-sm border-0 hub-table-card">
-        <div class="table-responsive">
-            <table class="table table-striped hub-data-table align-middle mb-0">
-                <thead>
-                    <tr>
-                        <th>Position</th>
-                        <th>Department</th>
-                        <th>Capabilities</th>
-                        <th>People</th>
-                        <th class="text-end">Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php foreach ($positions as $position): ?>
-                        <?php $caps = hub_position_capabilities($position); ?>
-                        <tr>
-                            <td><?= htmlspecialchars((string) $position['name'], ENT_QUOTES, 'UTF-8') ?></td>
-                            <td><?= htmlspecialchars(HUB_POSITION_DEPARTMENTS[(string) ($position['department'] ?? 'other')] ?? 'Other Roles', ENT_QUOTES, 'UTF-8') ?></td>
-                            <td>
-                                <?php if ($caps === []): ?>
-                                    <span class="text-muted">None yet</span>
-                                <?php else: ?>
-                                    <?php foreach ($caps as $cap): ?>
-                                        <span class="badge text-bg-secondary me-1"><?= htmlspecialchars(HUB_CAPABILITIES[$cap] ?? $cap, ENT_QUOTES, 'UTF-8') ?></span>
-                                    <?php endforeach; ?>
-                                <?php endif; ?>
-                            </td>
-                            <td><?= (int) ($holderCounts[(int) $position['id']] ?? 0) ?></td>
-                            <td class="text-end">
-                                <div class="d-inline-flex gap-2 hub-actions hub-actions--end">
-                                    <button
-                                        type="button"
-                                        class="btn btn-sm btn-outline-primary js-edit-position"
-                                        data-bs-toggle="modal"
-                                        data-bs-target="#positionEditorModal"
-                                        data-position="<?= htmlspecialchars(json_encode([
-                                            'id' => (int) $position['id'],
-                                            'name' => (string) $position['name'],
-                                            'department' => (string) ($position['department'] ?? 'other'),
-                                            'capabilities' => $caps,
-                                        ], JSON_UNESCAPED_SLASHES), ENT_QUOTES, 'UTF-8') ?>"
-                                        title="Edit position"
-                                    ><i class="fa-solid fa-pen" aria-hidden="true"></i></button>
-                                    <?php if (($holderCounts[(int) $position['id']] ?? 0) === 0): ?>
-                                        <form method="post" data-confirm="This cannot be undone." data-confirm-title="Delete this position?" data-confirm-action="Delete">
-                                            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(hub_auth_csrf_token(), ENT_QUOTES, 'UTF-8') ?>">
-                                            <input type="hidden" name="action" value="delete">
-                                            <input type="hidden" name="position_id" value="<?= (int) $position['id'] ?>">
-                                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete position"><i class="fa-solid fa-trash" aria-hidden="true"></i></button>
-                                        </form>
-                                    <?php endif; ?>
-                                </div>
-                            </td>
-                        </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
-        </div>
+    <div class="d-grid gap-4">
+        <?php foreach (HUB_POSITION_DEPARTMENTS as $departmentKey => $departmentLabel): ?>
+            <?php $departmentPositions = $positionsByDepartment[$departmentKey] ?? []; ?>
+            <div class="card shadow-sm border-0 hub-table-card">
+                <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center gap-2 px-4 pt-4 pb-2">
+                    <h3 class="h5 mb-0"><?= htmlspecialchars($departmentLabel, ENT_QUOTES, 'UTF-8') ?></h3>
+                    <span class="badge text-bg-light"><?= count($departmentPositions) ?> position<?= count($departmentPositions) === 1 ? '' : 's' ?></span>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-striped hub-data-table align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>Position</th>
+                                <th>Capabilities</th>
+                                <th>People</th>
+                                <th class="text-end">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php if ($departmentPositions === []): ?>
+                                <tr>
+                                    <td colspan="4" class="text-muted">No positions in this department yet.</td>
+                                </tr>
+                            <?php else: ?>
+                                <?php foreach ($departmentPositions as $position): ?>
+                                    <?php $caps = hub_position_capabilities($position); ?>
+                                    <tr>
+                                        <td><?= htmlspecialchars((string) $position['name'], ENT_QUOTES, 'UTF-8') ?></td>
+                                        <td>
+                                            <?php if ($caps === []): ?>
+                                                <span class="text-muted">None yet</span>
+                                            <?php else: ?>
+                                                <?php foreach ($caps as $cap): ?>
+                                                    <span class="badge text-bg-secondary me-1"><?= htmlspecialchars(HUB_CAPABILITIES[$cap] ?? $cap, ENT_QUOTES, 'UTF-8') ?></span>
+                                                <?php endforeach; ?>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td><?= (int) ($holderCounts[(int) $position['id']] ?? 0) ?></td>
+                                        <td class="text-end">
+                                            <div class="d-inline-flex gap-2 hub-actions hub-actions--end">
+                                                <button
+                                                    type="button"
+                                                    class="btn btn-sm btn-outline-primary js-edit-position"
+                                                    data-bs-toggle="modal"
+                                                    data-bs-target="#positionEditorModal"
+                                                    data-position="<?= htmlspecialchars(json_encode([
+                                                        'id' => (int) $position['id'],
+                                                        'name' => (string) $position['name'],
+                                                        'department' => (string) ($position['department'] ?? 'other'),
+                                                        'capabilities' => $caps,
+                                                    ], JSON_UNESCAPED_SLASHES), ENT_QUOTES, 'UTF-8') ?>"
+                                                    title="Edit position"
+                                                ><i class="fa-solid fa-pen" aria-hidden="true"></i></button>
+                                                <?php if (($holderCounts[(int) $position['id']] ?? 0) === 0): ?>
+                                                    <form method="post" data-confirm="This cannot be undone." data-confirm-title="Delete this position?" data-confirm-action="Delete">
+                                                        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(hub_auth_csrf_token(), ENT_QUOTES, 'UTF-8') ?>">
+                                                        <input type="hidden" name="action" value="delete">
+                                                        <input type="hidden" name="position_id" value="<?= (int) $position['id'] ?>">
+                                                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete position"><i class="fa-solid fa-trash" aria-hidden="true"></i></button>
+                                                    </form>
+                                                <?php endif; ?>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        <?php endforeach; ?>
     </div>
 </div>
 

@@ -26,12 +26,25 @@ $products = $shopEnabled ? shop_get_products($pdo, $productFilters) : [];
 
 $basketCount = shop_basket_count();
 
+// Use the first available catalogue photograph for the shared shop link.
+$previewImage = '';
+$previewAlt = '';
+foreach ($products as $previewProduct) {
+    $previewImage = trim((string) ($previewProduct['image_path'] ?? ''));
+    if ($previewImage !== '') {
+        $previewAlt = (string) $previewProduct['name'];
+        break;
+    }
+}
+
 shop_layout_top([
     'title' => 'Club Shop',
     'description' => (string) ($settings['shop_intro'] ?? 'Official Saltcoats Victoria FC merchandise.'),
     'active' => 'home',
     'basket_count' => $basketCount,
     'canonical' => stripe_public_base_url() . '/shop/',
+    'product_image' => $previewImage,
+    'image_alt' => $previewAlt,
 ]);
 ?>
 <section class="shop-hero">

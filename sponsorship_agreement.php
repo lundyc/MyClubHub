@@ -260,6 +260,7 @@ if($id===0&&$scopeForNew==='match'){
   <div class="col-md-4"><label class="form-label">Package</label><select class="form-select" name="package_id" onchange="document.getElementById('newAgreementSelectForm').submit()"><option value="">Select package</option><?php foreach($packages as $p): ?><option value="<?= (int)$p['id'] ?>" <?= $packageIdForNew===(int)$p['id']?'selected':'' ?>><?= h((string)$p['category'].' · '.(string)$p['name']) ?></option><?php endforeach; ?></select></div>
   <div class="col-md-4"><label class="form-label">Season</label><select class="form-select" name="season_id" onchange="document.getElementById('newAgreementSelectForm').submit()"><option value="">No specific season</option><?php foreach($seasons as $s): ?><option value="<?= (int)$s['id'] ?>" <?= (int)$data['season_id']===(int)$s['id']?'selected':'' ?>><?= h((string)$s['name']) ?></option><?php endforeach; ?></select></div>
   <?php if($scopeForNew==='match'): ?>
+  <input type="hidden" name="home_only" value="0">
   <div class="col-12"><div class="form-check form-switch"><input class="form-check-input" type="checkbox" role="switch" id="homeOnlyToggle" name="home_only" value="1" <?= $homeOnly?'checked':'' ?> onchange="document.getElementById('newAgreementSelectForm').submit()"><label class="form-check-label" for="homeOnlyToggle">Home fixtures only</label></div></div>
   <?php endif; ?>
  </div></div>
@@ -391,13 +392,16 @@ if($id===0&&$scopeForNew==='match'){
   </div>
   <?php if($stripeLinks): ?>
   <div class="table-responsive mt-3"><table class="table table-sm hub-data-table align-middle mb-0"><thead><tr><th>Created</th><th>Amount</th><th>Status</th><th>Sent to</th><th>Expires</th><th></th></tr></thead><tbody>
-   <?php foreach($stripeLinks as $l): ?><tr>
+   <?php foreach($stripeLinks as $l): ?><?php
+    $linkStatus=(string)$l['status'];
+    if($linkStatus!=='complete')$linkStatus=stripe_payment_link_public_expires_at($l)>time()?'open':'expired';
+   ?><tr>
     <td><?= h(date('d/m/Y H:i',strtotime((string)$l['created_at']))) ?></td>
     <td><?= gbp((float)$l['amount']) ?></td>
-    <td><span class="badge bg-<?= $l['status']==='complete'?'success':($l['status']==='expired'?'secondary':'warning text-dark') ?>"><?= h(ucfirst((string)$l['status'])) ?></span></td>
+    <td><span class="badge bg-<?= $linkStatus==='complete'?'success':($linkStatus==='expired'?'secondary':'warning text-dark') ?>"><?= h(ucfirst($linkStatus)) ?></span></td>
     <td><?= h((string)($l['sent_to_email'] ?: '—')) ?></td>
-    <td><?= h(date('d/m/Y H:i',strtotime((string)$l['expires_at']))) ?></td>
-    <td class="text-end"><?php if($l['status']==='open'): ?><button type="button" class="btn btn-sm btn-outline-danger stripe-cancel-link-btn" data-link-id="<?= (int)$l['id'] ?>" data-bundle-link="<?= !empty($l['is_bundle_link'])?'1':'0' ?>">Cancel</button><?php endif; ?></td>
+    <td><?= h(date('d/m/Y H:i',stripe_payment_link_public_expires_at($l))) ?></td>
+    <td class="text-end"><?php if($linkStatus==='open'): ?><div class="hub-actions hub-actions--end"><button type="button" class="btn btn-sm btn-outline-secondary stripe-copy-existing-link-btn" data-url="<?= h(stripe_payment_link_public_url($l)) ?>">Copy URL</button><button type="button" class="btn btn-sm btn-outline-danger stripe-cancel-link-btn" data-link-id="<?= (int)$l['id'] ?>" data-bundle-link="<?= !empty($l['is_bundle_link'])?'1':'0' ?>">Cancel</button></div><?php endif; ?></td>
    </tr><?php endforeach; ?>
   </tbody></table></div>
   <?php endif; ?>
@@ -501,6 +505,27 @@ if($id===0&&$scopeForNew==='match'){
       sendBtn.disabled=false;
       sendBtn.textContent=original;
     }
+  });
+
+  document.querySelectorAll('.stripe-copy-existing-link-btn').forEach((btn)=>{
+    btn.addEventListener('click',async()=>{
+      const url=btn.dataset.url||'';
+      if(!url){setStatus('No URL found for this payment link.','danger');return;}
+      try{
+        await navigator.clipboard.writeText(url);
+      }catch(error){
+        const fallback=document.createElement('textarea');
+        fallback.value=url;
+        fallback.setAttribute('readonly','');
+        fallback.style.position='fixed';
+        fallback.style.left='-9999px';
+        document.body.appendChild(fallback);
+        fallback.select();
+        document.execCommand('copy');
+        fallback.remove();
+      }
+      setStatus('Link copied to clipboard.','success');
+    });
   });
 
   document.querySelectorAll('.stripe-cancel-link-btn').forEach((btn)=>{

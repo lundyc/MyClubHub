@@ -165,6 +165,7 @@ function hidden_team_stripe_handle_checkout_completed(PDO $pdo, array $session):
     $paymentIntentId = (string) ($session['payment_intent'] ?? '');
     $person = getPerson($pdo, $personId);
     $holderName = (string) ($person['display_name'] ?? 'Member');
+    $totalPaid = 0.0;
 
     $pdo->beginTransaction();
     try {
@@ -178,6 +179,7 @@ function hidden_team_stripe_handle_checkout_completed(PDO $pdo, array $session):
             $claimed = $pdo->prepare("UPDATE hidden_team_teams SET person_id = :person, supporter_name = :name, is_taken = 1, paid = 1, claimed_at = NOW() WHERE id = :id AND is_taken = 0");
             $claimed->execute([':person' => $personId, ':name' => $holderName, ':id' => $teamId]);
             $wonTheRace = $claimed->rowCount() === 1;
+            $totalPaid += (float) $team['cost_per_team'];
 
             // Each team can only ever hold one claimant (unlike sponsorships,
             // which allow several historical agreement rows per slot) — if
@@ -225,6 +227,16 @@ function hidden_team_stripe_handle_checkout_completed(PDO $pdo, array $session):
     foreach (array_keys($gameIdsToCheck) as $gameId) {
         hiddenTeamMaybeAutoDrawIfSoldOut($pdo, $gameId);
     }
+
+    stripe_send_payment_notification(
+        $pdo,
+        'Hidden team',
+        $holderName,
+        (string) ($person['email'] ?? ''),
+        $totalPaid,
+        'Hidden team basket - session ' . $sessionId,
+        stripe_public_base_url() . '/hidden_team_games.php'
+    );
 }
 
 /**

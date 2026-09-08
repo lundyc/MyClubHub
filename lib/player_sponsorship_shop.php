@@ -11,6 +11,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/sponsorship_catalog.php';
 require_once __DIR__ . '/season.php';
 require_once __DIR__ . '/stripe.php';
+require_once __DIR__ . '/mailer.php';
 
 /**
  * Idempotent schema guard, same CREATE TABLE IF NOT EXISTS idiom as
@@ -541,6 +542,15 @@ function player_sponsorship_shop_stripe_handle_checkout_completed(PDO $pdo, arra
 
     sendPlayerSponsorshipReceiptEmail($pdo, $orderId);
     sendPlayerSponsorshipThankyouEmail($pdo, $orderId);
+    stripe_send_payment_notification(
+        $pdo,
+        'Player sponsorship shop',
+        (string) ($order['buyer_name'] ?? ''),
+        (string) ($order['buyer_email'] ?? ''),
+        (float) ($order['total_amount'] ?? 0),
+        'Player sponsorship order #' . $orderId,
+        stripe_public_base_url() . '/playersponsors_orders.php?id=' . $orderId
+    );
 }
 
 /**
@@ -576,14 +586,7 @@ function player_sponsorship_shop_email_wrapper(string $subject, string $preheade
 
 function player_sponsorship_shop_send_mail(string $toEmail, string $subject, string $html): bool
 {
-    $host = preg_replace('/^www\./', '', preg_replace('/:\d+$/', '', strtolower((string) ($_SERVER['HTTP_HOST'] ?? 'lundy.me.uk'))));
-    $fromAddress = 'no-reply@' . ($host !== '' ? $host : 'lundy.me.uk');
-    $headers = implode("\r\n", [
-        'MIME-Version: 1.0',
-        'Content-Type: text/html; charset=UTF-8',
-        'From: Saltcoats Victoria FC <' . $fromAddress . '>',
-    ]);
-    return (bool) @mail($toEmail, $subject, $html, $headers, '-f' . $fromAddress);
+    return hub_send_mail($toEmail, $subject, $html, true);
 }
 
 /**

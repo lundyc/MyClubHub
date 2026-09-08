@@ -88,6 +88,8 @@ shop_layout_top([
     'active' => '',
     'basket_count' => shop_basket_count(),
     'canonical' => stripe_public_base_url() . '/shop/p/' . rawurlencode((string) $product['slug']),
+    'product_image' => $mainImg,
+    'image_alt' => (string) $product['name'],
 ]);
 ?>
 <nav class="shop-breadcrumb" aria-label="Breadcrumb">

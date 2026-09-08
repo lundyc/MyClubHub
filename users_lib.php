@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/auth.php';
+require_once __DIR__ . '/lib/mailer.php';
 
 const HUB_RESET_TOKEN_TTL = 3600;
 
@@ -156,12 +157,6 @@ function hub_users_send_password_reset_email(array $user, string $resetUrl): boo
     }
 
     $subject = 'Reset your Hub password';
-    $fromAddress = 'no-reply@' . preg_replace('/^www\./', '', preg_replace('/:\d+$/', '', strtolower((string) ($_SERVER['HTTP_HOST'] ?? 'lundy.me.uk'))));
-    $headers = implode("\r\n", [
-        'MIME-Version: 1.0',
-        'Content-Type: text/plain; charset=UTF-8',
-        'From: Hub <' . $fromAddress . '>',
-    ]);
     $message = implode("\n", [
         'You requested a password reset for Hub.',
         '',
@@ -171,7 +166,7 @@ function hub_users_send_password_reset_email(array $user, string $resetUrl): boo
         'This link expires in ' . (int) (HUB_RESET_TOKEN_TTL / 60) . ' minutes.',
     ]);
 
-    return @mail($to, $subject, $message, $headers, '-f' . $fromAddress);
+    return hub_send_mail($to, $subject, $message, false);
 }
 
 function hub_users_issue_password_reset(string $login): array

@@ -23,21 +23,19 @@ $filters=[
  'from'=>trim((string)($_GET['from']??'')),
  'to'=>trim((string)($_GET['to']??'')),
 ];
-$transactions=stripe_get_transactions($pdo,$filters);
-$summary=stripe_dashboard_summary($pdo);
+$transactions=stripe_get_all_transactions($pdo,$filters);
+$allSummary=stripe_all_payments_summary($pdo,$filters);
 $seasons=$pdo->query('SELECT id,name FROM seasons ORDER BY start_date DESC,id DESC')->fetchAll(PDO::FETCH_ASSOC);
 $statusLabels=['succeeded'=>'Paid','refunded'=>'Refunded','partially_refunded'=>'Partially refunded'];
 $statusTones=['succeeded'=>'text-bg-success','refunded'=>'text-bg-secondary','partially_refunded'=>'text-bg-warning'];
 ?>
 <?php if(!stripe_is_configured()): ?><div class="alert alert-warning">Stripe is not configured yet. Add a secret key under <a href="settings.php?tab=payments">Settings &gt; Payments</a> to start generating payment links.</div><?php endif; ?>
 <?php hub_render_metric_grid([
- ['label'=>'Collected via Stripe','value'=>gbp($summary['collected']),'meta'=>'Net of refunds','icon'=>'fa-sterling-sign','tone'=>'success'],
- ['label'=>'Pending links','value'=>$summary['pending_links'],'meta'=>'Open, not yet paid','icon'=>'fa-link','tone'=>'warning'],
- ['label'=>'Expired links','value'=>$summary['expired_links'],'meta'=>'Never completed','icon'=>'fa-clock','tone'=>'neutral'],
- ['label'=>'Refunded','value'=>gbp($summary['refunded']),'meta'=>'Lifetime total','icon'=>'fa-rotate-left','tone'=>'danger'],
+ ['label'=>'All Stripe collected','value'=>gbp($allSummary['collected']),'meta'=>$allSummary['payments'].' payment'.((int)$allSummary['payments']===1?'':'s').' in this view','icon'=>'fa-sterling-sign','tone'=>'success'],
+ ['label'=>'All Stripe refunded','value'=>gbp($allSummary['refunded']),'meta'=>'Across tickets, shop and sponsorships','icon'=>'fa-rotate-left','tone'=>'danger'],
 ], 'Stripe summary'); ?>
 <div class="hub-section-commandbar">
- <div><h2>Transaction history</h2><p>Every Stripe payment recorded against a sponsorship agreement.</p></div>
+ <div><h2>Transaction history</h2><p>All Stripe payments recorded in Hub, including season tickets, match tickets, shop orders and sponsorships.</p></div>
 </div>
 <form class="card hub-list-card hub-form-card mb-4" method="get" aria-label="Filter Stripe transactions"><div class="card-body"><div class="row g-2">
  <div class="col-md-3"><label class="form-label" for="stripeStatusFilter">Status</label><select class="form-select" id="stripeStatusFilter" name="status"><option value="">All statuses</option><?php foreach($statusLabels as $v=>$l): ?><option value="<?= h($v) ?>" <?= $filters['status']===$v?'selected':'' ?>><?= h($l) ?></option><?php endforeach; ?></select></div>
@@ -47,26 +45,27 @@ $statusTones=['succeeded'=>'text-bg-success','refunded'=>'text-bg-secondary','pa
  <div class="col-md-2 d-grid"><button class="btn btn-brand">Filter</button></div>
 </div></div></form>
 <div class="card hub-list-card hub-table-card"><div class="card-body p-0"><div class="table-responsive"><table class="table align-middle hub-data-table hub-data-table--responsive"><caption class="visually-hidden">Stripe transactions</caption>
- <thead><tr><th>Date</th><th>Sponsor</th><th>Package</th><th>Amount</th><th>Status</th><th>Agreement</th><th></th></tr></thead><tbody>
+ <thead><tr><th>Date</th><th>Source</th><th>Customer</th><th>Details</th><th>Amount</th><th>Status</th><th>Record</th><th></th></tr></thead><tbody>
  <?php foreach($transactions as $t): ?>
  <tr>
   <td data-label="Date"><?= h(date('d/m/Y H:i',strtotime((string)$t['created_at']))) ?></td>
-  <td data-label="Sponsor" class="fw-semibold"><?= h((string)$t['sponsor_name']) ?></td>
-  <td data-label="Package"><?= h((string)$t['package_name']) ?></td>
+  <td data-label="Source"><span class="badge text-bg-light"><?= h((string)$t['source']) ?></span></td>
+  <td data-label="Customer" class="fw-semibold"><?= h((string)$t['customer_name']) ?><?php if(!empty($t['customer_email'])): ?><div class="small text-muted"><?= h((string)$t['customer_email']) ?></div><?php endif; ?></td>
+  <td data-label="Details"><?= h((string)$t['description']) ?></td>
   <td data-label="Amount"><?= gbp((float)$t['amount']) ?><?php if((float)$t['refunded_amount']>0): ?><div class="small text-muted"><?= gbp((float)$t['refunded_amount']) ?> refunded</div><?php endif; ?></td>
   <td data-label="Status"><span class="badge hub-status <?= h($statusTones[$t['status']]??'text-bg-light') ?>"><?= h($statusLabels[$t['status']]??ucfirst((string)$t['status'])) ?></span></td>
-  <td data-label="Agreement"><a href="sponsorship_agreement.php?id=<?= (int)$t['agreement_id'] ?>">Manage</a></td>
+  <td data-label="Record"><?php if(!empty($t['manage_url'])): ?><a href="<?= h((string)$t['manage_url']) ?>">Manage</a><?php else: ?>&mdash;<?php endif; ?></td>
   <td data-label="Actions" class="text-end">
-   <?php if(hub_auth_has_capability('finance')&&(float)$t['refunded_amount']<(float)$t['amount']-0.0001): ?>
+   <?php if(hub_auth_has_capability('finance')&&($t['source']??'')==='Sponsorship'&&!empty($t['local_transaction_id'])&&(float)$t['refunded_amount']<(float)$t['amount']-0.0001): ?>
    <button type="button" class="btn btn-sm btn-outline-danger stripe-refund-btn"
-     data-transaction-id="<?= (int)$t['id'] ?>"
+     data-transaction-id="<?= (int)$t['local_transaction_id'] ?>"
      data-remaining="<?= h(number_format((float)$t['amount']-(float)$t['refunded_amount'],2,'.','')) ?>"
-     data-sponsor="<?= h((string)$t['sponsor_name']) ?>">Refund</button>
+     data-sponsor="<?= h((string)$t['customer_name']) ?>">Refund</button>
    <?php endif; ?>
   </td>
  </tr>
  <?php endforeach; ?>
- <?php if(!$transactions): ?><tr><td colspan="7" class="hub-record-empty hub-empty-state">No Stripe transactions match these filters.</td></tr><?php endif; ?>
+ <?php if(!$transactions): ?><tr><td colspan="8" class="hub-record-empty hub-empty-state">No Stripe transactions match these filters.</td></tr><?php endif; ?>
  </tbody></table></div></div></div>
 
 <?php if(hub_auth_has_capability('finance')): ?>

@@ -99,6 +99,15 @@ function season_ticket_stripe_handle_checkout_completed(PDO $pdo, array $session
     foreach ($orders as $order) {
         markSeasonPassOrderPaid($pdo, (int) $order['id'], is_string($session['payment_intent'] ?? null) ? (string) $session['payment_intent'] : null);
         sendSeasonPassConfirmationIfNeeded($pdo, (int) $order['id'], false);
+        stripe_send_payment_notification(
+            $pdo,
+            'Season tickets',
+            (string) ($order['customer_name'] ?? $order['holder_name'] ?? ''),
+            (string) ($order['customer_email'] ?? $order['holder_email'] ?? ''),
+            (float) ($order['line_total'] ?? $order['total_amount'] ?? 0),
+            (string) ($order['type_name'] ?? 'Season ticket') . ' order #' . (int) $order['id'],
+            stripe_public_base_url() . '/season_ticket_orders.php?id=' . (int) $order['id']
+        );
     }
 }
 

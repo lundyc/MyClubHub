@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/people.php';
 require_once __DIR__ . '/season.php';
+require_once __DIR__ . '/mailer.php';
 
 function account_normalize_email(?string $email): ?string
 {
@@ -505,12 +506,6 @@ function issueAccountPasswordReset(PDO $pdo, string $email, string $resetPath): 
     $scheme = (!empty($_SERVER['HTTPS']) && strtolower((string) $_SERVER['HTTPS']) !== 'off') ? 'https' : 'http';
     $host = (string) ($_SERVER['HTTP_HOST'] ?? 'lundy.me.uk');
     $resetUrl = $scheme . '://' . $host . $resetPath . '?token=' . rawurlencode($token);
-    $fromAddress = 'no-reply@' . preg_replace('/^www\./', '', preg_replace('/:\d+$/', '', strtolower($host)));
-    $headers = implode("\r\n", [
-        'MIME-Version: 1.0',
-        'Content-Type: text/plain; charset=UTF-8',
-        'From: Saltcoats Victoria FC <' . $fromAddress . '>',
-    ]);
     $message = implode("\n", [
         'Hi ' . (string) $account['display_name'] . ',',
         '',
@@ -522,7 +517,7 @@ function issueAccountPasswordReset(PDO $pdo, string $email, string $resetPath): 
         'If you did not request this, you can ignore this email.',
     ]);
 
-    $sent = @mail((string) $account['email'], 'Set your Hub account password', $message, $headers, '-f' . $fromAddress);
+    $sent = hub_send_mail((string) $account['email'], 'Set your Hub account password', $message, false);
     if (!$sent) {
         return ['ok' => true, 'message' => 'Link generated. Email delivery is not configured, so use this link: ' . $resetUrl];
     }

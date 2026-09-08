@@ -3,8 +3,10 @@
 declare(strict_types=1);
 
 // PHASE3B_GUARD_MARKER
+$isCli = PHP_SAPI === 'cli';
+
 require_once __DIR__ . '/auth.php';
-if (!hub_auth_has_capability('content_social')) {
+if (!$isCli && !hub_auth_has_capability('content_social')) {
     http_response_code(403);
     exit('Access denied.');
 }
@@ -14,7 +16,6 @@ $cacheFile = __DIR__ . '/cache/wosfl_table.json';
 $exportFile = __DIR__ . '/export/latest_wosfl.png';
 $generatorScript = __DIR__ . '/generate_table_image.php';
 $historyFile = __DIR__ . '/logs/refresh_history.json';
-$isCli = PHP_SAPI === 'cli';
 
 /**
  * @return array<int, array<string, mixed>>

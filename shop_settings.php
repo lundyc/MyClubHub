@@ -16,6 +16,7 @@ $isAdmin = hub_auth_is_admin();
 const SHOP_SETTING_KEYS = [
     'shop_enabled', 'shop_name', 'shop_intro', 'contact_email',
     'collection_point', 'collection_details', 'delivery_note',
+    'delivery_enabled', 'delivery_fee',
     'lead_time', 'preorder_close_at', 'preorder_intro', 'terms',
 ];
 
@@ -28,8 +29,8 @@ if ($isAdmin && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     try {
         if ($action === 'save_settings') {
             foreach (SHOP_SETTING_KEYS as $key) {
-                if ($key === 'shop_enabled') {
-                    shop_save_setting($pdo, $key, empty($_POST['shop_enabled']) ? '0' : '1');
+                if ($key === 'shop_enabled' || $key === 'delivery_enabled') {
+                    shop_save_setting($pdo, $key, empty($_POST[$key]) ? '0' : '1');
                     continue;
                 }
                 if (!array_key_exists($key, $_POST)) {
@@ -38,6 +39,9 @@ if ($isAdmin && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                 $value = (string) $_POST[$key];
                 if ($key === 'preorder_close_at' && trim($value) !== '') {
                     $value = date('Y-m-d H:i:s', strtotime($value) ?: time());
+                }
+                if ($key === 'delivery_fee') {
+                    $value = number_format(max(0, round((float) $value, 2)), 2, '.', '');
                 }
                 shop_save_setting($pdo, $key, trim($value));
             }
@@ -115,13 +119,25 @@ foreach ($codes as $c) {
                         <div class="form-text">A copy of every paid order is emailed here.</div></div>
                 </section>
 
-                <section class="card hub-panel p-3">
+                <section class="card hub-panel p-3 mb-3">
                     <h2 class="h6 fw-bold text-uppercase text-muted">Collection</h2>
                     <div class="mb-2"><label class="form-label">Collection point</label>
                         <input class="form-control" name="collection_point" value="<?= h((string) ($s['collection_point'] ?? 'Campbell Park')) ?>"></div>
-                    <div class="mb-2"><label class="form-label">Collection details</label>
+                    <div class="mb-0"><label class="form-label">Collection details</label>
                         <textarea class="form-control" name="collection_details" rows="2"><?= h((string) ($s['collection_details'] ?? '')) ?></textarea></div>
-                    <div class="mb-0"><label class="form-label">Delivery note</label>
+                </section>
+
+                <section class="card hub-panel p-3">
+                    <h2 class="h6 fw-bold text-uppercase text-muted">Delivery</h2>
+                    <div class="form-check form-switch mb-2">
+                        <input class="form-check-input" type="checkbox" id="delivery_enabled" name="delivery_enabled" value="1" <?= ($s['delivery_enabled'] ?? '0') === '1' ? 'checked' : '' ?>>
+                        <label class="form-check-label" for="delivery_enabled">Offer delivery at checkout (public site shop)</label>
+                        <div class="form-text">Off by default. When on, customers can choose delivery instead of collection and enter an address — this only affects the public site's shop (myclubhub.co.uk/public/shop), not the original storefront.</div>
+                    </div>
+                    <div class="mb-2"><label class="form-label">Delivery fee (£)</label>
+                        <input class="form-control" type="number" step="0.01" min="0" name="delivery_fee" value="<?= h((string) ($s['delivery_fee'] ?? '0.00')) ?>" style="max-width:10rem">
+                        <div class="form-text">Flat fee added to the order total when a customer chooses delivery.</div></div>
+                    <div class="mb-0"><label class="form-label">"Collection only" note <span class="text-muted small">(shown while delivery is off)</span></label>
                         <input class="form-control" name="delivery_note" value="<?= h((string) ($s['delivery_note'] ?? '')) ?>"></div>
                 </section>
             </div>

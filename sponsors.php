@@ -8,6 +8,22 @@ require_once __DIR__ . '/lib/season.php';
 require_once __DIR__ . '/lib/sponsorship_catalog.php';
 
 $seasonId = getSelectedSeasonId($pdo);
+// Remember each season's directory filters when returning from another page.
+$sponsorFilterKeys = ['q', 'payment', 'status', 'scope', 'package', 'main', 'nologo', 'facebook'];
+$hasSponsorFilters = count(array_intersect($sponsorFilterKeys, array_keys($_GET))) > 0;
+if (isset($_GET['reset'])) {
+  unset($_SESSION['sponsors_list_filters'][$seasonId]);
+} elseif ($_SERVER['REQUEST_METHOD'] === 'GET' && !$hasSponsorFilters) {
+  $rememberedFilters = $_SESSION['sponsors_list_filters'][$seasonId] ?? [];
+  if ($rememberedFilters) {
+    $returnQuery = array_merge($rememberedFilters, ['season_id' => $seasonId]);
+    if (isset($_GET['saved'])) {
+      $returnQuery['saved'] = '1';
+    }
+    header('Location: sponsors.php?' . http_build_query($returnQuery));
+    exit;
+  }
+}
 $season = getSeasonById($pdo, $seasonId);
 $previousSeasonId = $seasonId > 0 ? getPreviousSeasonId($pdo, $seasonId) : 0;
 $seasonLocked = $season ? (int)$season['is_locked'] === 1 : false;
@@ -173,6 +189,17 @@ if (!in_array($facebookFilter, ['all', 'posted', 'not_posted'], true)) {
 }
 
 $search = trim($_GET['q'] ?? '');
+
+$_SESSION['sponsors_list_filters'][$seasonId] = [
+  'q' => $search,
+  'payment' => $paymentFilter,
+  'status' => $statusFilter,
+  'scope' => $scopeFilter,
+  'package' => $packageFilters,
+  'main' => $mainOnly ? '1' : '0',
+  'nologo' => $noLogoOnly ? '1' : '0',
+  'facebook' => $facebookFilter,
+];
 
 $whereParts = [];
 $params = [];
@@ -517,7 +544,7 @@ $visibleOutstanding = array_sum(array_map(
           <button class="btn btn-brand flex-grow-1 flex-lg-grow-0" type="submit">
             Apply Filters
           </button>
-          <a class="btn btn-outline-secondary flex-grow-1 flex-lg-grow-0" href="sponsors.php?season_id=<?= (int)$seasonId ?>">
+          <a class="btn btn-outline-secondary flex-grow-1 flex-lg-grow-0" href="sponsors.php?reset=1&amp;season_id=<?= (int)$seasonId ?>">
             Reset
           </a>
         </div>
@@ -639,13 +666,13 @@ $visibleOutstanding = array_sum(array_map(
             <caption class="visually-hidden">Sponsor portfolios, coverage, values and payment progress</caption>
             <thead>
               <tr>
-                <th>Sponsor</th>
-                <th>Portfolio</th>
-                <th>Coverage</th>
-                <th class="text-end">Value</th>
-                <th>Payment</th>
-                <th>Last payment</th>
-                <th class="text-center">Facebook</th>
+                <th data-sort-key="sponsor" data-sort-type="text"><button type="button" class="sponsor-sort-button">Sponsor <span class="sponsor-sort-icon" aria-hidden="true"></span></button></th>
+                <th data-sort-key="portfolio" data-sort-type="number"><button type="button" class="sponsor-sort-button">Portfolio <span class="sponsor-sort-icon" aria-hidden="true"></span></button></th>
+                <th data-sort-key="coverage" data-sort-type="text"><button type="button" class="sponsor-sort-button">Coverage <span class="sponsor-sort-icon" aria-hidden="true"></span></button></th>
+                <th class="text-end" data-sort-key="value" data-sort-type="number"><button type="button" class="sponsor-sort-button sponsor-sort-button--end">Value <span class="sponsor-sort-icon" aria-hidden="true"></span></button></th>
+                <th data-sort-key="payment" data-sort-type="number"><button type="button" class="sponsor-sort-button">Payment <span class="sponsor-sort-icon" aria-hidden="true"></span></button></th>
+                <th data-sort-key="last-payment" data-sort-type="number"><button type="button" class="sponsor-sort-button">Last payment <span class="sponsor-sort-icon" aria-hidden="true"></span></button></th>
+                <th class="text-center" data-sort-key="facebook" data-sort-type="number"><button type="button" class="sponsor-sort-button sponsor-sort-button--center">Facebook <span class="sponsor-sort-icon" aria-hidden="true"></span></button></th>
                 <th class="text-center" data-export-ignore="1">Actions</th>
               </tr>
             </thead>
@@ -656,8 +683,23 @@ $visibleOutstanding = array_sum(array_map(
                   $outstanding = max(0, (float)$s['total_amount'] - (float)$s['total_paid']);
                   $paymentPercent = (float)$s['total_amount'] > 0 ? min(100, round(((float)$s['total_paid'] / (float)$s['total_amount']) * 100)) : 0;
                   $packageNames = (array)$s['package_names'];
+                  $scopeSummary = implode(' ', array_map(
+                    static fn($scope, $count): string => ucfirst((string)$scope) . ' ' . (int)$count,
+                    array_keys((array)$s['scope_counts']),
+                    array_values((array)$s['scope_counts'])
+                  ));
+                  $paymentSortOrder = ['unpaid' => 0, 'partial' => 1, 'paid' => 2, 'complimentary' => 3, 'nocharge' => 4, 'noagreements' => 5];
+                  $lastPaymentSort = !empty($s['last_payment']) ? strtotime((string)$s['last_payment']) : 0;
                 ?>
-                <tr class="<?= in_array($state['key'], ['unpaid', 'partial'], true) ? 'sponsor-ledger-row--attention' : '' ?>">
+                <tr
+                  class="<?= in_array($state['key'], ['unpaid', 'partial'], true) ? 'sponsor-ledger-row--attention' : '' ?>"
+                  data-sort-sponsor="<?= h(strtolower((string)$s['name'])) ?>"
+                  data-sort-portfolio="<?= (int)$s['agreement_count'] ?>"
+                  data-sort-coverage="<?= h(strtolower($scopeSummary)) ?>"
+                  data-sort-value="<?= h(number_format((float)$s['total_amount'], 2, '.', '')) ?>"
+                  data-sort-payment="<?= (int)($paymentSortOrder[$state['key']] ?? 99) ?>"
+                  data-sort-last-payment="<?= (int)$lastPaymentSort ?>"
+                  data-sort-facebook="<?= (int)$s['facebook_spotlight_posted'] ?>">
                   <td>
                     <div class="sponsor-ledger-identity">
                       <div class="sponsor-ledger-logo"><?php if (!empty($s['logo_path'])): ?><img src="/uploads/sponsors/<?= h($s['logo_path']) ?>" alt=""><?php else: ?><span><?= h(strtoupper(substr((string)$s['name'], 0, 1))) ?></span><?php endif; ?></div>
@@ -734,6 +776,50 @@ $visibleOutstanding = array_sum(array_map(
   .sponsor-facebook-toggle--saving {
     opacity: .65;
   }
+  #sponsorsLedgerTable th[data-sort-key] {
+    cursor: pointer;
+    user-select: none;
+  }
+  .sponsor-sort-button {
+    align-items: center;
+    background: transparent;
+    border: 0;
+    color: inherit;
+    display: inline-flex;
+    font: inherit;
+    gap: .35rem;
+    justify-content: flex-start;
+    letter-spacing: inherit;
+    padding: 0;
+    text-align: inherit;
+    text-transform: inherit;
+    width: 100%;
+  }
+  .sponsor-sort-button--end {
+    justify-content: flex-end;
+  }
+  .sponsor-sort-button--center {
+    justify-content: center;
+  }
+  .sponsor-sort-button:focus-visible {
+    outline: 2px solid var(--brand-primary, #124e66);
+    outline-offset: 3px;
+  }
+  .sponsor-sort-icon::before {
+    color: currentColor;
+    content: "\f0dc";
+    font-family: "Font Awesome 6 Free";
+    font-weight: 900;
+    opacity: .35;
+  }
+  #sponsorsLedgerTable th[aria-sort="ascending"] .sponsor-sort-icon::before {
+    content: "\f0de";
+    opacity: .9;
+  }
+  #sponsorsLedgerTable th[aria-sort="descending"] .sponsor-sort-icon::before {
+    content: "\f0dd";
+    opacity: .9;
+  }
 </style>
 
 <script>
@@ -741,6 +827,14 @@ $visibleOutstanding = array_sum(array_map(
     $('[data-bs-toggle="tooltip"]').tooltip();
     var sponsorsCsrfToken = <?= json_encode((string)($_SESSION['csrf_token'] ?? ''), JSON_UNESCAPED_SLASHES) ?>;
     var selectedSeasonId = <?= (int)$seasonId ?>;
+    var sponsorSortStorageKey = 'sponsors.sort.' + selectedSeasonId;
+    var rememberedSponsorSort = null;
+    try {
+      if (<?= isset($_GET['reset']) ? 'true' : 'false' ?>) {
+        sessionStorage.removeItem(sponsorSortStorageKey);
+      }
+      rememberedSponsorSort = JSON.parse(sessionStorage.getItem(sponsorSortStorageKey));
+    } catch (error) { /* Sorting still works when browser storage is unavailable. */ }
 
     var packageCheckboxes = Array.prototype.slice.call(document.querySelectorAll('input[name="package[]"]'));
     var packageSelectAll = document.querySelector('[data-package-select-all]');
@@ -778,6 +872,91 @@ $visibleOutstanding = array_sum(array_map(
         updatePackageFilterSummary();
       });
       syncPackageSelectAll();
+    }
+
+    var sponsorsLedgerTable = document.getElementById('sponsorsLedgerTable');
+    if (sponsorsLedgerTable) {
+      var sortableHeaders = Array.prototype.slice.call(sponsorsLedgerTable.querySelectorAll('thead th[data-sort-key]'));
+      var tableBody = sponsorsLedgerTable.querySelector('tbody');
+
+      function getSponsorSortValue(row, key, type) {
+        var value = row.dataset['sort' + key.replace(/(^|-)([a-z])/g, function (_, __, letter) {
+          return letter.toUpperCase();
+        })] || '';
+
+        if (type === 'number') {
+          var numericValue = parseFloat(value);
+          return isNaN(numericValue) ? 0 : numericValue;
+        }
+
+        return String(value).toLowerCase();
+      }
+
+      function updateSponsorSortHeaders(activeHeader, direction) {
+        sortableHeaders.forEach(function (header) {
+          var button = header.querySelector('button');
+          var isActive = header === activeHeader;
+          header.setAttribute('aria-sort', isActive ? (direction === 'asc' ? 'ascending' : 'descending') : 'none');
+          if (button) {
+            button.setAttribute('aria-label', header.textContent.trim() + (isActive ? ', sorted ' + (direction === 'asc' ? 'ascending' : 'descending') : ', sort column'));
+          }
+        });
+      }
+
+      sortableHeaders.forEach(function (header) {
+        header.setAttribute('aria-sort', 'none');
+        var button = header.querySelector('button');
+        if (!button || !tableBody) {
+          return;
+        }
+
+        button.addEventListener('click', function () {
+          var key = header.dataset.sortKey;
+          var type = header.dataset.sortType || 'text';
+          var direction = header.dataset.sortDirection === 'asc' ? 'desc' : 'asc';
+          var rows = Array.prototype.slice.call(tableBody.querySelectorAll('tr'));
+
+          rows.sort(function (left, right) {
+            var leftValue = getSponsorSortValue(left, key, type);
+            var rightValue = getSponsorSortValue(right, key, type);
+            var result = 0;
+
+            if (type === 'number') {
+              result = leftValue - rightValue;
+            } else {
+              result = leftValue.localeCompare(rightValue, undefined, { numeric: true, sensitivity: 'base' });
+            }
+
+            if (result === 0) {
+              result = getSponsorSortValue(left, 'sponsor', 'text').localeCompare(getSponsorSortValue(right, 'sponsor', 'text'), undefined, { numeric: true, sensitivity: 'base' });
+            }
+
+            return direction === 'asc' ? result : -result;
+          });
+
+          sortableHeaders.forEach(function (otherHeader) {
+            if (otherHeader !== header) {
+              delete otherHeader.dataset.sortDirection;
+            }
+          });
+          header.dataset.sortDirection = direction;
+          try {
+            sessionStorage.setItem(sponsorSortStorageKey, JSON.stringify({ key: key, direction: direction }));
+          } catch (error) { /* Browser storage is optional. */ }
+          updateSponsorSortHeaders(header, direction);
+          rows.forEach(function (row) { tableBody.appendChild(row); });
+        });
+      });
+      updateSponsorSortHeaders(null, 'asc');
+      if (rememberedSponsorSort) {
+        var rememberedHeader = sortableHeaders.find(function (header) {
+          return header.dataset.sortKey === rememberedSponsorSort.key;
+        });
+        if (rememberedHeader && rememberedHeader.querySelector('button')) {
+          rememberedHeader.dataset.sortDirection = rememberedSponsorSort.direction === 'desc' ? 'asc' : 'desc';
+          rememberedHeader.querySelector('button').click();
+        }
+      }
     }
 
     document.querySelectorAll('[data-facebook-spotlight-toggle]').forEach(function (toggle) {

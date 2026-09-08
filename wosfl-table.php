@@ -7,6 +7,7 @@ ini_set('display_errors', '1');
 
 require_once __DIR__ . '/env.php';
 require_once __DIR__ . '/lib/league_table_form.php';
+require_once __DIR__ . '/lib/wosfl_table.php';
 
 $env = app_parse_env_file(__DIR__ . '/.env');
 $url = trim((string) ($env['WOSFL_TABLE_URL'] ?? ''));
@@ -78,110 +79,7 @@ function decode_wosfl_helper_rows(string $output): array
     return $rows;
 }
 
-/**
- * @return array<string, string>
- */
-function load_wosfl_badge_overrides(string $path): array
-{
-    if (!is_file($path)) {
-        return [];
-    }
-
-    $json = file_get_contents($path);
-    if ($json === false || trim($json) === '') {
-        return [];
-    }
-
-    $decoded = json_decode($json, true);
-    if (!is_array($decoded)) {
-        return [];
-    }
-
-    $overrides = [];
-    foreach ($decoded as $clubName => $badgePath) {
-        if (!is_string($clubName) || !is_string($badgePath)) {
-            continue;
-        }
-
-        $normalizedClub = normalize_wosfl_club_name($clubName);
-        if ($normalizedClub === '') {
-            continue;
-        }
-
-        $overrides[$normalizedClub] = trim($badgePath);
-    }
-
-    return $overrides;
-}
-
-function normalize_wosfl_club_name(string $clubName): string
-{
-    $clubName = strtolower(trim($clubName));
-    $clubName = preg_replace('/\s+/', ' ', $clubName) ?? $clubName;
-
-    return trim($clubName);
-}
-
-/**
- * Resolve a badge path for a club, preferring an explicit override file when available.
- */
-function resolve_wosfl_badge(string $clubName, string $logoUrl, string $badgeDir, array $badgeOverrides): array
-{
-    $slugSource = strtolower($clubName);
-    $slug = trim((string) preg_replace('/[^a-z0-9]+/', '-', $slugSource), '-');
-    $defaultRelative = 'badges/' . $slug . '.png';
-    $defaultPath = __DIR__ . '/' . $defaultRelative;
-
-    $overrideKey = normalize_wosfl_club_name($clubName);
-    $overrideRelative = null;
-
-    if ($overrideKey !== '' && isset($badgeOverrides[$overrideKey])) {
-        $overrideCandidate = trim((string) $badgeOverrides[$overrideKey]);
-        if ($overrideCandidate !== '') {
-            $overrideCandidate = str_replace('\\', '/', $overrideCandidate);
-            $overrideCandidate = ltrim($overrideCandidate, '/');
-            $overrideCandidate = preg_replace('#^\.\/#', '', $overrideCandidate) ?? $overrideCandidate;
-
-            if (str_starts_with($overrideCandidate, 'badges/')) {
-                $overrideRelative = $overrideCandidate;
-            } else {
-                $overrideRelative = 'badges/' . basename($overrideCandidate);
-            }
-        }
-    }
-
-    $candidates = [];
-    if ($overrideRelative !== null) {
-        $candidates[] = $overrideRelative;
-    }
-    $candidates[] = $defaultRelative;
-
-    foreach ($candidates as $relativePath) {
-        $absolutePath = __DIR__ . '/' . $relativePath;
-        if (is_file($absolutePath)) {
-            return [$relativePath, $absolutePath];
-        }
-    }
-
-    if ($logoUrl !== '' && !file_exists($defaultPath)) {
-        $img = @file_get_contents($logoUrl);
-        if ($img) {
-            file_put_contents($defaultPath, $img);
-        }
-    }
-
-    if (is_file($defaultPath)) {
-        return [$defaultRelative, $defaultPath];
-    }
-
-    if ($overrideRelative !== null) {
-        return [$overrideRelative, __DIR__ . '/' . $overrideRelative];
-    }
-
-    return [$defaultRelative, $defaultPath];
-}
-
-$badgeOverrides = load_wosfl_badge_overrides($badgeOverridesFile);
+$badgeOverrides = wosfl_load_badge_overrides($badgeOverridesFile);
 
 if (!is_dir(dirname($cacheFile))) {
     mkdir(dirname($cacheFile), 0777, true);
@@ -189,12 +87,6 @@ if (!is_dir(dirname($cacheFile))) {
 
 if (!is_dir($badgeDir)) {
     mkdir($badgeDir, 0777, true);
-}
-
-foreach (glob($badgeDir . '/*.png') as $file) {
-    if (time() - filemtime($file) > 60 * 60 * 24 * 30) {
-        unlink($file);
-    }
 }
 
 $cookieFile = tempnam(sys_get_temp_dir(), 'wosfl-session-');
@@ -230,7 +122,7 @@ if (!$html || $code !== 200) {
             foreach ($helperTeams as $team) {
                 $clubName = trim((string) ($team['club'] ?? ''));
                 $logoUrl = trim((string) ($team['logo'] ?? ''));
-                [$localLogo, $localPath] = resolve_wosfl_badge($clubName, $logoUrl, $badgeDir, $badgeOverrides);
+                [$localLogo] = wosfl_resolve_badge($clubName, $logoUrl, $badgeDir, $badgeOverrides);
 
                 $teams[] = [
                     'pos' => (string) ($team['pos'] ?? ''),
@@ -265,41 +157,7 @@ if (!$html || $code !== 200) {
         die('Unable to fetch WOSFL table page (' . $code . ')');
     }
 } else {
-    libxml_use_internal_errors(true);
-    $dom = new DOMDocument();
-    $dom->loadHTML($html);
-    libxml_clear_errors();
-
-    $xpath = new DOMXPath($dom);
-    $rows = $xpath->query('//table//tr');
-    $teams = [];
-
-    foreach ($rows as $row) {
-        $cols = $row->getElementsByTagName('td');
-        if ($cols->length < 10) {
-            continue;
-        }
-
-        $clubLink = $cols->item(1)->getElementsByTagName('a')->item(0);
-        $clubName = trim($clubLink->textContent ?? '');
-        $logoTag = $clubLink ? $clubLink->getElementsByTagName('img')->item(0) : null;
-        $logoUrl = $logoTag ? trim($logoTag->getAttribute('src')) : '';
-        [$localLogo, $localPath] = resolve_wosfl_badge($clubName, $logoUrl, $badgeDir, $badgeOverrides);
-
-        $teams[] = [
-            'pos' => trim($cols->item(0)->textContent),
-            'club' => $clubName,
-            'p' => trim($cols->item(2)->textContent),
-            'w' => trim($cols->item(3)->textContent),
-            'd' => trim($cols->item(4)->textContent),
-            'l' => trim($cols->item(5)->textContent),
-            'f' => trim($cols->item(6)->textContent),
-            'a' => trim($cols->item(7)->textContent),
-            'gd' => trim($cols->item(8)->textContent),
-            'pts' => trim($cols->item(9)->textContent),
-            'logo' => $localLogo,
-        ];
-    }
+    $teams = wosfl_parse_standings_html($html, $badgeDir, $badgeOverrides);
 }
 
 if ($teams === [] && file_exists($cacheFile)) {

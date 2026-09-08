@@ -39,7 +39,7 @@ $pageHero = [
 
 $fileEnv = hub_settings_load_env();
 $activeTab = isset($_GET['tab']) && is_string($_GET['tab']) ? trim($_GET['tab']) : 'general';
-$allowedTabs = ['general', 'database', 'calendar', 'payments', 'publishing'];
+$allowedTabs = ['general', 'database', 'calendar', 'payments', 'notifications', 'publishing'];
 if (!in_array($activeTab, $allowedTabs, true)) {
     $activeTab = 'general';
 }
@@ -65,6 +65,31 @@ $publishingPlatformHealth = hub_publishing_platform_health($socialsDirectory);
 $publishingHistory = hub_publishing_history_recent($pdo, 30);
 $publishingHistoryCounts = hub_publishing_history_counts($pdo);
 
+/**
+ * @return list<int>
+ */
+function settings_notification_account_ids(PDO $pdo): array
+{
+    return stripe_notification_account_ids($pdo);
+}
+
+/**
+ * @return list<string>
+ */
+function settings_notification_manual_emails(PDO $pdo): array
+{
+    return stripe_notification_manual_emails($pdo);
+}
+
+/**
+ * @param list<int> $accountIds
+ * @param list<string> $manualEmails
+ */
+function settings_save_notification_lists(PDO $pdo, array $accountIds, array $manualEmails, ?int $currentUserId = null): bool
+{
+    return stripe_notification_save_lists($pdo, $accountIds, $manualEmails, $currentUserId);
+}
+
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     $csrfToken = isset($_POST['csrf_token']) && is_string($_POST['csrf_token']) ? $_POST['csrf_token'] : null;
     if (!hub_auth_verify_csrf_token($csrfToken)) {
@@ -72,7 +97,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
         $statusMessage = 'Your session expired. Please reload the page and try again.';
     } else {
         $section = isset($_POST['section']) && is_string($_POST['section']) ? trim($_POST['section']) : '';
-        if (in_array($section, ['general', 'database', 'calendar', 'payments'], true)) {
+        if (in_array($section, ['general', 'database', 'calendar', 'payments', 'notifications'], true)) {
             $activeTab = $section;
             $updates = [];
 
@@ -136,27 +161,88 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
             $stripeWebhookSecret = isset($_POST['stripe_webhook_secret']) && is_string($_POST['stripe_webhook_secret']) ? trim($_POST['stripe_webhook_secret']) : '';
             $stripeCurrency = isset($_POST['stripe_default_currency']) && is_string($_POST['stripe_default_currency']) ? trim($_POST['stripe_default_currency']) : '';
             $stripeExpiryHours = isset($_POST['stripe_link_expiry_hours']) && is_string($_POST['stripe_link_expiry_hours']) ? trim($_POST['stripe_link_expiry_hours']) : '';
+            $stripePublicExpiryDays = isset($_POST['stripe_public_link_expiry_days']) && is_string($_POST['stripe_public_link_expiry_days']) ? trim($_POST['stripe_public_link_expiry_days']) : '';
 
             $updates['STRIPE_MODE'] = $stripeMode === 'live' ? 'live' : 'test';
             $updates['STRIPE_DEFAULT_CURRENCY'] = $stripeCurrency !== '' ? strtolower($stripeCurrency) : hub_settings_value($fileEnv, 'STRIPE_DEFAULT_CURRENCY', 'gbp');
             $updates['STRIPE_LINK_EXPIRY_HOURS'] = $stripeExpiryHours !== '' ? (string) max(1, min(24, (int) $stripeExpiryHours)) : hub_settings_value($fileEnv, 'STRIPE_LINK_EXPIRY_HOURS', '24');
+            $updates['STRIPE_PUBLIC_LINK_EXPIRY_DAYS'] = $stripePublicExpiryDays !== '' ? (string) max(1, min(30, (int) $stripePublicExpiryDays)) : hub_settings_value($fileEnv, 'STRIPE_PUBLIC_LINK_EXPIRY_DAYS', '7');
             if ($stripeSecretKey !== '') {
                 $updates['STRIPE_SECRET_KEY'] = $stripeSecretKey;
             }
             if ($stripeWebhookSecret !== '') {
                 $updates['STRIPE_WEBHOOK_SECRET'] = $stripeWebhookSecret;
             }
+        } elseif ($section === 'notifications') {
+            stripe_notification_seed_from_env($pdo, stripe_env(), (int) ($currentUser['id'] ?? 0) ?: null);
+            $accountIds = settings_notification_account_ids($pdo);
+            $manualEmails = settings_notification_manual_emails($pdo);
+            $notificationAction = isset($_POST['notification_action']) && is_string($_POST['notification_action']) ? trim($_POST['notification_action']) : '';
+
+            if ($notificationAction === 'add_accounts') {
+                $postedAccountIds = isset($_POST['account_ids']) && is_array($_POST['account_ids']) ? $_POST['account_ids'] : [];
+                foreach ($postedAccountIds as $accountId) {
+                    $accountId = is_scalar($accountId) ? trim((string) $accountId) : '';
+                    if ($accountId !== '' && ctype_digit($accountId) && (int) $accountId > 0) {
+                        $accountIds[] = (int) $accountId;
+                    }
+                }
+            } elseif ($notificationAction === 'remove_account') {
+                $removeId = (int) ($_POST['account_id'] ?? 0);
+                $accountIds = array_values(array_filter($accountIds, static fn(int $id): bool => $id !== $removeId));
+            } elseif ($notificationAction === 'add_email') {
+                $email = trim((string) ($_POST['email'] ?? ''));
+                if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                    $statusType = 'error';
+                    $statusMessage = 'Enter a valid email address.';
+                } else {
+                    $manualEmails[] = $email;
+                }
+            } elseif ($notificationAction === 'update_email') {
+                $oldEmail = strtolower(trim((string) ($_POST['old_email'] ?? '')));
+                $newEmail = trim((string) ($_POST['email'] ?? ''));
+                if ($newEmail === '' || !filter_var($newEmail, FILTER_VALIDATE_EMAIL)) {
+                    $statusType = 'error';
+                    $statusMessage = 'Enter a valid email address.';
+                } else {
+                    foreach ($manualEmails as $index => $email) {
+                        if (strtolower($email) === $oldEmail) {
+                            unset($manualEmails[$index]);
+                        }
+                    }
+                    $manualEmails[] = $newEmail;
+                }
+            } elseif ($notificationAction === 'delete_email') {
+                $deleteEmail = strtolower(trim((string) ($_POST['email'] ?? '')));
+                $manualEmails = array_values(array_filter($manualEmails, static fn(string $email): bool => strtolower($email) !== $deleteEmail));
+            } else {
+                $statusType = 'error';
+                $statusMessage = 'Unknown notification action.';
+            }
+
+            if ($statusType !== 'error') {
+                $saved = settings_save_notification_lists($pdo, $accountIds, $manualEmails, (int) ($currentUser['id'] ?? 0) ?: null);
+                if ($saved) {
+                    auditLog($pdo, 'settings_updated', 'Updated payment notification settings');
+                    header('Location: /settings.php?tab=notifications&saved=1');
+                    exit;
+                }
+                $statusType = 'error';
+                $statusMessage = 'Notification recipients could not be saved. Please try again.';
+            }
         }
 
-            $saved = hub_settings_save_env($updates);
+            $saved = $section === 'notifications' || $statusType === 'error' ? false : hub_settings_save_env($updates);
             if ($saved) {
                 auditLog($pdo, 'settings_updated', 'Updated club settings (' . $section . ')');
                 header('Location: /settings.php?tab=' . rawurlencode($activeTab) . '&saved=1');
                 exit;
             }
 
-            $statusType = 'error';
-            $statusMessage = 'Settings could not be saved. Check file permissions for `hub/.env`.';
+            if ($statusMessage === '') {
+                $statusType = 'error';
+                $statusMessage = 'Settings could not be saved. Check file permissions for `hub/.env`.';
+            }
         } elseif ($section === 'global_template_pack') {
             $activeTab = 'general';
             $packId = max(0, (int) ($_POST['template_pack_id'] ?? 0));
@@ -266,7 +352,13 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
 
 if (isset($_GET['saved']) && $_GET['saved'] === '1') {
     $statusType = 'success';
-    $statusMessage = $activeTab === 'publishing' ? 'Publishing settings saved.' : 'Settings saved.';
+    if ($activeTab === 'publishing') {
+        $statusMessage = 'Publishing settings saved.';
+    } elseif ($activeTab === 'notifications') {
+        $statusMessage = 'Email notification recipients updated.';
+    } else {
+        $statusMessage = 'Settings saved.';
+    }
 }
 if (isset($_GET['global_pack_saved']) && $_GET['global_pack_saved'] === '1') {
     $statusType = 'success';
@@ -300,9 +392,83 @@ $googleCalendarAccessToken = hub_settings_value($fileEnv, 'GOOGLE_CALENDAR_ACCES
 $stripeModeValue = hub_settings_value($fileEnv, 'STRIPE_MODE', 'test');
 $stripeDefaultCurrency = hub_settings_value($fileEnv, 'STRIPE_DEFAULT_CURRENCY', 'gbp');
 $stripeLinkExpiryHours = hub_settings_value($fileEnv, 'STRIPE_LINK_EXPIRY_HOURS', '24');
+$stripePublicLinkExpiryDays = hub_settings_value($fileEnv, 'STRIPE_PUBLIC_LINK_EXPIRY_DAYS', '7');
 $stripeSecretKeyConfigured = stripe_secret_key() !== '';
 $stripeWebhookSecretConfigured = stripe_webhook_secret() !== '';
 $stripeWebhookUrl = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' ? 'https://' : 'http://') . ($_SERVER['HTTP_HOST'] ?? 'lundy.me.uk') . '/stripe_webhook.php';
+stripe_notification_seed_from_env($pdo, stripe_env(), (int) ($currentUser['id'] ?? 0) ?: null);
+$orderNotificationManualEmails = settings_notification_manual_emails($pdo);
+$orderNotificationAccountIds = settings_notification_account_ids($pdo);
+$orderNotificationAccountIdSet = array_fill_keys($orderNotificationAccountIds, true);
+$legacyPaymentNotificationEmails = array_filter([
+    hub_settings_value($fileEnv, 'PAYMENT_NOTIFICATION_EMAILS', ''),
+    hub_settings_value($fileEnv, 'STRIPE_NOTIFICATION_EMAILS', ''),
+], static fn(string $value): bool => trim($value) !== '');
+$resolvedPaymentNotificationEmails = stripe_notification_recipients($pdo);
+$notificationAccountOptions = [];
+try {
+    if (stripe_table_exists($pdo, 'accounts') && stripe_table_exists($pdo, 'people')) {
+        $notificationAccountOptions = $pdo->query("SELECT a.id, a.person_id, a.email AS account_email, a.is_active AS account_is_active,
+                p.display_name, p.email AS profile_email, p.is_active AS person_is_active,
+                GROUP_CONCAT(DISTINCT r.name ORDER BY r.name SEPARATOR ', ') AS roles
+            FROM accounts a
+            JOIN people p ON p.id = a.person_id
+            LEFT JOIN account_roles ar ON ar.account_id = a.id
+            LEFT JOIN roles r ON r.id = ar.role_id
+            WHERE a.is_active = 1 AND p.is_active = 1
+            GROUP BY a.id, a.email, a.is_active, p.display_name, p.email, p.is_active
+            ORDER BY p.display_name, a.email")->fetchAll(PDO::FETCH_ASSOC);
+    }
+} catch (Throwable $e) {
+    $notificationAccountOptions = [];
+}
+$notificationAccountOptionsById = [];
+foreach ($notificationAccountOptions as $accountOption) {
+    $notificationAccountOptionsById[(int) $accountOption['id']] = $accountOption;
+}
+$notificationDeliveryRows = [];
+foreach ($orderNotificationAccountIds as $accountId) {
+    $accountOption = $notificationAccountOptionsById[$accountId] ?? null;
+    if (!$accountOption) {
+        continue;
+    }
+    $profileEmail = trim((string) ($accountOption['profile_email'] ?? ''));
+    $accountEmail = trim((string) ($accountOption['account_email'] ?? ''));
+    $deliveryEmail = $profileEmail !== '' ? $profileEmail : $accountEmail;
+    $notificationDeliveryRows[] = [
+        'type' => 'account',
+        'account_id' => $accountId,
+        'person_id' => (int) ($accountOption['person_id'] ?? 0),
+        'name' => (string) ($accountOption['display_name'] ?: 'Account #' . $accountId),
+        'email' => $deliveryEmail,
+        'source' => 'Hub user',
+        'roles' => (string) ($accountOption['roles'] ?: 'No role'),
+    ];
+}
+foreach ($orderNotificationManualEmails as $email) {
+    $notificationDeliveryRows[] = [
+        'type' => 'email',
+        'account_id' => 0,
+        'person_id' => 0,
+        'name' => 'Manual recipient',
+        'email' => $email,
+        'source' => 'Additional email',
+        'roles' => '',
+    ];
+}
+if ($notificationDeliveryRows === [] && $resolvedPaymentNotificationEmails !== []) {
+    foreach ($resolvedPaymentNotificationEmails as $email) {
+        $notificationDeliveryRows[] = [
+            'type' => 'fallback',
+            'account_id' => 0,
+            'person_id' => 0,
+            'name' => 'Fallback admin recipient',
+            'email' => (string) $email,
+            'source' => 'Fallback',
+            'roles' => 'Active admin/treasurer',
+        ];
+    }
+}
 
 $availableTemplatePacks = template_packs_list_available($pdo);
 $globalTemplatePack = template_packs_get_global_default($pdo);
@@ -329,6 +495,9 @@ require_once __DIR__ . '/header.php';
         </li>
         <li class="nav-item">
             <a class="nav-link<?= $activeTab === 'payments' ? ' active' : '' ?>" href="?tab=payments">Payments</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link<?= $activeTab === 'notifications' ? ' active' : '' ?>" href="?tab=notifications">Email Notifications</a>
         </li>
         <li class="nav-item">
             <a class="nav-link<?= $activeTab === 'publishing' ? ' active' : '' ?>" href="?tab=publishing">Publishing</a>
@@ -556,9 +725,14 @@ require_once __DIR__ . '/header.php';
                             <input class="form-control" id="stripe_default_currency" type="text" name="stripe_default_currency" value="<?= htmlspecialchars($stripeDefaultCurrency, ENT_QUOTES, 'UTF-8') ?>" maxlength="10">
                         </div>
                         <div class="settings-field">
-                            <label class="form-label fw-semibold" for="stripe_link_expiry_hours">Payment link expiry (hours)</label>
+                            <label class="form-label fw-semibold" for="stripe_public_link_expiry_days">Sponsor link expiry (days)</label>
+                            <input class="form-control" id="stripe_public_link_expiry_days" type="number" min="1" max="30" name="stripe_public_link_expiry_days" value="<?= htmlspecialchars($stripePublicLinkExpiryDays, ENT_QUOTES, 'UTF-8') ?>">
+                            <div class="form-text">How long the Hub <code>/p/...</code> link remains usable. Default is 7 days.</div>
+                        </div>
+                        <div class="settings-field">
+                            <label class="form-label fw-semibold" for="stripe_link_expiry_hours">Stripe session expiry (hours)</label>
                             <input class="form-control" id="stripe_link_expiry_hours" type="number" min="1" max="24" name="stripe_link_expiry_hours" value="<?= htmlspecialchars($stripeLinkExpiryHours, ENT_QUOTES, 'UTF-8') ?>">
-                            <div class="form-text">Maximum 24 hours — this is a Stripe Checkout limit.</div>
+                            <div class="form-text">Maximum 24 hours — Stripe requires this. The sponsor link above can renew it automatically.</div>
                         </div>
                         <div class="settings-field">
                             <label class="form-label fw-semibold" for="stripe_secret_key">Secret key</label>
@@ -574,6 +748,98 @@ require_once __DIR__ . '/header.php';
                         <button class="btn btn-primary" type="submit">Save Payments</button>
                     </div>
                 </form>
+            </div>
+        <?php elseif ($activeTab === 'notifications'): ?>
+            <div class="tab-pane fade show active">
+                <div class="settings-card hub-form-card">
+                    <div class="settings-card__header">
+                        <div>
+                            <p class="settings-card__eyebrow">Order alerts</p>
+                            <h2 class="settings-card__title">Email notifications</h2>
+                            <p class="settings-card__subtitle">Choose who receives an email when a Stripe order or payment is completed.</p>
+                        </div>
+                        <div class="d-flex flex-wrap gap-2">
+                            <button class="btn btn-primary" type="button" data-bs-toggle="modal" data-bs-target="#addNotificationUsersModal">
+                                <i class="fa-solid fa-user-plus me-1" aria-hidden="true"></i>Add Users
+                            </button>
+                            <button class="btn btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#addNotificationEmailModal">
+                                <i class="fa-solid fa-envelope me-1" aria-hidden="true"></i>Add Email
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="settings-note mb-4">
+                        These emails are sent after Stripe confirms payment for season tickets, match tickets, shop orders, sponsorships, player sponsorship orders and fundraiser payments.
+                    </div>
+
+                    <?php if ($legacyPaymentNotificationEmails !== []): ?>
+                        <div class="alert alert-info mt-3 mb-4">
+                            Older notification keys are still present in the environment. They are used only as an import/fallback source; the editable delivery list is now stored in the database:
+                            <code><?= htmlspecialchars(implode(', ', $legacyPaymentNotificationEmails), ENT_QUOTES, 'UTF-8') ?></code>
+                        </div>
+                    <?php endif; ?>
+
+                    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-end gap-3 mb-3">
+                        <div>
+                            <p class="settings-card__eyebrow">Current delivery list</p>
+                            <h3 class="settings-card__title h5 mb-1">Recipients</h3>
+                            <p class="settings-card__subtitle mb-0">Hub users use the email saved on their profile. Additional emails are stored directly.</p>
+                        </div>
+                    </div>
+                    <?php if ($notificationDeliveryRows === []): ?>
+                        <div class="settings-note mb-0">No notification recipients are currently configured.</div>
+                    <?php else: ?>
+                        <div class="table-responsive">
+                            <table class="table align-middle hub-data-table mb-0">
+                                <caption class="visually-hidden">Payment notification recipients</caption>
+                                <thead><tr><th>Name</th><th>Email</th><th>Type</th><th>Role</th><th class="text-end">Actions</th></tr></thead>
+                                <tbody>
+                                    <?php foreach ($notificationDeliveryRows as $row): ?>
+                                        <tr>
+                                            <td class="fw-semibold"><?= htmlspecialchars((string) $row['name'], ENT_QUOTES, 'UTF-8') ?></td>
+                                            <td><?= htmlspecialchars((string) $row['email'], ENT_QUOTES, 'UTF-8') ?></td>
+                                            <td><span class="badge text-bg-light"><?= htmlspecialchars((string) $row['source'], ENT_QUOTES, 'UTF-8') ?></span></td>
+                                            <td class="text-muted"><?= htmlspecialchars((string) ($row['roles'] ?: '—'), ENT_QUOTES, 'UTF-8') ?></td>
+                                            <td class="text-end">
+                                                <div class="d-inline-flex gap-1">
+                                                    <?php if ($row['type'] === 'account'): ?>
+                                                        <a class="btn btn-sm btn-outline-secondary" href="/club_person.php?id=<?= (int) $row['person_id'] ?>" title="Edit user profile" aria-label="Edit <?= htmlspecialchars((string) $row['name'], ENT_QUOTES, 'UTF-8') ?>">
+                                                            <i class="fa-solid fa-pen-to-square" aria-hidden="true"></i>
+                                                        </a>
+                                                        <form method="post" class="d-inline">
+                                                            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(hub_auth_csrf_token(), ENT_QUOTES, 'UTF-8') ?>">
+                                                            <input type="hidden" name="section" value="notifications">
+                                                            <input type="hidden" name="notification_action" value="remove_account">
+                                                            <input type="hidden" name="account_id" value="<?= (int) $row['account_id'] ?>">
+                                                            <button class="btn btn-sm btn-outline-danger" type="submit" title="Remove from notifications" aria-label="Remove <?= htmlspecialchars((string) $row['name'], ENT_QUOTES, 'UTF-8') ?>">
+                                                                <i class="fa-solid fa-trash" aria-hidden="true"></i>
+                                                            </button>
+                                                        </form>
+                                                    <?php elseif ($row['type'] === 'email'): ?>
+                                                        <button class="btn btn-sm btn-outline-secondary" type="button" title="Edit email" aria-label="Edit <?= htmlspecialchars((string) $row['email'], ENT_QUOTES, 'UTF-8') ?>" data-bs-toggle="modal" data-bs-target="#editNotificationEmailModal" data-email="<?= htmlspecialchars((string) $row['email'], ENT_QUOTES, 'UTF-8') ?>">
+                                                            <i class="fa-solid fa-pen-to-square" aria-hidden="true"></i>
+                                                        </button>
+                                                        <form method="post" class="d-inline">
+                                                            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(hub_auth_csrf_token(), ENT_QUOTES, 'UTF-8') ?>">
+                                                            <input type="hidden" name="section" value="notifications">
+                                                            <input type="hidden" name="notification_action" value="delete_email">
+                                                            <input type="hidden" name="email" value="<?= htmlspecialchars((string) $row['email'], ENT_QUOTES, 'UTF-8') ?>">
+                                                            <button class="btn btn-sm btn-outline-danger" type="submit" title="Delete email" aria-label="Delete <?= htmlspecialchars((string) $row['email'], ENT_QUOTES, 'UTF-8') ?>">
+                                                                <i class="fa-solid fa-trash" aria-hidden="true"></i>
+                                                            </button>
+                                                        </form>
+                                                    <?php else: ?>
+                                                        <span class="text-muted small">Fallback</span>
+                                                    <?php endif; ?>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    <?php endif; ?>
+                </div>
             </div>
         <?php else: ?>
             <div class="tab-pane fade show active">
@@ -765,6 +1031,137 @@ require_once __DIR__ . '/header.php';
         <?php endif; ?>
     </div>
 </div>
+
+<?php if ($activeTab === 'notifications'): ?>
+<div class="modal fade" id="addNotificationUsersModal" tabindex="-1" aria-labelledby="addNotificationUsersModalTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <form method="post" class="modal-content">
+            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(hub_auth_csrf_token(), ENT_QUOTES, 'UTF-8') ?>">
+            <input type="hidden" name="section" value="notifications">
+            <input type="hidden" name="notification_action" value="add_accounts">
+            <div class="modal-header">
+                <h2 class="modal-title h5" id="addNotificationUsersModalTitle">Add Users</h2>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <?php if ($notificationAccountOptions === []): ?>
+                    <div class="settings-note mb-0">No active users are available.</div>
+                <?php else: ?>
+                    <div class="list-group" data-notification-user-picker>
+                        <?php foreach ($notificationAccountOptions as $accountOption): ?>
+                            <?php
+                            $accountId = (int) $accountOption['id'];
+                            $profileEmail = trim((string) ($accountOption['profile_email'] ?? ''));
+                            $accountEmail = trim((string) ($accountOption['account_email'] ?? ''));
+                            $deliveryEmail = $profileEmail !== '' ? $profileEmail : $accountEmail;
+                            $hasValidEmail = filter_var($deliveryEmail, FILTER_VALIDATE_EMAIL);
+                            $alreadySelected = isset($orderNotificationAccountIdSet[$accountId]);
+                            ?>
+                            <div class="list-group-item list-group-item-action d-flex flex-column flex-md-row justify-content-between gap-2<?= (!$hasValidEmail || $alreadySelected) ? ' disabled' : '' ?>" role="button" tabindex="<?= (!$hasValidEmail || $alreadySelected) ? '-1' : '0' ?>" data-notification-user-option>
+                                <span>
+                                    <strong><?= htmlspecialchars((string) ($accountOption['display_name'] ?: 'Account #' . $accountId), ENT_QUOTES, 'UTF-8') ?></strong>
+                                    <span class="d-block small text-muted">
+                                        <?= $hasValidEmail ? htmlspecialchars($deliveryEmail, ENT_QUOTES, 'UTF-8') : 'No valid email on profile or account' ?>
+                                    </span>
+                                </span>
+                                <span class="d-flex align-items-center gap-2">
+                                    <span class="badge text-bg-light"><?= $alreadySelected ? 'Already added' : htmlspecialchars((string) ($accountOption['roles'] ?: 'No role'), ENT_QUOTES, 'UTF-8') ?></span>
+                                    <i class="fa-solid fa-check text-success d-none" aria-hidden="true"></i>
+                                </span>
+                                <input class="visually-hidden" type="checkbox" name="account_ids[]" value="<?= $accountId ?>" tabindex="-1"<?= (!$hasValidEmail || $alreadySelected) ? ' disabled' : '' ?>>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                <?php endif; ?>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" class="btn btn-primary">Add Selected Users</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="modal fade" id="addNotificationEmailModal" tabindex="-1" aria-labelledby="addNotificationEmailModalTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <form method="post" class="modal-content">
+            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(hub_auth_csrf_token(), ENT_QUOTES, 'UTF-8') ?>">
+            <input type="hidden" name="section" value="notifications">
+            <input type="hidden" name="notification_action" value="add_email">
+            <div class="modal-header">
+                <h2 class="modal-title h5" id="addNotificationEmailModalTitle">Add Email Recipient</h2>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <label class="form-label fw-semibold" for="notificationEmailAdd">Email address</label>
+                <input class="form-control" id="notificationEmailAdd" type="email" name="email" autocomplete="email" required>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" class="btn btn-primary">Add Email</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="modal fade" id="editNotificationEmailModal" tabindex="-1" aria-labelledby="editNotificationEmailModalTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <form method="post" class="modal-content">
+            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(hub_auth_csrf_token(), ENT_QUOTES, 'UTF-8') ?>">
+            <input type="hidden" name="section" value="notifications">
+            <input type="hidden" name="notification_action" value="update_email">
+            <input type="hidden" name="old_email" id="notificationEmailOld" value="">
+            <div class="modal-header">
+                <h2 class="modal-title h5" id="editNotificationEmailModalTitle">Edit Email Recipient</h2>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <label class="form-label fw-semibold" for="notificationEmailEdit">Email address</label>
+                <input class="form-control" id="notificationEmailEdit" type="email" name="email" autocomplete="email" required>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save Email</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+(function () {
+    document.querySelectorAll('[data-notification-user-option]').forEach(function (button) {
+        function toggleUser() {
+            if (button.classList.contains('disabled')) return;
+            var input = button.querySelector('input[type="checkbox"]');
+            var icon = button.querySelector('.fa-check');
+            if (!input) return;
+            input.checked = !input.checked;
+            button.classList.toggle('active', input.checked);
+            if (icon) icon.classList.toggle('d-none', !input.checked);
+        }
+        button.addEventListener('click', toggleUser);
+        button.addEventListener('keydown', function (event) {
+            if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                toggleUser();
+            }
+        });
+    });
+
+    var editModal = document.getElementById('editNotificationEmailModal');
+    if (editModal) {
+        editModal.addEventListener('show.bs.modal', function (event) {
+            var trigger = event.relatedTarget;
+            var email = trigger ? (trigger.getAttribute('data-email') || '') : '';
+            var oldInput = document.getElementById('notificationEmailOld');
+            var editInput = document.getElementById('notificationEmailEdit');
+            if (oldInput) oldInput.value = email;
+            if (editInput) editInput.value = email;
+        });
+    }
+})();
+</script>
+<?php endif; ?>
 
 <?php if ($activeTab === 'publishing'): ?>
 <script>

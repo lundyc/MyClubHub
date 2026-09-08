@@ -339,7 +339,9 @@ $pageHero = [
     'eyebrow' => 'Publishing',
     'title' => 'League Table',
     'subtitle' => $leagueConfig['league_title'] . ' standings and publish tools.',
-    'actions' => [],
+    'actions' => [
+        ['label' => 'Update from WOSFL', 'href' => '/league_table_manual_update.php', 'class' => 'btn btn-brand btn-sm'],
+    ],
 ];
 
 require_once __DIR__ . '/header.php';

@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../env.php';
 require_once __DIR__ . '/functions.php';
+require_once __DIR__ . '/mailer.php';
 require_once __DIR__ . '/sponsorship_catalog.php';
 require_once __DIR__ . '/match_sponsorship.php';
 
 const STRIPE_API_BASE = 'https://api.stripe.com/v1';
 const STRIPE_DEFAULT_LINK_EXPIRY_HOURS = 24; // Stripe Checkout Sessions cannot expire more than 24h after creation.
+const STRIPE_DEFAULT_PUBLIC_LINK_EXPIRY_DAYS = 7;
 const STRIPE_WEBHOOK_TOLERANCE_SECONDS = 300;
 
 /**
@@ -26,6 +28,11 @@ function stripe_env(): array
         'STRIPE_WEBHOOK_SECRET' => getenv('STRIPE_WEBHOOK_SECRET') !== false ? (string) getenv('STRIPE_WEBHOOK_SECRET') : '',
         'STRIPE_DEFAULT_CURRENCY' => getenv('STRIPE_DEFAULT_CURRENCY') !== false ? (string) getenv('STRIPE_DEFAULT_CURRENCY') : '',
         'STRIPE_LINK_EXPIRY_HOURS' => getenv('STRIPE_LINK_EXPIRY_HOURS') !== false ? (string) getenv('STRIPE_LINK_EXPIRY_HOURS') : '',
+        'STRIPE_PUBLIC_LINK_EXPIRY_DAYS' => getenv('STRIPE_PUBLIC_LINK_EXPIRY_DAYS') !== false ? (string) getenv('STRIPE_PUBLIC_LINK_EXPIRY_DAYS') : '',
+        'ORDER_NOTIFICATION_ACCOUNT_IDS' => getenv('ORDER_NOTIFICATION_ACCOUNT_IDS') !== false ? (string) getenv('ORDER_NOTIFICATION_ACCOUNT_IDS') : '',
+        'ORDER_NOTIFICATION_EMAILS' => getenv('ORDER_NOTIFICATION_EMAILS') !== false ? (string) getenv('ORDER_NOTIFICATION_EMAILS') : '',
+        'PAYMENT_NOTIFICATION_EMAILS' => getenv('PAYMENT_NOTIFICATION_EMAILS') !== false ? (string) getenv('PAYMENT_NOTIFICATION_EMAILS') : '',
+        'STRIPE_NOTIFICATION_EMAILS' => getenv('STRIPE_NOTIFICATION_EMAILS') !== false ? (string) getenv('STRIPE_NOTIFICATION_EMAILS') : '',
     ];
 
     return array_merge($fileEnv, array_filter($runtimeEnv, static fn(string $value): bool => $value !== ''));
@@ -63,6 +70,15 @@ function stripe_link_expiry_hours(): int
     return min($hours, STRIPE_DEFAULT_LINK_EXPIRY_HOURS);
 }
 
+function stripe_public_link_expiry_days(): int
+{
+    $days = (int) (stripe_env()['STRIPE_PUBLIC_LINK_EXPIRY_DAYS'] ?? STRIPE_DEFAULT_PUBLIC_LINK_EXPIRY_DAYS);
+    if ($days < 1) {
+        return STRIPE_DEFAULT_PUBLIC_LINK_EXPIRY_DAYS;
+    }
+    return min($days, 30);
+}
+
 function stripe_is_configured(): bool
 {
     return stripe_secret_key() !== '';
@@ -95,6 +111,7 @@ function ensureStripeSchema(PDO $pdo): void
         created_by BIGINT UNSIGNED DEFAULT NULL,
         created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
         expires_at DATETIME DEFAULT NULL,
+        public_expires_at DATETIME DEFAULT NULL,
         updated_at TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
         PRIMARY KEY (id),
         UNIQUE KEY uq_stripe_payment_links_session (stripe_checkout_session_id),
@@ -153,6 +170,9 @@ function ensureStripeSchema(PDO $pdo): void
     }
     if (!isset($linkColumns['slug'])) {
         $pdo->exec("ALTER TABLE stripe_payment_links ADD COLUMN slug VARCHAR(24) DEFAULT NULL AFTER url");
+    }
+    if (!isset($linkColumns['public_expires_at'])) {
+        $pdo->exec("ALTER TABLE stripe_payment_links ADD COLUMN public_expires_at DATETIME DEFAULT NULL AFTER expires_at");
     }
     if (!isset($linkIndexes['idx_stripe_payment_links_slug'])) {
         $pdo->exec('ALTER TABLE stripe_payment_links ADD KEY idx_stripe_payment_links_slug (slug)');
@@ -347,28 +367,37 @@ function stripe_payment_link_public_url(array $link): string
     return (string) ($link['url'] ?? '');
 }
 
-/**
- * Create a Stripe Checkout Session for an agreement's outstanding balance
- * and persist it in stripe_payment_links. The amount is always computed
- * server-side from the agreement record — never trust a client-submitted
- * amount for this.
- *
- * @param array<string, mixed> $agreement
- * @return array<string, mixed> the stripe_payment_links row
- */
-function stripe_create_checkout_session_for_agreement(PDO $pdo, array $agreement, string $successUrl, string $cancelUrl, ?int $createdByUserId = null): array
+function stripe_payment_link_public_expires_at(array $link): int
 {
-    ensureStripeSchema($pdo);
-
-    if ((int) ($agreement['is_complimentary'] ?? 0) === 1) {
-        throw new RuntimeException('Complimentary agreements cannot be charged.');
+    $slug = trim((string) ($link['slug'] ?? ''));
+    $stripeExpiresAt = trim((string) ($link['expires_at'] ?? ''));
+    if ($slug === '') {
+        $timestamp = $stripeExpiresAt !== '' ? strtotime($stripeExpiresAt) : false;
+        return $timestamp !== false ? $timestamp : time();
     }
 
-    $amount = stripe_agreement_outstanding_amount($agreement);
-    if ($amount <= 0) {
-        throw new RuntimeException('This agreement has no outstanding balance.');
+    $publicExpiresAt = trim((string) ($link['public_expires_at'] ?? ''));
+    if ($publicExpiresAt !== '') {
+        $timestamp = strtotime($publicExpiresAt);
+        if ($timestamp !== false) {
+            return $timestamp;
+        }
     }
 
+    $createdAt = trim((string) ($link['created_at'] ?? ''));
+    if ($createdAt !== '') {
+        $timestamp = strtotime($createdAt . ' +' . stripe_public_link_expiry_days() . ' days');
+        if ($timestamp !== false) {
+            return $timestamp;
+        }
+    }
+
+    $timestamp = $stripeExpiresAt !== '' ? strtotime($stripeExpiresAt) : false;
+    return $timestamp !== false ? $timestamp : time();
+}
+
+function stripe_create_checkout_session_payload(array $agreement, float $amount, string $successUrl, string $cancelUrl): array
+{
     $currency = stripe_default_currency();
     $expiresAt = time() + (stripe_link_expiry_hours() * 3600);
 
@@ -407,11 +436,158 @@ function stripe_create_checkout_session_for_agreement(PDO $pdo, array $agreement
         $params['customer_email'] = $contactEmail;
     }
 
+    return [$params, $currency, $expiresAt];
+}
+
+function stripe_refresh_payment_link_checkout_session(PDO $pdo, array $link): array
+{
+    ensureStripeSchema($pdo);
+
+    if ((string) ($link['status'] ?? '') === 'complete') {
+        return $link;
+    }
+
+    $links = [$link];
+    $slug = trim((string) ($link['slug'] ?? ''));
+    if ($slug !== '') {
+        $stmt = $pdo->prepare("SELECT * FROM stripe_payment_links WHERE slug = :slug AND status <> 'complete' ORDER BY id");
+        $stmt->execute([':slug' => $slug]);
+        $slugLinks = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        if ($slugLinks) {
+            $links = $slugLinks;
+        }
+    }
+
+    $chargeable = [];
+    foreach ($links as $candidate) {
+        $agreement = getSponsorshipAgreement($pdo, (int) ($candidate['agreement_id'] ?? 0));
+        if (!$agreement) {
+            throw new RuntimeException('Agreement not found.');
+        }
+        $amount = stripe_agreement_outstanding_amount($agreement);
+        if ($amount <= 0) {
+            $pdo->prepare("UPDATE stripe_payment_links SET status = 'complete' WHERE id = :id")
+                ->execute([':id' => (int) $candidate['id']]);
+            continue;
+        }
+        $chargeable[] = ['link' => $candidate, 'agreement' => $agreement, 'amount' => $amount];
+    }
+
+    if (!$chargeable) {
+        $stmt = $pdo->prepare('SELECT * FROM stripe_payment_links WHERE id = :id');
+        $stmt->execute([':id' => (int) $link['id']]);
+        return $stmt->fetch(PDO::FETCH_ASSOC) ?: $link;
+    }
+
+    $firstAgreement = $chargeable[0]['agreement'];
+    $baseUrl = stripe_public_base_url() . '/sponsorship_agreement.php?id=' . (int) $firstAgreement['id'];
+    $successUrl = $baseUrl . '&stripe=success&session_id={CHECKOUT_SESSION_ID}';
+    $cancelUrl = $baseUrl . '&stripe=cancelled';
+
+    if (count($chargeable) === 1) {
+        [$params, $currency, $expiresAt] = stripe_create_checkout_session_payload($firstAgreement, (float) $chargeable[0]['amount'], $successUrl, $cancelUrl);
+    } else {
+        $currency = stripe_default_currency();
+        $expiresAt = time() + (stripe_link_expiry_hours() * 3600);
+        $lineItems = [];
+        $agreementIds = [];
+        $contactEmail = '';
+        foreach ($chargeable as $item) {
+            $agreement = $item['agreement'];
+            $lineItems[] = [
+                'quantity' => 1,
+                'price_data' => [
+                    'currency' => $currency,
+                    'unit_amount' => stripe_amount_to_minor_units((float) $item['amount'], $currency),
+                    'product_data' => [
+                        'name' => stripe_agreement_display_name($agreement),
+                        'description' => 'Sponsorship payment — Saltcoats Victoria FC',
+                    ],
+                ],
+            ];
+            $agreementIds[] = (int) $agreement['id'];
+            if ($contactEmail === '') {
+                $candidateEmail = trim((string) ($agreement['sponsor_contact_email'] ?? ''));
+                if ($candidateEmail !== '' && filter_var($candidateEmail, FILTER_VALIDATE_EMAIL)) {
+                    $contactEmail = $candidateEmail;
+                }
+            }
+        }
+        $params = [
+            'mode' => 'payment',
+            'success_url' => $successUrl,
+            'cancel_url' => $cancelUrl,
+            'expires_at' => $expiresAt,
+            'line_items' => $lineItems,
+            'metadata' => [
+                'agreement_ids' => implode(',', $agreementIds),
+                'sponsor_id' => (string) ($firstAgreement['sponsor_id'] ?? ''),
+            ],
+        ];
+        if ($contactEmail !== '') {
+            $params['customer_email'] = $contactEmail;
+        }
+    }
+
     $session = stripe_request('POST', '/checkout/sessions', $params);
 
+    $update = $pdo->prepare("UPDATE stripe_payment_links
+        SET stripe_checkout_session_id = :session_id,
+            stripe_payment_intent_id = :payment_intent_id,
+            amount = :amount,
+            currency = :currency,
+            url = :url,
+            status = 'open',
+            expires_at = :expires_at
+        WHERE id = :id");
+    foreach ($chargeable as $item) {
+        $update
+            ->execute([
+                ':session_id' => (string) $session['id'],
+                ':payment_intent_id' => is_string($session['payment_intent'] ?? null) ? $session['payment_intent'] : null,
+                ':amount' => (float) $item['amount'],
+                ':currency' => $currency,
+                ':url' => (string) $session['url'],
+                ':expires_at' => date('Y-m-d H:i:s', $expiresAt),
+                ':id' => (int) $item['link']['id'],
+            ]);
+    }
+
+    $stmt = $pdo->prepare('SELECT * FROM stripe_payment_links WHERE id = :id');
+    $stmt->execute([':id' => (int) $link['id']]);
+    return $stmt->fetch(PDO::FETCH_ASSOC) ?: $link;
+}
+
+/**
+ * Create a Stripe Checkout Session for an agreement's outstanding balance
+ * and persist it in stripe_payment_links. The amount is always computed
+ * server-side from the agreement record — never trust a client-submitted
+ * amount for this.
+ *
+ * @param array<string, mixed> $agreement
+ * @return array<string, mixed> the stripe_payment_links row
+ */
+function stripe_create_checkout_session_for_agreement(PDO $pdo, array $agreement, string $successUrl, string $cancelUrl, ?int $createdByUserId = null): array
+{
+    ensureStripeSchema($pdo);
+
+    if ((int) ($agreement['is_complimentary'] ?? 0) === 1) {
+        throw new RuntimeException('Complimentary agreements cannot be charged.');
+    }
+
+    $amount = stripe_agreement_outstanding_amount($agreement);
+    if ($amount <= 0) {
+        throw new RuntimeException('This agreement has no outstanding balance.');
+    }
+
+    [$params, $currency, $expiresAt] = stripe_create_checkout_session_payload($agreement, $amount, $successUrl, $cancelUrl);
+
+    $session = stripe_request('POST', '/checkout/sessions', $params);
+    $publicExpiresAt = time() + (stripe_public_link_expiry_days() * 86400);
+
     $stmt = $pdo->prepare('INSERT INTO stripe_payment_links
-        (agreement_id, stripe_checkout_session_id, stripe_payment_intent_id, amount, currency, url, status, created_by, created_at, expires_at)
-        VALUES (:agreement_id, :session_id, :payment_intent_id, :amount, :currency, :url, :status, :created_by, NOW(), :expires_at)');
+        (agreement_id, stripe_checkout_session_id, stripe_payment_intent_id, amount, currency, url, status, created_by, created_at, expires_at, public_expires_at)
+        VALUES (:agreement_id, :session_id, :payment_intent_id, :amount, :currency, :url, :status, :created_by, NOW(), :expires_at, :public_expires_at)');
     $stmt->execute([
         ':agreement_id' => (int) $agreement['id'],
         ':session_id' => (string) $session['id'],
@@ -422,6 +598,7 @@ function stripe_create_checkout_session_for_agreement(PDO $pdo, array $agreement
         ':status' => 'open',
         ':created_by' => $createdByUserId,
         ':expires_at' => date('Y-m-d H:i:s', $expiresAt),
+        ':public_expires_at' => date('Y-m-d H:i:s', $publicExpiresAt),
     ]);
 
     $linkId = (int) $pdo->lastInsertId();
@@ -523,10 +700,11 @@ function stripe_create_checkout_session_for_bundle(PDO $pdo, array $agreements, 
     $sessionId = (string) $session['id'];
     $paymentIntentId = is_string($session['payment_intent'] ?? null) ? $session['payment_intent'] : null;
     $url = (string) $session['url'];
+    $publicExpiresAt = time() + (stripe_public_link_expiry_days() * 86400);
 
     $insert = $pdo->prepare('INSERT INTO stripe_payment_links
-        (agreement_id, stripe_checkout_session_id, stripe_payment_intent_id, amount, currency, url, status, created_by, created_at, expires_at)
-        VALUES (:agreement_id, :session_id, :payment_intent_id, :amount, :currency, :url, :status, :created_by, NOW(), :expires_at)');
+        (agreement_id, stripe_checkout_session_id, stripe_payment_intent_id, amount, currency, url, status, created_by, created_at, expires_at, public_expires_at)
+        VALUES (:agreement_id, :session_id, :payment_intent_id, :amount, :currency, :url, :status, :created_by, NOW(), :expires_at, :public_expires_at)');
     foreach ($chargeable as $item) {
         $insert->execute([
             ':agreement_id' => (int) $item['agreement']['id'],
@@ -538,6 +716,7 @@ function stripe_create_checkout_session_for_bundle(PDO $pdo, array $agreements, 
             ':status' => 'open',
             ':created_by' => $createdByUserId,
             ':expires_at' => date('Y-m-d H:i:s', $expiresAt),
+            ':public_expires_at' => date('Y-m-d H:i:s', $publicExpiresAt),
         ]);
     }
 
@@ -564,23 +743,32 @@ function stripe_create_checkout_session_for_bundle(PDO $pdo, array $agreements, 
  */
 function stripe_expire_payment_link(PDO $pdo, array $link): void
 {
-    if ((string) $link['status'] !== 'open') {
+    if ((string) $link['status'] === 'complete') {
         return;
     }
 
-    try {
-        stripe_request('POST', '/checkout/sessions/' . rawurlencode((string) $link['stripe_checkout_session_id']) . '/expire');
-    } catch (StripeApiException $e) {
-        // Already expired/completed on Stripe's side (e.g. the sponsor paid or it lapsed
-        // moments ago) — fall through and reconcile our local status regardless.
+    if ((string) $link['status'] === 'open') {
+        try {
+            stripe_request('POST', '/checkout/sessions/' . rawurlencode((string) $link['stripe_checkout_session_id']) . '/expire');
+        } catch (StripeApiException $e) {
+            // Already expired/completed on Stripe's side (e.g. the sponsor paid or it lapsed
+            // moments ago) — fall through and reconcile our local status regardless.
+        }
     }
 
     // Stripe expires the whole Checkout Session, not one line item — a bundle's combined
     // link is several local rows sharing that one session, so every sibling (not just the
     // row that was clicked) needs to flip to expired, or the others would be stuck showing
     // "open" locally for a link that no longer actually works.
-    $pdo->prepare("UPDATE stripe_payment_links SET status = 'expired' WHERE stripe_checkout_session_id = :session_id AND status = 'open'")
+    $pdo->prepare("UPDATE stripe_payment_links SET status = 'expired', public_expires_at = NOW() WHERE stripe_checkout_session_id = :session_id AND status = 'open'")
         ->execute([':session_id' => (string) $link['stripe_checkout_session_id']]);
+    $pdo->prepare("UPDATE stripe_payment_links SET status = 'expired', public_expires_at = NOW() WHERE id = :id")
+        ->execute([':id' => (int) $link['id']]);
+    $slug = trim((string) ($link['slug'] ?? ''));
+    if ($slug !== '') {
+        $pdo->prepare("UPDATE stripe_payment_links SET status = 'expired', public_expires_at = NOW() WHERE slug = :slug AND status <> 'complete'")
+            ->execute([':slug' => $slug]);
+    }
 }
 
 /**
@@ -627,7 +815,7 @@ function stripe_agreement_context_lines(array $agreement): array
 function stripe_build_payment_message(string $sponsorName, array $agreement, array $link): string
 {
     $amount = gbp((float) $link['amount']);
-    $expires = date('d/m/Y H:i', strtotime((string) $link['expires_at']));
+    $expires = date('d/m/Y H:i', stripe_payment_link_public_expires_at($link));
 
     $out = [];
     $out[] = 'Saltcoats Victoria FC — Sponsorship Payment';
@@ -662,7 +850,7 @@ function stripe_build_payment_message(string $sponsorName, array $agreement, arr
 function stripe_build_payment_email_html(string $sponsorName, array $agreement, array $link): string
 {
     $amount = gbp((float) $link['amount']);
-    $expires = date('d/m/Y H:i', strtotime((string) $link['expires_at']));
+    $expires = date('d/m/Y H:i', stripe_payment_link_public_expires_at($link));
     $url = stripe_payment_link_public_url($link);
     $greetingName = $sponsorName !== '' ? h($sponsorName) : 'there';
 
@@ -694,11 +882,7 @@ function stripe_build_payment_email_html(string $sponsorName, array $agreement, 
 }
 
 /**
- * Email a payment link to a sponsor, reusing the mail() approach from
- * hub_users_send_password_reset_email() in hub/users_lib.php (no
- * PHPMailer/SMTP library is used anywhere in this project). Sent as
- * multipart/alternative so both a plain-text fallback and the styled HTML
- * button version are included.
+ * Email a payment link to a sponsor through the shared SMTP mailer.
  *
  * @param array<string, mixed> $agreement
  * @param array<string, mixed> $link
@@ -711,30 +895,10 @@ function stripe_send_payment_link_email(string $toEmail, string $sponsorName, ar
 
     $amount = gbp((float) $link['amount']);
     $subject = 'Sponsorship payment request — ' . $amount;
-    $fromAddress = 'no-reply@' . preg_replace('/^www\./', '', preg_replace('/:\d+$/', '', strtolower((string) ($_SERVER['HTTP_HOST'] ?? 'lundy.me.uk'))));
-
     $textBody = stripe_build_payment_message($sponsorName, $agreement, $link);
     $htmlBody = stripe_build_payment_email_html($sponsorName, $agreement, $link);
 
-    $boundary = 'stripe_' . bin2hex(random_bytes(12));
-    $headers = implode("\r\n", [
-        'MIME-Version: 1.0',
-        'From: Saltcoats Victoria FC <' . $fromAddress . '>',
-        'Content-Type: multipart/alternative; boundary="' . $boundary . '"',
-    ]);
-
-    $body = "--{$boundary}\r\n"
-        . "Content-Type: text/plain; charset=UTF-8\r\n"
-        . "Content-Transfer-Encoding: 8bit\r\n\r\n"
-        . $textBody . "\r\n\r\n"
-        . "--{$boundary}\r\n"
-        . "Content-Type: text/html; charset=UTF-8\r\n"
-        . "Content-Transfer-Encoding: 8bit\r\n\r\n"
-        . $htmlBody . "\r\n\r\n"
-        . "--{$boundary}--";
-
-    $sent = @mail($toEmail, $subject, $body, $headers, '-f' . $fromAddress);
-    return (bool) $sent;
+    return hub_send_mail($toEmail, $subject, $htmlBody, true);
 }
 
 /**
@@ -1033,6 +1197,15 @@ function stripe_handle_checkout_session_completed(PDO $pdo, array $session): voi
             ]);
 
         stripe_record_agreement_payment($pdo, $agreement, $amount, 'Stripe payment (session ' . $sessionId . ')');
+        stripe_send_payment_notification(
+            $pdo,
+            'Sponsorship',
+            (string) ($agreement['sponsor_name'] ?? ''),
+            (string) ($agreement['sponsor_contact_email'] ?? ''),
+            $amount,
+            (string) ($agreement['package_name'] ?? 'Sponsorship') . ' agreement #' . (int) $agreement['id'],
+            stripe_public_base_url() . '/sponsorship_agreement.php?id=' . (int) $agreement['id']
+        );
     }
 }
 
@@ -1172,6 +1345,493 @@ function stripe_create_refund(PDO $pdo, array $transaction, float $amount, ?stri
     return $response;
 }
 
+function stripe_table_exists(PDO $pdo, string $table): bool
+{
+    if (!preg_match('/^[A-Za-z0-9_]+$/', $table)) {
+        return false;
+    }
+
+    try {
+        $stmt = $pdo->query("SHOW TABLES LIKE " . $pdo->quote($table));
+        return (bool) ($stmt && $stmt->fetchColumn());
+    } catch (Throwable $e) {
+        return false;
+    }
+}
+
+/**
+ * @return list<int>
+ */
+function stripe_notification_env_account_ids(array $env): array
+{
+    $ids = [];
+    foreach (preg_split('/[,;\s]+/', (string) ($env['ORDER_NOTIFICATION_ACCOUNT_IDS'] ?? '')) ?: [] as $id) {
+        $id = trim((string) $id);
+        if ($id !== '' && ctype_digit($id) && (int) $id > 0) {
+            $ids[(int) $id] = (int) $id;
+        }
+    }
+
+    return array_values($ids);
+}
+
+/**
+ * @return list<string>
+ */
+function stripe_notification_env_emails(array $env, bool $includeLegacy = true): array
+{
+    $emails = [];
+    $keys = $includeLegacy
+        ? ['STRIPE_NOTIFICATION_EMAILS', 'PAYMENT_NOTIFICATION_EMAILS', 'ORDER_NOTIFICATION_EMAILS']
+        : ['ORDER_NOTIFICATION_EMAILS'];
+    foreach ($keys as $key) {
+        foreach (preg_split('/[,;\s]+/', (string) ($env[$key] ?? '')) ?: [] as $email) {
+            $email = trim((string) $email);
+            if ($email !== '' && filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                $emails[strtolower($email)] = $email;
+            }
+        }
+    }
+
+    return array_values($emails);
+}
+
+function stripe_notification_ensure_schema(PDO $pdo): void
+{
+    static $done = false;
+    if ($done) {
+        return;
+    }
+    $done = true;
+
+    $pdo->exec("CREATE TABLE IF NOT EXISTS payment_notification_recipients (
+        id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+        recipient_type VARCHAR(20) NOT NULL,
+        account_id INT UNSIGNED NULL,
+        email VARCHAR(190) NULL,
+        email_normalized VARCHAR(190) NULL,
+        created_by BIGINT UNSIGNED NULL,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        UNIQUE KEY uq_payment_notification_account (account_id),
+        UNIQUE KEY uq_payment_notification_email (email_normalized),
+        KEY idx_payment_notification_type (recipient_type)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+}
+
+function stripe_notification_seed_from_env(PDO $pdo, array $env, ?int $createdBy = null): void
+{
+    try {
+        stripe_notification_ensure_schema($pdo);
+        $count = (int) $pdo->query('SELECT COUNT(*) FROM payment_notification_recipients')->fetchColumn();
+        if ($count > 0) {
+            return;
+        }
+
+        $accountIds = stripe_notification_env_account_ids($env);
+        $emails = stripe_notification_env_emails($env);
+        if ($accountIds === [] && $emails === []) {
+            return;
+        }
+
+        stripe_notification_save_lists($pdo, $accountIds, $emails, $createdBy);
+    } catch (Throwable $e) {
+    }
+}
+
+/**
+ * @return list<int>
+ */
+function stripe_notification_account_ids(PDO $pdo): array
+{
+    try {
+        stripe_notification_ensure_schema($pdo);
+        $stmt = $pdo->query("SELECT account_id FROM payment_notification_recipients WHERE recipient_type = 'account' AND account_id IS NOT NULL ORDER BY id");
+        $ids = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $id) {
+            $id = (int) $id;
+            if ($id > 0) {
+                $ids[$id] = $id;
+            }
+        }
+
+        return array_values($ids);
+    } catch (Throwable $e) {
+        return [];
+    }
+}
+
+/**
+ * @return list<string>
+ */
+function stripe_notification_manual_emails(PDO $pdo): array
+{
+    try {
+        stripe_notification_ensure_schema($pdo);
+        $stmt = $pdo->query("SELECT email FROM payment_notification_recipients WHERE recipient_type = 'email' AND email IS NOT NULL AND TRIM(email) <> '' ORDER BY email");
+        $emails = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $email) {
+            $email = trim((string) $email);
+            if ($email !== '' && filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                $emails[strtolower($email)] = $email;
+            }
+        }
+
+        return array_values($emails);
+    } catch (Throwable $e) {
+        return [];
+    }
+}
+
+/**
+ * @param list<int> $accountIds
+ * @param list<string> $manualEmails
+ */
+function stripe_notification_save_lists(PDO $pdo, array $accountIds, array $manualEmails, ?int $createdBy = null): bool
+{
+    $cleanIds = [];
+    foreach ($accountIds as $accountId) {
+        $accountId = (int) $accountId;
+        if ($accountId > 0) {
+            $cleanIds[$accountId] = $accountId;
+        }
+    }
+
+    $cleanEmails = [];
+    foreach ($manualEmails as $email) {
+        $email = trim((string) $email);
+        if ($email !== '' && filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $cleanEmails[strtolower($email)] = $email;
+        }
+    }
+
+    try {
+        stripe_notification_ensure_schema($pdo);
+        $pdo->beginTransaction();
+        $pdo->exec('DELETE FROM payment_notification_recipients');
+
+        $accountStmt = $pdo->prepare("INSERT INTO payment_notification_recipients (recipient_type, account_id, created_by) VALUES ('account', :account_id, :created_by)");
+        foreach ($cleanIds as $accountId) {
+            $accountStmt->execute([
+                ':account_id' => $accountId,
+                ':created_by' => $createdBy,
+            ]);
+        }
+
+        $emailStmt = $pdo->prepare("INSERT INTO payment_notification_recipients (recipient_type, email, email_normalized, created_by) VALUES ('email', :email, :email_normalized, :created_by)");
+        foreach ($cleanEmails as $normalized => $email) {
+            $emailStmt->execute([
+                ':email' => $email,
+                ':email_normalized' => $normalized,
+                ':created_by' => $createdBy,
+            ]);
+        }
+
+        $pdo->commit();
+        return true;
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+
+        return false;
+    }
+}
+
+/**
+ * @return list<string>
+ */
+function stripe_notification_recipients(PDO $pdo): array
+{
+    $emails = [];
+    $env = stripe_env();
+    stripe_notification_seed_from_env($pdo, $env);
+
+    $dbAccountIds = stripe_notification_account_ids($pdo);
+    $dbManualEmails = stripe_notification_manual_emails($pdo);
+    $hasExplicitRecipients = $dbAccountIds !== []
+        || $dbManualEmails !== []
+        || trim((string) ($env['ORDER_NOTIFICATION_ACCOUNT_IDS'] ?? '')) !== ''
+        || trim((string) ($env['ORDER_NOTIFICATION_EMAILS'] ?? '')) !== ''
+        || trim((string) ($env['PAYMENT_NOTIFICATION_EMAILS'] ?? '')) !== ''
+        || trim((string) ($env['STRIPE_NOTIFICATION_EMAILS'] ?? '')) !== '';
+
+    $accountIds = $dbAccountIds !== [] ? $dbAccountIds : stripe_notification_env_account_ids($env);
+    if ($accountIds !== [] && stripe_table_exists($pdo, 'accounts') && stripe_table_exists($pdo, 'people')) {
+        try {
+            $placeholders = implode(',', array_fill(0, count($accountIds), '?'));
+            $stmt = $pdo->prepare("SELECT COALESCE(NULLIF(TRIM(p.email), ''), NULLIF(TRIM(a.email), '')) AS email
+                FROM accounts a
+                JOIN people p ON p.id = a.person_id
+                WHERE a.id IN ({$placeholders})
+                  AND a.is_active = 1
+                  AND p.is_active = 1");
+            $stmt->execute(array_values($accountIds));
+            foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $email) {
+                $email = trim((string) $email);
+                if ($email !== '' && filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                    $emails[strtolower($email)] = $email;
+                }
+            }
+        } catch (Throwable $e) {
+        }
+    }
+
+    foreach ($dbManualEmails !== [] ? $dbManualEmails : stripe_notification_env_emails($env) as $email) {
+        $emails[strtolower($email)] = $email;
+    }
+
+    if (stripe_table_exists($pdo, 'shop_settings')) {
+        try {
+            $stmt = $pdo->query("SELECT setting_value FROM shop_settings WHERE setting_key = 'contact_email' LIMIT 1");
+            $email = trim((string) ($stmt ? $stmt->fetchColumn() : ''));
+            if ($email !== '' && filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                $hasExplicitRecipients = true;
+                $emails[strtolower($email)] = $email;
+            }
+        } catch (Throwable $e) {
+        }
+    }
+
+    if (!$hasExplicitRecipients && stripe_table_exists($pdo, 'users')) {
+        try {
+            $stmt = $pdo->query("SELECT email FROM users WHERE is_active = 1 AND role IN ('admin','super_admin','treasurer') ORDER BY id LIMIT 10");
+            foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $email) {
+                $email = trim((string) $email);
+                if ($email !== '' && filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                    $emails[strtolower($email)] = $email;
+                }
+            }
+        } catch (Throwable $e) {
+        }
+    }
+
+    return array_values($emails);
+}
+
+function stripe_send_payment_notification(PDO $pdo, string $source, string $customerName, string $customerEmail, float $amount, string $reference, ?string $manageUrl = null): void
+{
+    $recipients = stripe_notification_recipients($pdo);
+    if ($recipients === []) {
+        return;
+    }
+
+    $subject = '[' . $source . '] New payment received - ' . gbp($amount);
+    $lines = [
+        'A new payment has been received.',
+        '',
+        'Source: ' . $source,
+        'Reference: ' . $reference,
+        'Customer: ' . ($customerName !== '' ? $customerName : 'Unknown'),
+        'Email: ' . ($customerEmail !== '' ? $customerEmail : 'Unknown'),
+        'Amount: ' . gbp($amount),
+    ];
+    if ($manageUrl !== null && $manageUrl !== '') {
+        $lines[] = 'Manage: ' . $manageUrl;
+    }
+    $lines[] = '';
+    $lines[] = 'My Club Hub';
+
+    foreach ($recipients as $to) {
+        hub_send_mail($to, $subject, implode("\n", $lines), false);
+    }
+}
+
+/**
+ * @return list<array<string, mixed>>
+ */
+function stripe_get_all_transactions(PDO $pdo, array $filters = []): array
+{
+    ensureStripeSchema($pdo);
+
+    $rows = [];
+    $status = trim((string) ($filters['status'] ?? ''));
+    $seasonId = (int) ($filters['season_id'] ?? 0);
+    $from = trim((string) ($filters['from'] ?? ''));
+    $to = trim((string) ($filters['to'] ?? ''));
+    $limit = isset($filters['limit']) ? max(1, min((int) $filters['limit'], 500)) : 0;
+
+    $include = static function (array $row) use ($status, $seasonId, $from, $to): bool {
+        if ($status !== '' && (string) $row['status'] !== $status) {
+            return false;
+        }
+        if ($seasonId > 0 && (int) ($row['season_id'] ?? 0) !== $seasonId) {
+            return false;
+        }
+        $createdAt = (string) ($row['created_at'] ?? '');
+        if ($from !== '' && $createdAt < $from . ' 00:00:00') {
+            return false;
+        }
+        if ($to !== '' && $createdAt > $to . ' 23:59:59') {
+            return false;
+        }
+        return true;
+    };
+
+    foreach (stripe_get_transactions($pdo, []) as $row) {
+        $item = $row + [
+            'source' => 'Sponsorship',
+            'customer_name' => (string) ($row['sponsor_name'] ?? ''),
+            'customer_email' => '',
+            'description' => (string) ($row['package_name'] ?? ''),
+            'manage_url' => 'sponsorship_agreement.php?id=' . (int) $row['agreement_id'],
+            'local_transaction_id' => (int) $row['id'],
+        ];
+        if ($include($item)) {
+            $rows[] = $item;
+        }
+    }
+
+    if (stripe_table_exists($pdo, 'payments') && stripe_table_exists($pdo, 'orders') && stripe_table_exists($pdo, 'order_items')) {
+        $hasSeasonPassTables = stripe_table_exists($pdo, 'entitlements') && stripe_table_exists($pdo, 'season_passes');
+        $hasMatchTicketTables = stripe_table_exists($pdo, 'fixture_ticket_packages') && stripe_table_exists($pdo, 'match_fixtures');
+        $seasonSelect = $hasSeasonPassTables ? 'MAX(sp.season_id)' : '0';
+        $fixtureSeasonSelect = $hasMatchTicketTables ? 'MAX(mf.season_id)' : '0';
+        $seasonJoins = $hasSeasonPassTables
+            ? 'LEFT JOIN entitlements e ON e.order_item_id = oi.id
+                LEFT JOIN season_passes sp ON sp.entitlement_id = e.id'
+            : '';
+        $matchTicketJoins = $hasMatchTicketTables
+            ? "LEFT JOIN fixture_ticket_packages ftp ON ftp.id = oi.product_reference_id AND oi.product_type = 'match_ticket'
+                LEFT JOIN match_fixtures mf ON mf.id = ftp.fixture_id"
+            : '';
+        $refundJoin = stripe_table_exists($pdo, 'refunds')
+            ? "LEFT JOIN (
+                    SELECT payment_id, SUM(amount) AS refunded_amount
+                    FROM refunds
+                    WHERE status IN ('complete','completed','succeeded','paid')
+                    GROUP BY payment_id
+                ) ref ON ref.payment_id = pay.id"
+            : "LEFT JOIN (SELECT NULL AS payment_id, 0 AS refunded_amount) ref ON ref.payment_id = pay.id";
+        $sql = "SELECT pay.id, pay.provider_payment_id AS stripe_payment_intent_id,
+                   pay.provider_checkout_session_id AS stripe_checkout_session_id,
+                   pay.amount, pay.currency, pay.status,
+                   COALESCE(ref.refunded_amount, 0) AS refunded_amount,
+                   COALESCE(pay.paid_at, pay.created_at) AS created_at,
+                   o.id AS order_id, o.customer_name, COALESCE(o.customer_email, '') AS customer_email,
+                   GROUP_CONCAT(DISTINCT oi.product_type ORDER BY oi.product_type SEPARATOR ', ') AS product_types,
+                   GROUP_CONCAT(DISTINCT oi.description_snapshot ORDER BY oi.id SEPARATOR ', ') AS description,
+                   {$seasonSelect} AS season_id,
+                   {$fixtureSeasonSelect} AS fixture_season_id
+                FROM payments pay
+                JOIN orders o ON o.id = pay.order_id
+                JOIN order_items oi ON oi.order_id = o.id
+                {$refundJoin}
+                {$seasonJoins}
+                {$matchTicketJoins}
+                WHERE pay.provider = 'stripe' AND pay.status IN ('paid','refunded','partially_refunded')
+                GROUP BY pay.id, pay.provider_payment_id, pay.provider_checkout_session_id, pay.amount, pay.currency, pay.status,
+                         pay.paid_at, pay.created_at, o.id, o.customer_name, o.customer_email, ref.refunded_amount
+                ORDER BY created_at DESC, pay.id DESC";
+        foreach ($pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $productTypes = (string) ($row['product_types'] ?? '');
+            $source = str_contains($productTypes, 'match_ticket') ? 'Match tickets' : (str_contains($productTypes, 'season_ticket') ? 'Season tickets' : 'Orders');
+            $item = [
+                'id' => 'payment:' . (int) $row['id'],
+                'source' => $source,
+                'customer_name' => (string) $row['customer_name'],
+                'customer_email' => (string) $row['customer_email'],
+                'description' => (string) $row['description'],
+                'amount' => (float) $row['amount'],
+                'currency' => strtolower((string) $row['currency']),
+                'status' => (string) $row['status'] === 'paid' ? 'succeeded' : (string) $row['status'],
+                'refunded_amount' => (float) $row['refunded_amount'],
+                'created_at' => (string) $row['created_at'],
+                'season_id' => (int) ($row['season_id'] ?: $row['fixture_season_id'] ?: 0),
+                'stripe_payment_intent_id' => (string) ($row['stripe_payment_intent_id'] ?? ''),
+                'stripe_checkout_session_id' => (string) ($row['stripe_checkout_session_id'] ?? ''),
+                'manage_url' => str_contains($productTypes, 'season_ticket') ? 'season_ticket_orders.php?id=' . (int) $row['order_id'] : 'ticket_orders.php?id=' . (int) $row['order_id'],
+            ];
+            if ($include($item)) {
+                $rows[] = $item;
+            }
+        }
+    }
+
+    if (stripe_table_exists($pdo, 'shop_orders')) {
+        $sql = "SELECT id, order_ref, customer_name, customer_email, total AS amount, currency, amount_refunded AS refunded_amount,
+                   status, COALESCE(paid_at, created_at) AS created_at, stripe_payment_intent_id, stripe_checkout_session_id
+                FROM shop_orders
+                WHERE (stripe_payment_intent_id IS NOT NULL OR stripe_checkout_session_id IS NOT NULL)
+                  AND status IN ('paid','collected','refunded')
+                ORDER BY created_at DESC, id DESC";
+        foreach ($pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $item = [
+                'id' => 'shop:' . (int) $row['id'],
+                'source' => 'Club shop',
+                'customer_name' => (string) $row['customer_name'],
+                'customer_email' => (string) $row['customer_email'],
+                'description' => 'Shop order ' . (string) $row['order_ref'],
+                'amount' => (float) $row['amount'],
+                'currency' => strtolower((string) $row['currency']),
+                'status' => (string) $row['status'] === 'refunded' ? 'refunded' : 'succeeded',
+                'refunded_amount' => (float) $row['refunded_amount'],
+                'created_at' => (string) $row['created_at'],
+                'season_id' => 0,
+                'stripe_payment_intent_id' => (string) ($row['stripe_payment_intent_id'] ?? ''),
+                'stripe_checkout_session_id' => (string) ($row['stripe_checkout_session_id'] ?? ''),
+                'manage_url' => 'shop_order.php?id=' . (int) $row['id'],
+            ];
+            if ($include($item)) {
+                $rows[] = $item;
+            }
+        }
+    }
+
+    if (stripe_table_exists($pdo, 'hidden_team_payments')) {
+        $sql = "SELECT p.id, p.amount, 'gbp' AS currency, p.status, p.paid_at AS created_at,
+                   p.stripe_payment_intent_id, p.stripe_checkout_session_id,
+                   t.supporter_name AS customer_name, t.team_name, g.name AS game_name, g.season_id
+                FROM hidden_team_payments p
+                JOIN hidden_team_teams t ON t.id = p.team_id
+                JOIN hidden_team_games g ON g.id = t.game_id
+                WHERE p.method = 'stripe'
+                ORDER BY p.paid_at DESC, p.id DESC";
+        foreach ($pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $item = [
+                'id' => 'hidden_team:' . (int) $row['id'],
+                'source' => 'Hidden team',
+                'customer_name' => (string) $row['customer_name'],
+                'customer_email' => '',
+                'description' => (string) $row['game_name'] . ' - ' . (string) $row['team_name'],
+                'amount' => (float) $row['amount'],
+                'currency' => (string) $row['currency'],
+                'status' => (string) $row['status'] === 'conflict' ? 'partially_refunded' : 'succeeded',
+                'refunded_amount' => 0.0,
+                'created_at' => (string) $row['created_at'],
+                'season_id' => (int) ($row['season_id'] ?? 0),
+                'stripe_payment_intent_id' => (string) ($row['stripe_payment_intent_id'] ?? ''),
+                'stripe_checkout_session_id' => (string) ($row['stripe_checkout_session_id'] ?? ''),
+                'manage_url' => 'hidden_team_games.php',
+            ];
+            if ($include($item)) {
+                $rows[] = $item;
+            }
+        }
+    }
+
+    usort($rows, static fn(array $a, array $b): int => strcmp((string) $b['created_at'], (string) $a['created_at']));
+    return $limit > 0 ? array_slice($rows, 0, $limit) : $rows;
+}
+
+/**
+ * @return array{collected: float, refunded: float, payments: int}
+ */
+function stripe_all_payments_summary(PDO $pdo, array $filters = []): array
+{
+    $rows = stripe_get_all_transactions($pdo, $filters);
+    $collected = 0.0;
+    $refunded = 0.0;
+    foreach ($rows as $row) {
+        $amount = (float) ($row['amount'] ?? 0);
+        $refund = (float) ($row['refunded_amount'] ?? 0);
+        $collected += max(0.0, $amount - $refund);
+        $refunded += max(0.0, $refund);
+    }
+    return ['collected' => round($collected, 2), 'refunded' => round($refunded, 2), 'payments' => count($rows)];
+}
+
 /**
  * @return list<array<string, mixed>>
  */
@@ -1211,6 +1871,25 @@ function stripe_get_transactions(PDO $pdo, array $filters = []): array
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
+function stripe_get_payment_links(PDO $pdo, int $limit = 100): array
+{
+    ensureStripeSchema($pdo);
+
+    $limit = max(1, min($limit, 250));
+    $sql = 'SELECT l.*, s.name AS sponsor_name, p.name AS package_name, a.season_id,
+            pl.name AS player_name, f.opponent AS fixture_opponent, f.match_date AS fixture_date
+        FROM stripe_payment_links l
+        JOIN sponsorship_agreements a ON a.id = l.agreement_id
+        JOIN sponsors s ON s.id = a.sponsor_id
+        JOIN packages p ON p.id = a.package_id
+        LEFT JOIN players pl ON pl.id = a.player_id
+        LEFT JOIN match_fixtures f ON f.id = a.fixture_id
+        ORDER BY l.created_at DESC, l.id DESC
+        LIMIT ' . $limit;
+
+    return $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);
+}
+
 /**
  * @return array{collected: float, pending_links: int, expired_links: int, refunded: float}
  */
@@ -1219,8 +1898,9 @@ function stripe_dashboard_summary(PDO $pdo): array
     ensureStripeSchema($pdo);
 
     $collected = (float) ($pdo->query("SELECT COALESCE(SUM(amount - refunded_amount),0) FROM stripe_transactions WHERE status IN ('succeeded','partially_refunded')")->fetchColumn());
-    $pendingLinks = (int) ($pdo->query("SELECT COUNT(*) FROM stripe_payment_links WHERE status = 'open' AND (expires_at IS NULL OR expires_at > NOW())")->fetchColumn());
-    $expiredLinks = (int) ($pdo->query("SELECT COUNT(*) FROM stripe_payment_links WHERE status = 'expired'")->fetchColumn());
+    $publicExpirySql = "CASE WHEN COALESCE(slug, '') <> '' THEN COALESCE(public_expires_at, DATE_ADD(created_at, INTERVAL " . stripe_public_link_expiry_days() . " DAY), expires_at) ELSE expires_at END";
+    $pendingLinks = (int) ($pdo->query("SELECT COUNT(*) FROM stripe_payment_links WHERE status <> 'complete' AND {$publicExpirySql} > NOW()")->fetchColumn());
+    $expiredLinks = (int) ($pdo->query("SELECT COUNT(*) FROM stripe_payment_links WHERE status <> 'complete' AND {$publicExpirySql} <= NOW()")->fetchColumn());
     $refunded = (float) ($pdo->query('SELECT COALESCE(SUM(refunded_amount),0) FROM stripe_transactions')->fetchColumn());
 
     return [

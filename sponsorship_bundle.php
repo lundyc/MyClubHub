@@ -67,7 +67,7 @@ if($id>0&&$bundle){
   foreach($linksStmt->fetchAll(PDO::FETCH_ASSOC) as $link){
    $sid=(string)$link['stripe_checkout_session_id'];
    if(!isset($stripeSessions[$sid])){
-    $stripeSessions[$sid]=['session_id'=>$sid,'url'=>stripe_payment_link_public_url($link),'status'=>$link['status'],'created_at'=>$link['created_at'],'expires_at'=>$link['expires_at'],'amount'=>0.0,'item_count'=>0,'first_link_id'=>(int)$link['id']];
+    $stripeSessions[$sid]=['session_id'=>$sid,'url'=>stripe_payment_link_public_url($link),'status'=>$link['status'],'created_at'=>$link['created_at'],'expires_at'=>$link['expires_at'],'public_expires_at'=>stripe_payment_link_public_expires_at($link),'amount'=>0.0,'item_count'=>0,'first_link_id'=>(int)$link['id']];
    }
    $stripeSessions[$sid]['amount']+=(float)$link['amount'];
    $stripeSessions[$sid]['item_count']++;
@@ -109,13 +109,16 @@ if($id>0&&$bundle){
   </div>
   <?php if($stripeSessions): ?>
   <div class="table-responsive mt-3"><table class="table table-sm hub-data-table align-middle mb-0"><thead><tr><th>Created</th><th>Items</th><th>Amount</th><th>Status</th><th>Expires</th><th></th></tr></thead><tbody>
-   <?php foreach($stripeSessions as $s): ?><tr>
+   <?php foreach($stripeSessions as $s): ?><?php
+    $linkStatus=(string)$s['status'];
+    if($linkStatus!=='complete')$linkStatus=(int)$s['public_expires_at']>time()?'open':'expired';
+   ?><tr>
     <td><?= h(date('d/m/Y H:i',strtotime((string)$s['created_at']))) ?></td>
     <td><?= (int)$s['item_count'] ?></td>
     <td><?= gbp((float)$s['amount']) ?></td>
-    <td><span class="badge bg-<?= $s['status']==='complete'?'success':($s['status']==='expired'?'secondary':'warning text-dark') ?>"><?= h(ucfirst((string)$s['status'])) ?></span></td>
-    <td><?= h(date('d/m/Y H:i',strtotime((string)$s['expires_at']))) ?></td>
-    <td class="text-end"><?php if($s['status']==='open'): ?><div class="hub-actions hub-actions--end"><button type="button" class="btn btn-sm btn-outline-secondary bundle-stripe-copy-existing-btn" data-url="<?= h((string)$s['url']) ?>">Copy link</button><button type="button" class="btn btn-sm btn-outline-danger bundle-stripe-cancel-btn" data-link-id="<?= (int)$s['first_link_id'] ?>">Cancel</button></div><?php endif; ?></td>
+    <td><span class="badge bg-<?= $linkStatus==='complete'?'success':($linkStatus==='expired'?'secondary':'warning text-dark') ?>"><?= h(ucfirst($linkStatus)) ?></span></td>
+    <td><?= h(date('d/m/Y H:i',(int)$s['public_expires_at'])) ?></td>
+    <td class="text-end"><?php if($linkStatus==='open'): ?><div class="hub-actions hub-actions--end"><button type="button" class="btn btn-sm btn-outline-secondary bundle-stripe-copy-existing-btn" data-url="<?= h((string)$s['url']) ?>">Copy link</button><button type="button" class="btn btn-sm btn-outline-danger bundle-stripe-cancel-btn" data-link-id="<?= (int)$s['first_link_id'] ?>">Cancel</button></div><?php endif; ?></td>
    </tr><?php endforeach; ?>
   </tbody></table></div>
   <?php endif; ?>

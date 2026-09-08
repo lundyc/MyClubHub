@@ -40,6 +40,8 @@ function hub_media_category(string $relativePath): string
     if (str_starts_with($path, 'uploads/sponsors/')) return 'Sponsors';
     if (str_starts_with($path, 'uploads/players/')) return 'Players';
     if (str_starts_with($path, 'uploads/matches/')) return 'Matches';
+    if (str_starts_with($path, 'uploads/history/gallery/')) return 'Club archive';
+    if (str_starts_with($path, 'uploads/history/')) return 'Club archive';
     if (str_starts_with($path, 'uploads/competitions/')) return 'Competitions';
     if (str_starts_with($path, 'uploads/match_fixtures/')) return 'Match fixtures';
     if (str_starts_with($path, 'assets/images/')) return 'Design assets';

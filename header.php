@@ -494,6 +494,9 @@ $documentTitle = $documentTitle !== '' ? $documentTitle . ' – ' . APP_NAME : A
                     <section class="nav-section">
                         <div class="nav-section-label">Overview</div>
                         <ul class="navbar-nav nav-main mb-0">
+                            <?php if (hub_auth_is_developer()): ?>
+                                <li class="nav-item"><a class="nav-link <?= activePage('developer_analytics.php') ?>"<?= hub_nav_current(['developer_analytics.php']) ?> href="/developer_analytics.php"><i class="fa-solid fa-chart-line me-1" aria-hidden="true"></i>Product analytics</a></li>
+                            <?php endif; ?>
                             <li class="nav-item"><a class="nav-link <?= activePage('index.php') ?>"<?= hub_nav_current(['index.php']) ?> href="/index.php"><i class="fa-solid fa-house me-1" aria-hidden="true"></i>Club overview</a></li>
                             <li class="nav-item"><a class="nav-link <?= activePage('club_reminders.php') ?>"<?= hub_nav_current(['club_reminders.php']) ?> href="/club_reminders.php"><i class="fa-solid fa-bell me-1" aria-hidden="true"></i>Reminders</a></li>
                         </ul>
@@ -592,6 +595,19 @@ $documentTitle = $documentTitle !== '' ? $documentTitle . ' – ' . APP_NAME : A
                     </section>
 
                     <section class="nav-section">
+                        <?php $websiteActive = activeGroup(['news.php', 'news_edit.php', 'club_pages.php', 'settings_public.php', 'player_website.php']); ?>
+                        <button class="nav-section-toggle <?= $websiteActive ?>" type="button" data-bs-toggle="collapse" data-bs-target="#hubWebsiteNavigation" data-nav-section="website" aria-expanded="<?= $websiteActive === 'active' ? 'true' : 'false' ?>" aria-controls="hubWebsiteNavigation">
+                            <span>Public website</span><i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
+                        </button>
+                        <ul class="navbar-nav nav-main nav-submenu collapse <?= $websiteActive === 'active' ? 'show' : '' ?> mb-0" id="hubWebsiteNavigation">
+                            <li class="nav-item"><a class="nav-link <?= activeGroup(['news.php', 'news_edit.php']) ?>"<?= hub_nav_current(['news.php', 'news_edit.php']) ?> href="/news.php"><i class="fa-solid fa-newspaper me-1" aria-hidden="true"></i>News</a></li>
+                            <li class="nav-item"><a class="nav-link <?= activePage('club_pages.php') ?>"<?= hub_nav_current(['club_pages.php']) ?> href="/club_pages.php"><i class="fa-solid fa-file-lines me-1" aria-hidden="true"></i>Club pages</a></li>
+                            <li class="nav-item"><a class="nav-link <?= activePage('settings_public.php') ?>"<?= hub_nav_current(['settings_public.php']) ?> href="/settings_public.php"><i class="fa-solid fa-gear me-1" aria-hidden="true"></i>Website settings</a></li>
+                            <li class="nav-item"><a class="nav-link" href="/public/" target="_blank" rel="noopener"><i class="fa-solid fa-arrow-up-right-from-square me-1" aria-hidden="true"></i>View website</a></li>
+                        </ul>
+                    </section>
+
+                    <section class="nav-section">
                         <?php $financeActive = activeGroup(['reports.php', 'stripe_dashboard.php', 'matchday_finance.php', 'matchday_finance_edit.php']); ?>
                         <button class="nav-section-toggle <?= $financeActive ?>" type="button" data-bs-toggle="collapse" data-bs-target="#hubFinanceNavigation" data-nav-section="finance" aria-expanded="<?= $financeActive === 'active' ? 'true' : 'false' ?>" aria-controls="hubFinanceNavigation">
                             <span>Finance</span><i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
@@ -648,13 +664,14 @@ $documentTitle = $documentTitle !== '' ? $documentTitle . ' – ' . APP_NAME : A
 
                     <?php if ($isAdmin): ?>
                         <section class="nav-section">
-                            <?php $adminActive = activeGroup(['match_photos.php', 'media.php', 'facebook_photo_import.php', 'people.php', 'settings.php', 'social_post_settings.php', 'club_people.php', 'club_person.php', 'positions.php']); ?>
+                            <?php $adminActive = activeGroup(['match_photos.php', 'media.php', 'facebook_photo_import.php', 'people.php', 'photo_albums.php', 'photo_album.php', 'settings.php', 'social_post_settings.php', 'club_people.php', 'club_person.php', 'positions.php']); ?>
                             <button class="nav-section-toggle <?= $adminActive ?>" type="button" data-bs-toggle="collapse" data-bs-target="#hubAdminNavigation" data-nav-section="admin" aria-expanded="<?= $adminActive === 'active' ? 'true' : 'false' ?>" aria-controls="hubAdminNavigation">
                                 <span>Admin</span><i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
                             </button>
                             <ul class="navbar-nav nav-main nav-submenu collapse <?= $adminActive === 'active' ? 'show' : '' ?> mb-0" id="hubAdminNavigation">
                                 <li class="nav-item"><a class="nav-link <?= activeGroup(['match_photos.php', 'media.php', 'facebook_photo_import.php']) ?>"<?= hub_nav_current(['match_photos.php', 'media.php', 'facebook_photo_import.php']) ?> href="/match_photos.php"><i class="fa-solid fa-photo-film me-1" aria-hidden="true"></i>Media Library</a></li>
                                 <li class="nav-item"><a class="nav-link <?= activePage('people.php') ?>"<?= hub_nav_current(['people.php']) ?> href="/people.php"><i class="fa-solid fa-user-tag me-1" aria-hidden="true"></i>Photo tags</a></li>
+                                <li class="nav-item"><a class="nav-link <?= activeGroup(['photo_albums.php', 'photo_album.php']) ?>"<?= hub_nav_current(['photo_albums.php', 'photo_album.php']) ?> href="/photo_albums.php"><i class="fa-solid fa-images me-1" aria-hidden="true"></i>Photo albums</a></li>
                                 <li class="nav-item"><a class="nav-link <?= activeGroup(['settings.php', 'social_post_settings.php']) ?>"<?= hub_nav_current(['settings.php', 'social_post_settings.php']) ?> href="/settings.php"><i class="fa-solid fa-gear me-1" aria-hidden="true"></i>Settings</a></li>
                                 <li class="nav-item"><a class="nav-link <?= activeGroup(['club_people.php', 'club_person.php']) ?>"<?= hub_nav_current(['club_people.php', 'club_person.php']) ?> href="/club_people.php"><i class="fa-solid fa-address-book me-1" aria-hidden="true"></i>People &amp; Users</a></li>
                                 <li class="nav-item"><a class="nav-link <?= activePage('positions.php') ?>"<?= hub_nav_current(['positions.php']) ?> href="/positions.php"><i class="fa-solid fa-sitemap me-1" aria-hidden="true"></i>Roles &amp; Positions</a></li>
