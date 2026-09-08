@@ -1,10 +1,10 @@
 <?php
 declare(strict_types=1);
 
-require_once __DIR__ . '/../db.php';
-require_once __DIR__ . '/../lib/functions.php';
-require_once __DIR__ . '/../lib/pos.php';
-require_once __DIR__ . '/../lib/pos_controls.php';
+require_once __DIR__ . '/../admin/db.php';
+require_once __DIR__ . '/../admin/lib/functions.php';
+require_once __DIR__ . '/../admin/lib/pos.php';
+require_once __DIR__ . '/../admin/lib/pos_controls.php';
 
 pos_controls_ensure_schema($pdo);
 pos_require_actor($pdo);

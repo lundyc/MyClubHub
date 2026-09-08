@@ -1,10 +1,10 @@
 <?php
 declare(strict_types=1);
 
-require_once __DIR__ . '/../db.php';
-require_once __DIR__ . '/../lib/functions.php';
-require_once __DIR__ . '/../lib/pos.php';
-require_once __DIR__ . '/../lib/pos_controls.php';
+require_once __DIR__ . '/../admin/db.php';
+require_once __DIR__ . '/../admin/lib/functions.php';
+require_once __DIR__ . '/../admin/lib/pos.php';
+require_once __DIR__ . '/../admin/lib/pos_controls.php';
 
 pos_ensure_schema($pdo);
 pos_controls_ensure_schema($pdo);
@@ -90,11 +90,11 @@ $pageHero = [
     'title' => 'POS Transaction',
     'subtitle' => (string) $sale['sale_ref'],
 ];
-require_once __DIR__ . '/../header.php';
+require_once __DIR__ . '/../admin/header.php';
 ?>
 
 <div class="pos-sale-page">
-    <nav class="hub-breadcrumb" aria-label="Breadcrumb"><a href="/pos_overview.php">POS Overview</a><i class="fa-solid fa-chevron-right" aria-hidden="true"></i><span aria-current="page"><?= h((string) $sale['sale_ref']) ?></span></nav>
+    <nav class="hub-breadcrumb" aria-label="Breadcrumb"><a href="/admin/pos_overview.php">POS Overview</a><i class="fa-solid fa-chevron-right" aria-hidden="true"></i><span aria-current="page"><?= h((string) $sale['sale_ref']) ?></span></nav>
     <?php if ($notice): ?><div class="alert alert-success"><?= h($notice) ?></div><?php endif; ?>
     <?php if ($error): ?><div class="alert alert-danger"><?= h($error) ?></div><?php endif; ?>
 
@@ -114,7 +114,7 @@ require_once __DIR__ . '/../header.php';
                 <form method="post"><?= csrf_field() ?><input type="hidden" name="id" value="<?= (int) $saleId ?>"><input type="hidden" name="action" value="cancel_cash_pending"><button class="btn btn-sm btn-outline-danger" type="submit">Cancel cash</button></form>
             <?php endif; ?>
             <?php if ($status === 'refund'): ?><a class="btn btn-sm btn-outline-secondary" href="/pos/receipt.php?id=<?= (int) $saleId ?>"><i class="fa-solid fa-print" aria-hidden="true"></i>Refund receipt</a><?php endif; ?>
-            <a class="btn btn-sm btn-outline-secondary" href="/pos_overview.php">Back to overview</a>
+            <a class="btn btn-sm btn-outline-secondary" href="/admin/pos_overview.php">Back to overview</a>
         </div>
     </section>
 
@@ -185,4 +185,4 @@ require_once __DIR__ . '/../header.php';
     <?php endif; ?>
 </div>
 
-<?php require __DIR__ . '/../footer.php'; ?>
+<?php require __DIR__ . '/../admin/footer.php'; ?>

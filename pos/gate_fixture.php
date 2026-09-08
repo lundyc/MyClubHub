@@ -1,11 +1,11 @@
 <?php
 declare(strict_types=1);
 
-require_once __DIR__ . '/../db.php';
-require_once __DIR__ . '/../lib/functions.php';
-require_once __DIR__ . '/../lib/season.php';
-require_once __DIR__ . '/../lib/pos.php';
-require_once __DIR__ . '/../lib/audit.php';
+require_once __DIR__ . '/../admin/db.php';
+require_once __DIR__ . '/../admin/lib/functions.php';
+require_once __DIR__ . '/../admin/lib/season.php';
+require_once __DIR__ . '/../admin/lib/pos.php';
+require_once __DIR__ . '/../admin/lib/audit.php';
 
 pos_ensure_schema($pdo);
 $actor = pos_require_actor($pdo);
@@ -48,7 +48,7 @@ $csrfToken = (string) ($_SESSION['csrf_token'] ?? '');
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Gate Fixture - POS</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="/assets/css/style.css" rel="stylesheet">
+    <link href="/admin/assets/css/style.css" rel="stylesheet">
 </head>
 <body class="hub-shell">
 <main class="container py-4">

@@ -1,0 +1,40 @@
+DirectoryIndex index.php
+Options -Indexes
+
+RewriteEngine On
+
+<IfModule mod_alias.c>
+RedirectMatch 403 (?i)(^|/)\.git(/|$)
+RedirectMatch 403 (?i)(^|/)\.env$
+</IfModule>
+
+RewriteRule (^|/)\.git - [F,L]
+RewriteRule (^|/)\.env$ - [F,L]
+RewriteRule (^|/)tools(/|$) - [F,L]
+RewriteRule ^uploads/secretary_documents(/|$) - [F,L]
+
+RewriteRule ^season-tickets/?$ season_tickets_signup.php [L,QSA]
+RewriteRule ^season-tickets/checkout/?$ season_tickets_checkout.php [L,QSA]
+RewriteRule ^tickets/?$ tickets_shop.php [L,QSA]
+
+RewriteRule ^shop/?$ shop/index.php [L,QSA]
+RewriteRule ^shop/p/([A-Za-z0-9-]+)/?$ shop/product.php?slug=$1 [L,QSA]
+RewriteRule ^shop/basket/?$ shop/basket.php [L,QSA]
+RewriteRule ^shop/checkout/?$ shop/checkout.php [L,QSA]
+RewriteRule ^shop/order/([A-Za-z0-9]+)/?$ shop/confirmation.php?token=$1 [L,QSA]
+RewriteRule ^playersponsors/?$ playersponsors.php [L,QSA]
+RewriteRule ^playersponsors/checkout/?$ playersponsors_checkout.php [L,QSA]
+RewriteRule ^p/([A-Za-z0-9]{6,24})/?$ pay.php?c=$1 [L,QSA]
+
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/css text/javascript application/javascript application/json image/svg+xml
+</IfModule>
+
+<IfModule mod_headers.c>
+    <FilesMatch "\.(css|js)$">
+        Header set Cache-Control "public, max-age=604800"
+    </FilesMatch>
+    <FilesMatch "\.(png|jpe?g|gif|webp|svg|ico|woff2?)$">
+        Header set Cache-Control "public, max-age=2592000"
+    </FilesMatch>
+</IfModule>

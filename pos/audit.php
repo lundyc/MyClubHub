@@ -1,10 +1,10 @@
 <?php
 declare(strict_types=1);
 
-require_once __DIR__ . '/../db.php';
-require_once __DIR__ . '/../lib/functions.php';
-require_once __DIR__ . '/../lib/pos.php';
-require_once __DIR__ . '/../lib/pos_controls.php';
+require_once __DIR__ . '/../admin/db.php';
+require_once __DIR__ . '/../admin/lib/functions.php';
+require_once __DIR__ . '/../admin/lib/pos.php';
+require_once __DIR__ . '/../admin/lib/pos_controls.php';
 
 pos_controls_ensure_schema($pdo);
 $actor = pos_require_actor($pdo);
@@ -56,10 +56,10 @@ $pageHero = [
     'title' => 'POS Audit Log',
     'subtitle' => 'Review till, refund, cash movement, and close-count activity.',
 ];
-require_once __DIR__ . '/../header.php';
+require_once __DIR__ . '/../admin/header.php';
 ?>
 <div class="pos-audit-page">
-    <nav class="hub-breadcrumb" aria-label="Breadcrumb"><a href="/pos_overview.php">POS Overview</a><i class="fa-solid fa-chevron-right" aria-hidden="true"></i><span aria-current="page">Audit Log</span></nav>
+    <nav class="hub-breadcrumb" aria-label="Breadcrumb"><a href="/admin/pos_overview.php">POS Overview</a><i class="fa-solid fa-chevron-right" aria-hidden="true"></i><span aria-current="page">Audit Log</span></nav>
     <section class="card hub-panel p-3 mb-3">
         <form class="row g-3 align-items-end" method="get">
             <div class="col-md-3"><label class="form-label fw-bold" for="trading_day_id">Trading day</label><select class="form-select" id="trading_day_id" name="trading_day_id"><?php foreach ($days as $day): ?><option value="<?= (int) $day['id'] ?>" <?= (int) $day['id'] === $selectedDayId ? 'selected' : '' ?>><?= h(date('d/m/Y', strtotime((string) $day['business_date']))) ?> · <?= h((string) $day['status']) ?></option><?php endforeach; ?></select></div>
@@ -81,4 +81,4 @@ require_once __DIR__ . '/../header.php';
         </table>
     </section>
 </div>
-<?php require __DIR__ . '/../footer.php'; ?>
+<?php require __DIR__ . '/../admin/footer.php'; ?>

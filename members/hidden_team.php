@@ -1,7 +1,7 @@
 <?php
 require_once __DIR__ . '/header.php';
-require_once __DIR__ . '/../lib/hidden_team.php';
-require_once __DIR__ . '/../lib/hidden_team_stripe.php';
+require_once __DIR__ . '/../admin/lib/hidden_team.php';
+require_once __DIR__ . '/../admin/lib/hidden_team_stripe.php';
 
 /**
  * Picks a column count so every row has the same number of boxes — the

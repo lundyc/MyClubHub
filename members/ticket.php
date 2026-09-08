@@ -1,6 +1,6 @@
 <?php
 require_once __DIR__ . '/header.php';
-require_once __DIR__ . '/../lib/season_passes.php';
+require_once __DIR__ . '/../admin/lib/season_passes.php';
 
 $currentPersonId = member_auth_current_person_id() ?? 0;
 $currentPerson = member_auth_current_person();
@@ -166,7 +166,7 @@ $host = (string) ($_SERVER['HTTP_HOST'] ?? 'lundy.me.uk');
     </div>
 </div>
 
-<script src="/assets/js/vendor/qrcode.min.js"></script>
+<script src="/admin/assets/js/vendor/qrcode.min.js"></script>
 <script>(() => {
     document.querySelectorAll('[data-qr]').forEach((el) => {
         const size = Math.min(window.matchMedia('(max-width: 575.98px)').matches ? 280 : 240, Math.max(210, el.parentElement ? el.parentElement.clientWidth - 40 : 240));

@@ -1,10 +1,10 @@
 <?php
 declare(strict_types=1);
 
-require_once __DIR__ . '/../db.php';
-require_once __DIR__ . '/../lib/functions.php';
-require_once __DIR__ . '/../lib/pos.php';
-require_once __DIR__ . '/../lib/pos_trading_days.php';
+require_once __DIR__ . '/../admin/db.php';
+require_once __DIR__ . '/../admin/lib/functions.php';
+require_once __DIR__ . '/../admin/lib/pos.php';
+require_once __DIR__ . '/../admin/lib/pos_trading_days.php';
 
 pos_ensure_schema($pdo);
 pos_trading_day_ensure_schema($pdo);
@@ -43,11 +43,11 @@ $pageHero = [
     'title' => 'Top Sellers',
     'subtitle' => 'Review product sales for a selected trading day.',
 ];
-require_once __DIR__ . '/../header.php';
+require_once __DIR__ . '/../admin/header.php';
 ?>
 
 <div class="pos-top-sellers-page">
-    <nav class="hub-breadcrumb" aria-label="Breadcrumb"><a href="/pos_overview.php">POS Overview</a><i class="fa-solid fa-chevron-right" aria-hidden="true"></i><span aria-current="page">Top sellers</span></nav>
+    <nav class="hub-breadcrumb" aria-label="Breadcrumb"><a href="/admin/pos_overview.php">POS Overview</a><i class="fa-solid fa-chevron-right" aria-hidden="true"></i><span aria-current="page">Top sellers</span></nav>
     <section class="hub-section-commandbar" aria-labelledby="topSellersActionsTitle">
         <div>
             <h2 id="topSellersActionsTitle">Product report</h2>
@@ -78,4 +78,4 @@ require_once __DIR__ . '/../header.php';
     </section>
 </div>
 
-<?php require __DIR__ . '/../footer.php'; ?>
+<?php require __DIR__ . '/../admin/footer.php'; ?>

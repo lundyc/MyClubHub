@@ -1,6 +1,6 @@
 <?php
 require_once __DIR__ . '/header.php';
-require_once __DIR__ . '/../lib/member_matches.php';
+require_once __DIR__ . '/../admin/lib/member_matches.php';
 
 $currentSeason = getCurrentSeason($pdo);
 $fixtures = $currentSeason ? member_matches_for_season($pdo, (int) $currentSeason['id']) : [];

@@ -1,10 +1,10 @@
 <?php
 declare(strict_types=1);
 
-require_once __DIR__ . '/../config.php';
-require_once __DIR__ . '/../db.php';
-require_once __DIR__ . '/../member_auth.php';
-require_once __DIR__ . '/../lib/feedback.php';
+require_once __DIR__ . '/../admin/config.php';
+require_once __DIR__ . '/../admin/db.php';
+require_once __DIR__ . '/../admin/member_auth.php';
+require_once __DIR__ . '/../admin/lib/feedback.php';
 ensureFeedbackSchema($pdo);
 
 header('Content-Type: application/json; charset=utf-8');

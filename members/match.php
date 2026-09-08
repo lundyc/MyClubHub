@@ -1,8 +1,8 @@
 <?php
 require_once __DIR__ . '/header.php';
-require_once __DIR__ . '/../lib/member_matches.php';
-require_once __DIR__ . '/../lib/venue_reviews.php';
-require_once __DIR__ . '/../lib/motm.php';
+require_once __DIR__ . '/../admin/lib/member_matches.php';
+require_once __DIR__ . '/../admin/lib/venue_reviews.php';
+require_once __DIR__ . '/../admin/lib/motm.php';
 ensureVenueReviewsSchema($pdo);
 ensureMotmSchema($pdo);
 
@@ -26,7 +26,7 @@ $h2hMatches = member_match_head_to_head($pdo, $fixture);
 $h2hRecord = member_match_head_to_head_record($h2hMatches);
 
 $tableTeams = [];
-$cachePath = __DIR__ . '/../cache/wosfl_table.json';
+$cachePath = __DIR__ . '/../admin/cache/wosfl_table.json';
 if (is_file($cachePath)) {
     $decoded = json_decode((string) file_get_contents($cachePath), true);
     $tableTeams = is_array($decoded) ? $decoded : [];

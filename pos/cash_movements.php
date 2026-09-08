@@ -1,10 +1,10 @@
 <?php
 declare(strict_types=1);
 
-require_once __DIR__ . '/../db.php';
-require_once __DIR__ . '/../lib/functions.php';
-require_once __DIR__ . '/../lib/pos.php';
-require_once __DIR__ . '/../lib/pos_controls.php';
+require_once __DIR__ . '/../admin/db.php';
+require_once __DIR__ . '/../admin/lib/functions.php';
+require_once __DIR__ . '/../admin/lib/pos.php';
+require_once __DIR__ . '/../admin/lib/pos_controls.php';
 
 pos_controls_ensure_schema($pdo);
 $actor = pos_require_actor($pdo);
@@ -66,10 +66,10 @@ $pageHero = [
     'title' => 'Cash Movements',
     'subtitle' => 'Record skims, safe drops, paid-ins, and paid-outs against the active trading day.',
 ];
-require_once __DIR__ . '/../header.php';
+require_once __DIR__ . '/../admin/header.php';
 ?>
 <div class="pos-cash-movements-page">
-    <nav class="hub-breadcrumb" aria-label="Breadcrumb"><a href="/pos_overview.php">POS Overview</a><i class="fa-solid fa-chevron-right" aria-hidden="true"></i><span aria-current="page">Cash Movements</span></nav>
+    <nav class="hub-breadcrumb" aria-label="Breadcrumb"><a href="/admin/pos_overview.php">POS Overview</a><i class="fa-solid fa-chevron-right" aria-hidden="true"></i><span aria-current="page">Cash Movements</span></nav>
     <?php if ($notice): ?><div class="alert alert-success"><?= h($notice) ?></div><?php endif; ?>
     <?php if ($error): ?><div class="alert alert-danger"><?= h($error) ?></div><?php endif; ?>
 
@@ -126,4 +126,4 @@ require_once __DIR__ . '/../header.php';
         </table>
     </section>
 </div>
-<?php require __DIR__ . '/../footer.php'; ?>
+<?php require __DIR__ . '/../admin/footer.php'; ?>

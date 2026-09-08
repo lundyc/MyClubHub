@@ -1,16 +1,16 @@
 <?php
 declare(strict_types=1);
 
-require_once __DIR__ . '/../db.php';
-require_once __DIR__ . '/../auth.php';
-require_once __DIR__ . '/../lib/functions.php';
-require_once __DIR__ . '/../lib/season.php';
-require_once __DIR__ . '/../lib/season_ticket_attendance.php';
-require_once __DIR__ . '/../lib/match_tickets.php';
+require_once __DIR__ . '/../admin/db.php';
+require_once __DIR__ . '/../admin/auth.php';
+require_once __DIR__ . '/../admin/lib/functions.php';
+require_once __DIR__ . '/../admin/lib/season.php';
+require_once __DIR__ . '/../admin/lib/season_ticket_attendance.php';
+require_once __DIR__ . '/../admin/lib/match_tickets.php';
 ensureMatchTicketSchema($pdo);
 
 if (!hub_auth_is_authenticated()) {
-    header('Location: /login.php');
+    header('Location: /admin/login.php');
     exit;
 }
 hub_auth_require_permission('tickets.scan');
@@ -176,7 +176,7 @@ function scan_match_type_label(array $fixture): string
     <?php if (!$fixture): ?>
         <main class="scan-picker">
             <div class="scan-topbar">
-                <div class="scan-brand"><img src="/Saltcoats Victoria FC -White_Transparent.png" alt=""> <span>Vics Scan</span></div>
+                <div class="scan-brand"><img src="/admin/Saltcoats Victoria FC -White_Transparent.png" alt=""> <span>Vics Scan</span></div>
                 <div class="scan-user"><?= h((string) ($currentUser['display_name'] ?? $currentUser['username'] ?? 'Hub user')) ?></div>
             </div>
             <h1 class="scan-title">Select Home Match</h1>

@@ -1,8 +1,8 @@
 <?php
 require_once __DIR__ . '/header.php';
-require_once __DIR__ . '/../lib/member_sponsorship.php';
-require_once __DIR__ . '/../lib/member_matches.php';
-require_once __DIR__ . '/../lib/match_tickets.php';
+require_once __DIR__ . '/../admin/lib/member_sponsorship.php';
+require_once __DIR__ . '/../admin/lib/member_matches.php';
+require_once __DIR__ . '/../admin/lib/match_tickets.php';
 ensureMatchTicketSchema($pdo);
 
 $myOrders = getSeasonTicketOrders($pdo, ['holder_id' => (int) $currentHolder['id']]);
@@ -42,7 +42,7 @@ function member_sponsorship_summary_line(array $agreement): string
         <div class="alert alert-success">Welcome! Your account is ready — buy a season ticket any time to unlock the league table, announcements and more.</div>
     <?php endif; ?>
     <?php if (isset($_GET['hub_login'])): ?>
-        <div class="alert alert-info">You're signed in to your supporter account. Club staff sign in to the Hub at <a href="/login.php">the staff login</a>.</div>
+        <div class="alert alert-info">You're signed in to your supporter account. Club staff sign in to the Hub at <a href="/admin/login.php">the staff login</a>.</div>
     <?php endif; ?>
 
     <section class="member-hero">

@@ -5,9 +5,9 @@ declare(strict_types=1);
 // hub/login.php's look exactly. Re-does the slice of header.php's bootstrap
 // this page actually needs: staff-session capture + auto-login, and the
 // already-authenticated redirect.
-require_once __DIR__ . '/../auth.php';
-require_once __DIR__ . '/../member_auth.php';
-require_once __DIR__ . '/../lib/functions.php';
+require_once __DIR__ . '/../admin/auth.php';
+require_once __DIR__ . '/../admin/member_auth.php';
+require_once __DIR__ . '/../admin/lib/functions.php';
 
 // Capture the staff identity (if any) from the default/staff session *before*
 // member_auth_* functions switch $_SESSION over to the isolated member
@@ -52,13 +52,13 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Login - <?= h(APP_NAME) ?></title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="/assets/css/style.css" rel="stylesheet">
-    <link rel="stylesheet" href="/assets/css/login.css">
+    <link href="/admin/assets/css/style.css" rel="stylesheet">
+    <link rel="stylesheet" href="/admin/assets/css/login.css">
 </head>
 <body>
     <div class="login-card">
         <img
-            src="/Saltcoats Victoria FC -White_Transparent.png"
+            src="/admin/Saltcoats Victoria FC -White_Transparent.png"
             alt="Saltcoats Victoria FC"
             class="login-card__logo"
             loading="eager"
@@ -96,7 +96,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                 <a href="matches.php">Browse fixtures, results &amp; the league table</a>
             </div>
             <div class="text-center mt-2 small">
-                Club staff? <a href="/login.php">Sign in to the Hub</a>
+                Club staff? <a href="/admin/login.php">Sign in to the Hub</a>
             </div>
         </form>
     </div>

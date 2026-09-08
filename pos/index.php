@@ -1,10 +1,10 @@
 <?php
 declare(strict_types=1);
 
-require_once __DIR__ . '/../db.php';
-require_once __DIR__ . '/../lib/functions.php';
-require_once __DIR__ . '/../lib/pos.php';
-require_once __DIR__ . '/../lib/pos_trading_days.php';
+require_once __DIR__ . '/../admin/db.php';
+require_once __DIR__ . '/../admin/lib/functions.php';
+require_once __DIR__ . '/../admin/lib/pos.php';
+require_once __DIR__ . '/../admin/lib/pos_trading_days.php';
 
 pos_ensure_schema($pdo);
 pos_trading_day_ensure_schema($pdo);
@@ -12,7 +12,7 @@ $actor = pos_require_actor($pdo);
 $activeTradingDay = pos_trading_day_active($pdo);
 if (!$activeTradingDay) {
     if (pos_actor_is_manager($pdo)) {
-        header('Location: /pos_overview.php?day_closed=1');
+        header('Location: /admin/pos_overview.php?day_closed=1');
         exit;
     }
     http_response_code(423);
@@ -21,14 +21,14 @@ if (!$activeTradingDay) {
 $locations = pos_locations_for_actor($pdo, $actor);
 $requestedLocationId = (int) ($_GET['location_id'] ?? 0);
 if ($requestedLocationId <= 0 && count($locations) > 1) {
-    header('Location: /pos_overview.php?select_till=1');
+    header('Location: /admin/pos_overview.php?select_till=1');
     exit;
 }
 $locationId = $requestedLocationId > 0 ? $requestedLocationId : (int) ($locations[0]['id'] ?? 0);
 $location = pos_location($pdo, $locationId);
 if (!$location && $locations) {
     if (count($locations) > 1) {
-        header('Location: /pos_overview.php?select_till=1');
+        header('Location: /admin/pos_overview.php?select_till=1');
         exit;
     }
     $location = $locations[0];
@@ -37,7 +37,7 @@ if (!$location && $locations) {
 $activeTillSession = $locationId > 0 ? pos_till_session_active($pdo, (int) $activeTradingDay['id'], $locationId) : null;
 if ($locationId > 0 && !$activeTillSession) {
     if (pos_actor_is_manager($pdo)) {
-        header('Location: /pos_overview.php?till_closed=1');
+        header('Location: /admin/pos_overview.php?till_closed=1');
         exit;
     }
     http_response_code(423);
@@ -231,7 +231,7 @@ $canViewFinancials = pos_actor_is_manager($pdo);
                         <?php if (hub_auth_is_authenticated()): ?>
                             <a href="/">Hub</a>
                             <a href="/pos/switch_operator.php">Operator login</a>
-                            <a href="/logout.php">Log out Hub</a>
+                            <a href="/admin/logout.php">Log out Hub</a>
                         <?php else: ?>
                             <a href="/pos/logout.php">Logout</a>
                         <?php endif; ?>

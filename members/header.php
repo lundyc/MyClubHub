@@ -2,10 +2,10 @@
 declare(strict_types=1);
 ob_start();
 
-require_once __DIR__ . '/../config.php';
-require_once __DIR__ . '/../db.php';
-require_once __DIR__ . '/../lib/functions.php';
-require_once __DIR__ . '/../auth.php';
+require_once __DIR__ . '/../admin/config.php';
+require_once __DIR__ . '/../admin/db.php';
+require_once __DIR__ . '/../admin/lib/functions.php';
+require_once __DIR__ . '/../admin/auth.php';
 
 // Capture the staff identity (if any) from the default/staff session *before*
 // member_auth.php switches $_SESSION over to the isolated member cookie —
@@ -14,9 +14,9 @@ require_once __DIR__ . '/../auth.php';
 hub_auth_start_session();
 $staffUserForAutoLogin = hub_auth_is_authenticated() ? hub_auth_current_user() : null;
 
-require_once __DIR__ . '/../member_auth.php';
-require_once __DIR__ . '/../lib/season.php';
-require_once __DIR__ . '/../lib/season_tickets.php';
+require_once __DIR__ . '/../admin/member_auth.php';
+require_once __DIR__ . '/../admin/lib/season.php';
+require_once __DIR__ . '/../admin/lib/season_tickets.php';
 ensureSeasonTicketSchema($pdo);
 
 $currentScript = basename($_SERVER['PHP_SELF'] ?? '');
@@ -216,8 +216,8 @@ if ($memberIsPublicContentPage) {
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/all.min.css" rel="stylesheet">
-    <link href="/assets/css/style.css?v=<?= (int) (@filemtime(__DIR__ . '/../assets/css/style.css') ?: time()) ?>" rel="stylesheet">
-    <script src="/assets/js/app.js?v=<?= (int) (@filemtime(__DIR__ . '/../assets/js/app.js') ?: time()) ?>" defer></script>
+    <link href="/admin/assets/css/style.css?v=<?= (int) (@filemtime(__DIR__ . '/../admin/assets/css/style.css') ?: time()) ?>" rel="stylesheet">
+    <script src="/admin/assets/js/app.js?v=<?= (int) (@filemtime(__DIR__ . '/../admin/assets/js/app.js') ?: time()) ?>" defer></script>
     <style>
         .member-page { --member-maroon:#4b0818; --member-gold:#e0b42a; --member-ink:#21141a; --member-muted:#6f6470; --member-line:#eadfdf; --member-panel:#fff; color:var(--member-ink); }
         .member-hero { position:relative; overflow:hidden; border-radius:18px; padding:clamp(1.25rem,3vw,2.25rem); margin-bottom:1.25rem; color:#fff; background:linear-gradient(135deg,#4b0818 0%,#7a1730 58%,#a6791d 100%); box-shadow:0 20px 45px rgba(75,8,24,.2); }
@@ -326,7 +326,7 @@ if ($memberIsPublicContentPage) {
     <nav class="navbar border-bottom shadow-sm navbar-dark" id="hubSideNavigation">
         <div class="container-fluid member-navbar-container">
             <a class="navbar-brand fw-bold text-brand" href="/members/index.php">
-                <img src="/Saltcoats Victoria FC -White_Transparent.png" alt="Saltcoats Victoria FC" class="navbar-brand__logo" loading="eager">
+                <img src="/admin/Saltcoats Victoria FC -White_Transparent.png" alt="Saltcoats Victoria FC" class="navbar-brand__logo" loading="eager">
                 <span class="navbar-brand__text">MY VICS</span>
             </a>
 
@@ -386,7 +386,7 @@ if ($memberIsPublicContentPage) {
     <a class="hub-skip-link" href="#hubMemberMainContent">Skip to main content</a>
     <header class="member-public-topbar">
         <a class="member-public-topbar__brand" href="/members/matches.php">
-            <img src="/Saltcoats Victoria FC -White_Transparent.png" alt="Saltcoats Victoria FC" loading="eager">
+            <img src="/admin/Saltcoats Victoria FC -White_Transparent.png" alt="Saltcoats Victoria FC" loading="eager">
             <span>Saltcoats Victoria FC</span>
         </a>
         <nav class="member-public-topbar__nav" aria-label="Sections">

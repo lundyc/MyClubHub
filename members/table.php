@@ -1,6 +1,6 @@
 <?php
 require_once __DIR__ . '/header.php';
-require_once __DIR__ . '/../lib/match_sponsorship.php';
+require_once __DIR__ . '/../admin/lib/match_sponsorship.php';
 
 $currentSeason = getCurrentSeason($pdo);
 $leagueCompetition = null;
@@ -15,7 +15,7 @@ $wosflTableUrlOverride = is_array($leagueEdition) ? trim((string) ($leagueEditio
 if ($wosflTableUrlOverride === '' && is_array($leagueCompetition) && !empty($leagueCompetition['is_league'])) {
     $wosflTableUrlOverride = trim((string) ($leagueCompetition['league_url'] ?? ''));
 }
-require_once __DIR__ . '/../wosfl-table.php';
+require_once __DIR__ . '/../admin/wosfl-table.php';
 if (!isset($teams) || !is_array($teams)) {
     $teams = [];
 }

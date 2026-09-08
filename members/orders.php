@@ -1,6 +1,6 @@
 <?php
 require_once __DIR__ . '/header.php';
-require_once __DIR__ . '/../lib/match_tickets.php';
+require_once __DIR__ . '/../admin/lib/match_tickets.php';
 ensureMatchTicketSchema($pdo);
 
 $matchOrders = getMatchTicketOrdersForMember($pdo, $currentHolder);

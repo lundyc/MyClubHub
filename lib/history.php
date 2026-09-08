@@ -2,117 +2,221 @@
 
 declare(strict_types=1);
 
-/**
- * Historical archive tables for the public site: results going back to 1999,
- * the all-time appearances/goals leaderboard, and the photo-gallery albums —
- * all imported from the old saltcoatsvictoria.co.uk backup by
- * tools/import_svfc_history.php and never touched by the live Hub match system.
- *
- * Schema self-heals on first use (Hub convention); there is no formal
- * migration because none of this feeds Hub operations.
+/*
+ * Public, read-only queries over the imported historical archive:
+ * history_matches, history_player_stats, history_galleries(+ _photos).
+ * Populated by tools/import_svfc_history.php; empty tables just render as
+ * "nothing here yet".
  */
 
-function history_ensure_schema(PDO $pdo): void
+/** @return list<array{season:string,played:int,w:int,d:int,l:int,gf:int,ga:int}> newest first */
+function pub_history_seasons(): array
 {
-    static $done = false;
-    if ($done) {
-        return;
+    try {
+        return db()->query(
+            "SELECT season,
+                    COUNT(*)          AS played,
+                    SUM(result = 'W') AS w,
+                    SUM(result = 'D') AS d,
+                    SUM(result = 'L') AS l,
+                    SUM(home_score)   AS gf,
+                    SUM(away_score)   AS ga
+             FROM history_matches
+             WHERE season <> '' AND home_score IS NOT NULL AND away_score IS NOT NULL
+             GROUP BY season
+             ORDER BY season DESC"
+        )->fetchAll();
+    } catch (Throwable) {
+        return [];
     }
+}
 
-    $pdo->exec("CREATE TABLE IF NOT EXISTS history_matches (
-        id INT UNSIGNED NOT NULL AUTO_INCREMENT,
-        slug VARCHAR(180) NOT NULL,
-        match_date DATE NULL,
-        season VARCHAR(20) NOT NULL DEFAULT '',
-        competition VARCHAR(190) NOT NULL DEFAULT '',
-        is_home TINYINT(1) NOT NULL DEFAULT 1,
-        opponent VARCHAR(190) NOT NULL DEFAULT '',
-        opponent_badge VARCHAR(255) NOT NULL DEFAULT '',
-        home_score SMALLINT NULL,
-        away_score SMALLINT NULL,
-        score_line VARCHAR(30) NOT NULL DEFAULT '',
-        result CHAR(1) NULL,
-        venue VARCHAR(190) NOT NULL DEFAULT '',
-        scorers_text TEXT NULL,
-        report_html MEDIUMTEXT NULL,
-        report_by VARCHAR(120) NOT NULL DEFAULT '',
-        has_report TINYINT(1) NOT NULL DEFAULT 0,
-        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        PRIMARY KEY (id),
-        UNIQUE KEY uq_history_matches_slug (slug),
-        KEY idx_history_matches_date (match_date),
-        KEY idx_history_matches_season (season)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
-
-    $pdo->exec("CREATE TABLE IF NOT EXISTS history_player_stats (
-        id INT UNSIGNED NOT NULL AUTO_INCREMENT,
-        legacy_id INT UNSIGNED NULL,
-        name VARCHAR(160) NOT NULL,
-        sort_name VARCHAR(160) NOT NULL DEFAULT '',
-        appearances INT NOT NULL DEFAULT 0,
-        starts INT NOT NULL DEFAULT 0,
-        subs INT NOT NULL DEFAULT 0,
-        goals INT NOT NULL DEFAULT 0,
-        penalties INT NOT NULL DEFAULT 0,
-        clean_sheets INT NOT NULL DEFAULT 0,
-        yellows INT NOT NULL DEFAULT 0,
-        reds INT NOT NULL DEFAULT 0,
-        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        PRIMARY KEY (id),
-        UNIQUE KEY uq_history_stats_legacy (legacy_id),
-        KEY idx_history_stats_apps (appearances),
-        KEY idx_history_stats_goals (goals)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
-
-    $pdo->exec("CREATE TABLE IF NOT EXISTS history_galleries (
-        id INT UNSIGNED NOT NULL AUTO_INCREMENT,
-        slug VARCHAR(120) NOT NULL,
-        title VARCHAR(190) NOT NULL DEFAULT '',
-        description VARCHAR(255) NOT NULL DEFAULT '',
-        album_date DATE NULL,
-        match_fixture_id INT UNSIGNED NULL,
-        photo_count INT NOT NULL DEFAULT 0,
-        cover_path VARCHAR(255) NOT NULL DEFAULT '',
-        display_on_site TINYINT(1) NOT NULL DEFAULT 1,
-        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        PRIMARY KEY (id),
-        UNIQUE KEY uq_history_galleries_slug (slug),
-        KEY idx_history_galleries_date (album_date),
-        KEY idx_history_galleries_fixture (match_fixture_id)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
-
-    // Additive: columns that arrived after the first import. Existing rows keep
-    // sensible defaults; albums are now created/managed in photo_albums.php.
-    $galleryColumns = [];
-    foreach ($pdo->query('SHOW COLUMNS FROM history_galleries') as $column) {
-        $galleryColumns[(string) $column['Field']] = true;
+/** Played matches in a season, chronological. @return list<array<string,mixed>> */
+function pub_history_results(string $season): array
+{
+    try {
+        $stmt = db()->prepare(
+            "SELECT * FROM history_matches
+             WHERE season = :s AND home_score IS NOT NULL AND away_score IS NOT NULL
+             ORDER BY match_date ASC, id ASC"
+        );
+        $stmt->execute([':s' => $season]);
+        return $stmt->fetchAll();
+    } catch (Throwable) {
+        return [];
     }
-    if (!isset($galleryColumns['display_on_site'])) {
-        $pdo->exec("ALTER TABLE history_galleries ADD COLUMN display_on_site TINYINT(1) NOT NULL DEFAULT 1 AFTER cover_path");
-    }
-    if (!isset($galleryColumns['description'])) {
-        $pdo->exec("ALTER TABLE history_galleries ADD COLUMN description VARCHAR(255) NOT NULL DEFAULT '' AFTER title");
-    }
-    if (!isset($galleryColumns['match_fixture_id'])) {
-        $pdo->exec("ALTER TABLE history_galleries ADD COLUMN match_fixture_id INT UNSIGNED NULL AFTER album_date, ADD KEY idx_history_galleries_fixture (match_fixture_id)");
-    }
-    if (!isset($galleryColumns['updated_at'])) {
-        $pdo->exec("ALTER TABLE history_galleries ADD COLUMN updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP AFTER created_at");
-    }
+}
 
-    $pdo->exec("CREATE TABLE IF NOT EXISTS history_gallery_photos (
-        id INT UNSIGNED NOT NULL AUTO_INCREMENT,
-        gallery_id INT UNSIGNED NOT NULL,
-        file_path VARCHAR(255) NOT NULL,
-        thumb_path VARCHAR(255) NOT NULL DEFAULT '',
-        photo_date DATE NULL,
-        sort_order INT NOT NULL DEFAULT 0,
-        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        PRIMARY KEY (id),
-        UNIQUE KEY uq_history_photo (gallery_id, file_path),
-        KEY idx_history_photo_gallery (gallery_id, sort_order)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+function pub_history_match(string $slug): ?array
+{
+    try {
+        $stmt = db()->prepare('SELECT * FROM history_matches WHERE slug = :s LIMIT 1');
+        $stmt->execute([':s' => $slug]);
+        return $stmt->fetch() ?: null;
+    } catch (Throwable) {
+        return null;
+    }
+}
 
-    $done = true;
+/** Overall totals across every played archive match. @return array<string,int> */
+function pub_history_totals(): array
+{
+    try {
+        $row = db()->query(
+            "SELECT COUNT(*) played, SUM(result='W') w, SUM(result='D') d, SUM(result='L') l,
+                    MIN(YEAR(match_date)) y0, MAX(YEAR(match_date)) y1
+             FROM history_matches
+             WHERE home_score IS NOT NULL AND away_score IS NOT NULL"
+        )->fetch();
+        return array_map(static fn ($v) => (int) $v, $row ?: []);
+    } catch (Throwable) {
+        return [];
+    }
+}
+
+/** @return list<array<string,mixed>> ordered by goals then appearances */
+function pub_history_top_scorers(int $limit = 25): array
+{
+    try {
+        $stmt = db()->prepare(
+            'SELECT * FROM history_player_stats WHERE goals > 0
+             ORDER BY goals DESC, appearances DESC, sort_name ASC LIMIT :n'
+        );
+        $stmt->bindValue(':n', $limit, PDO::PARAM_INT);
+        $stmt->execute();
+        return $stmt->fetchAll();
+    } catch (Throwable) {
+        return [];
+    }
+}
+
+/** @return list<array<string,mixed>> ordered by appearances */
+function pub_history_appearances(int $limit = 50): array
+{
+    try {
+        $stmt = db()->prepare(
+            'SELECT * FROM history_player_stats
+             ORDER BY appearances DESC, goals DESC, sort_name ASC LIMIT :n'
+        );
+        $stmt->bindValue(':n', $limit, PDO::PARAM_INT);
+        $stmt->execute();
+        return $stmt->fetchAll();
+    } catch (Throwable) {
+        return [];
+    }
+}
+
+/**
+ * Whether an optional column exists on a table (memoised). Lets new Hub flags
+ * (e.g. history_galleries.display_on_site) roll out before the schema ALTER has
+ * run in every environment without the public queries hard-failing.
+ */
+function pub_history_has_column(string $table, string $column): bool
+{
+    static $cache = [];
+    $key = $table . '.' . $column;
+    if (!array_key_exists($key, $cache)) {
+        try {
+            $stmt = db()->prepare(
+                'SELECT 1 FROM information_schema.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :t AND COLUMN_NAME = :c
+                 LIMIT 1'
+            );
+            $stmt->execute([':t' => $table, ':c' => $column]);
+            $cache[$key] = (bool) $stmt->fetchColumn();
+        } catch (Throwable) {
+            $cache[$key] = false;
+        }
+    }
+    return $cache[$key];
+}
+
+/** All albums flagged to show on the site, newest first (undated last). @return list<array<string,mixed>> */
+function pub_galleries(): array
+{
+    $visible = pub_history_has_column('history_galleries', 'display_on_site')
+        ? 'WHERE g.display_on_site = 1'
+        : '';
+    try {
+        return db()->query(
+            "SELECT g.*,
+                    (SELECT COUNT(*) FROM history_gallery_photos p WHERE p.gallery_id = g.id) AS real_count
+             FROM history_galleries g
+             $visible
+             ORDER BY album_date IS NULL, album_date DESC, id DESC"
+        )->fetchAll();
+    } catch (Throwable) {
+        return [];
+    }
+}
+
+/**
+ * One album with its photos — only if it is flagged to show on the site.
+ * When the album is linked to a fixture, $album gets fixture_id / fixture_opponent
+ * / fixture_date / fixture_is_home.
+ * @return array{album:array,photos:list<array>}|null
+ */
+function pub_gallery(string $slug): ?array
+{
+    try {
+        $hasFixture = pub_history_has_column('history_galleries', 'match_fixture_id');
+        $join = $hasFixture
+            ? 'LEFT JOIN match_fixtures f ON f.id = g.match_fixture_id
+               LEFT JOIN match_opponents o ON o.id = f.opponent_id'
+            : '';
+        $extra = $hasFixture
+            ? ', g.match_fixture_id AS fixture_id, f.match_date AS fixture_date,
+               f.is_home AS fixture_is_home, COALESCE(o.clubname, f.opponent) AS fixture_opponent'
+            : '';
+        $stmt = db()->prepare("SELECT g.* {$extra} FROM history_galleries g {$join} WHERE g.slug = :s LIMIT 1");
+        $stmt->execute([':s' => $slug]);
+        $album = $stmt->fetch();
+        if (!$album) {
+            return null;
+        }
+        if (pub_history_has_column('history_galleries', 'display_on_site') && (int) ($album['display_on_site'] ?? 1) !== 1) {
+            return null;
+        }
+        $pstmt = db()->prepare(
+            'SELECT * FROM history_gallery_photos WHERE gallery_id = :g ORDER BY sort_order ASC, id ASC'
+        );
+        $pstmt->execute([':g' => $album['id']]);
+        return ['album' => $album, 'photos' => $pstmt->fetchAll()];
+    } catch (Throwable) {
+        return null;
+    }
+}
+
+/**
+ * The visible album linked to a fixture, if any (for the public match page).
+ * @return array{slug:string,title:string,photo_count:int,cover_path:string}|null
+ */
+function pub_gallery_for_fixture(int $fixtureId): ?array
+{
+    if ($fixtureId <= 0 || !pub_history_has_column('history_galleries', 'match_fixture_id')) {
+        return null;
+    }
+    $visible = pub_history_has_column('history_galleries', 'display_on_site') ? 'AND display_on_site = 1' : '';
+    try {
+        $stmt = db()->prepare(
+            "SELECT slug, title, photo_count, cover_path
+             FROM history_galleries
+             WHERE match_fixture_id = :f {$visible}
+             ORDER BY id DESC LIMIT 1"
+        );
+        $stmt->execute([':f' => $fixtureId]);
+        $row = $stmt->fetch();
+        return $row ?: null;
+    } catch (Throwable) {
+        return null;
+    }
+}
+
+/** "2016-2017" -> "2016/17" for display. */
+function pub_history_season_label(string $season): string
+{
+    if (preg_match('/^(\d{4})-(\d{4})$/', $season, $m)) {
+        return $m[1] . '/' . substr($m[2], 2);
+    }
+    return $season;
 }

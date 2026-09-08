@@ -1,6 +1,6 @@
 <?php
 require_once __DIR__ . '/header.php';
-require_once __DIR__ . '/../lib/player_match_stats.php';
+require_once __DIR__ . '/../admin/lib/player_match_stats.php';
 
 $playerId = (int) ($_GET['id'] ?? 0);
 $stmt = $pdo->prepare('SELECT * FROM players WHERE id = :id LIMIT 1');
@@ -14,7 +14,7 @@ if (!$player) {
 }
 
 $currentSeason = getCurrentSeason($pdo);
-$stats = $currentSeason ? hub_player_match_stats($pdo, (int) $currentSeason['id'], (string) $player['name'], __DIR__ . '/../data/matches.json') : null;
+$stats = $currentSeason ? hub_player_match_stats($pdo, (int) $currentSeason['id'], (string) $player['name'], __DIR__ . '/../admin/data/matches.json') : null;
 ?>
 
 <nav class="mb-3"><a href="sponsor.php">&larr; Sponsor a player</a></nav>

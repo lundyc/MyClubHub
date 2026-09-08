@@ -1,9 +1,9 @@
 <?php
 declare(strict_types=1);
 
-require_once __DIR__ . '/../db.php';
-require_once __DIR__ . '/../lib/functions.php';
-require_once __DIR__ . '/../lib/pos.php';
+require_once __DIR__ . '/../admin/db.php';
+require_once __DIR__ . '/../admin/lib/functions.php';
+require_once __DIR__ . '/../admin/lib/pos.php';
 
 pos_ensure_schema($pdo);
 
@@ -62,7 +62,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
             <button class="btn btn-brand btn-lg w-100" type="submit">Log in</button>
         </form>
         <div class="mt-4 small text-muted">Hub admins can use the main Hub login and open POS from the navigation.</div>
-        <div class="mt-3"><a class="small fw-bold text-decoration-none" href="/login.php">Log in as Hub admin instead</a></div>
+        <div class="mt-3"><a class="small fw-bold text-decoration-none" href="/admin/login.php">Log in as Hub admin instead</a></div>
     </main>
 </body>
 </html>

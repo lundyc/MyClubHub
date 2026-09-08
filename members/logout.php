@@ -1,6 +1,6 @@
 <?php
 declare(strict_types=1);
-require_once __DIR__ . '/../member_auth.php';
+require_once __DIR__ . '/../admin/member_auth.php';
 
 $clearHubSession = (string) ($_GET['all'] ?? '') === '1';
 $hubSessionName = session_name();

@@ -2,7 +2,7 @@
 // Feedback bar/fab/modal disabled site-wide for now — flip this back to true
 // to bring it back rather than re-adding the markup below.
 const FEEDBACK_BAR_ENABLED = false;
-require_once __DIR__ . '/../lib/feedback.php';
+require_once __DIR__ . '/../admin/lib/feedback.php';
 ensureFeedbackSchema($pdo);
 $feedbackPersonId = member_auth_current_person_id() ?? (is_array($currentHolder) ? (int) ($currentHolder['person_id'] ?? 0) : 0);
 $feedbackLegacyHolderId = member_auth_current_legacy_holder_id() ?? (is_array($currentHolder) ? (int) ($currentHolder['legacy_holder_id'] ?? $currentHolder['id'] ?? 0) : 0);

@@ -1,10 +1,10 @@
 <?php
 declare(strict_types=1);
 
-require_once __DIR__ . '/../db.php';
-require_once __DIR__ . '/../lib/functions.php';
-require_once __DIR__ . '/../lib/pos.php';
-require_once __DIR__ . '/../lib/pos_controls.php';
+require_once __DIR__ . '/../admin/db.php';
+require_once __DIR__ . '/../admin/lib/functions.php';
+require_once __DIR__ . '/../admin/lib/pos.php';
+require_once __DIR__ . '/../admin/lib/pos_controls.php';
 
 pos_controls_ensure_schema($pdo);
 $actor = pos_require_actor($pdo);
@@ -104,18 +104,18 @@ $pageHero = [
     'title' => 'POS Products',
     'subtitle' => 'Manage till products, location availability, button colours, and discount rules.',
 ];
-require_once __DIR__ . '/../header.php';
+require_once __DIR__ . '/../admin/header.php';
 ?>
 <style>.swatch{display:inline-block;width:18px;height:18px;border-radius:50%;vertical-align:middle}</style>
 <div class="pos-products-page">
-    <nav class="hub-breadcrumb" aria-label="Breadcrumb"><a href="/pos_overview.php">POS Overview</a><i class="fa-solid fa-chevron-right" aria-hidden="true"></i><span aria-current="page">Products</span></nav>
+    <nav class="hub-breadcrumb" aria-label="Breadcrumb"><a href="/admin/pos_overview.php">POS Overview</a><i class="fa-solid fa-chevron-right" aria-hidden="true"></i><span aria-current="page">Products</span></nav>
     <section class="hub-section-commandbar" aria-labelledby="posProductsActionsTitle">
         <div>
             <h2 id="posProductsActionsTitle">Product setup</h2>
             <p>Products marked available appear on the selected till.</p>
         </div>
         <div class="hub-local-actions">
-            <a class="btn btn-outline-secondary btn-sm" href="/pos_overview.php"><i class="fa-solid fa-chart-line" aria-hidden="true"></i>Overview</a>
+            <a class="btn btn-outline-secondary btn-sm" href="/admin/pos_overview.php"><i class="fa-solid fa-chart-line" aria-hidden="true"></i>Overview</a>
             <a class="btn btn-outline-secondary btn-sm" href="/pos/reports.php"><i class="fa-solid fa-table-list" aria-hidden="true"></i>Daily report</a>
             <a class="btn btn-outline-secondary btn-sm" href="/pos/operators.php"><i class="fa-solid fa-users-gear" aria-hidden="true"></i>Operators</a>
             <a class="btn btn-outline-secondary btn-sm" href="/pos/locations.php"><i class="fa-solid fa-location-dot" aria-hidden="true"></i>Locations</a>
@@ -177,4 +177,4 @@ require_once __DIR__ . '/../header.php';
         </tbody></table>
     </section>
 </div>
-<?php require __DIR__ . '/../footer.php'; ?>
+<?php require __DIR__ . '/../admin/footer.php'; ?>

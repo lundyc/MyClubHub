@@ -2,8 +2,8 @@
 
 declare(strict_types=1);
 
-require_once __DIR__ . '/../players_lib.php';
-require_once __DIR__ . '/../sponsors_lib.php';
+require_once __DIR__ . '/../admin/players_lib.php';
+require_once __DIR__ . '/../admin/sponsors_lib.php';
 
 header('Content-Type: application/json; charset=UTF-8');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
