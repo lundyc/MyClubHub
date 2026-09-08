@@ -55,7 +55,7 @@ set_meta([
       <div class="album-grid" data-lightbox>
         <?php foreach ($photos as $i => $p): ?>
           <a class="album-grid__item" href="<?= e(uploads($p['file_path'])) ?>"
-             data-full="<?= e(uploads($p['file_path'])) ?>" data-index="<?= $i ?>">
+             data-full="<?= e(uploads($p['file_path'])) ?>" data-caption="" data-index="<?= $i ?>">
             <img src="<?= e(uploads($p['thumb_path'] ?: $p['file_path'])) ?>" alt="" loading="lazy">
           </a>
         <?php endforeach; ?>
@@ -64,9 +64,4 @@ set_meta([
   </div>
 </div>
 
-<div class="lightbox" id="lightbox" hidden>
-  <button class="lightbox__close" type="button" aria-label="Close">&times;</button>
-  <button class="lightbox__nav lightbox__nav--prev" type="button" aria-label="Previous">&#8249;</button>
-  <img class="lightbox__img" src="" alt="">
-  <button class="lightbox__nav lightbox__nav--next" type="button" aria-label="Next">&#8250;</button>
-</div>
+<?php partial('lightbox'); ?>

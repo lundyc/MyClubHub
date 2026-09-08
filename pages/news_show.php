@@ -65,14 +65,18 @@ pub_jsonld([
       <?= $bodyHtml /* sanitised by news_purify() */ ?>
 
       <?php if ($gallery): ?>
-        <div class="article__gallery">
+        <div class="article__gallery" data-lightbox>
           <?php foreach ($gallery as $img): ?>
+            <?php $gu = news_image_url((string) $img['file_path']); $gc = trim((string) $img['caption']); ?>
             <figure>
-              <img src="<?= e(news_image_url((string) $img['file_path'])) ?>" alt="<?= e($img['caption']) ?>" loading="lazy">
-              <?php if (trim((string) $img['caption']) !== ''): ?><figcaption><?= e($img['caption']) ?></figcaption><?php endif; ?>
+              <a class="article__gallery__item" href="<?= e($gu) ?>" data-full="<?= e($gu) ?>" data-caption="<?= e($gc) ?>">
+                <img src="<?= e($gu) ?>" alt="<?= e($gc) ?>" loading="lazy">
+              </a>
+              <?php if ($gc !== ''): ?><figcaption><?= e($gc) ?></figcaption><?php endif; ?>
             </figure>
           <?php endforeach; ?>
         </div>
+        <?php partial('lightbox'); ?>
       <?php endif; ?>
 
       <?php if (!empty($article['fixture_id'])): ?>

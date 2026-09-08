@@ -2199,6 +2199,11 @@ body.nav-open {
   margin: 0;
 }
 
+.article__gallery__item {
+  display: block;
+  cursor: zoom-in;
+}
+
 .article__gallery img {
   width: 100%;
   aspect-ratio: 1 / 1;
@@ -2207,9 +2212,8 @@ body.nav-open {
   transition: filter .15s ease;
 }
 
-.article__gallery a:hover img,
-.article__gallery img:hover {
-  filter: brightness(1.06);
+.article__gallery__item:hover img {
+  filter: brightness(1.07);
 }
 
 .article__gallery figcaption {
@@ -3489,10 +3493,13 @@ a.pp-sponsor:hover {
   position: fixed;
   inset: 0;
   z-index: 999;
-  background: rgba(20, 5, 9, .93);
+  background: rgba(20, 5, 9, .94);
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: .7rem;
+  padding: 3.4rem 1rem 1rem;
 }
 
 .lightbox[hidden] {
@@ -3810,11 +3817,93 @@ a.pp-sponsor:hover {
   white-space: nowrap;
 }
 
+.lightbox__stage {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: .55rem;
+  max-width: 100%;
+}
+
 .lightbox__img {
   max-width: 92vw;
-  max-height: 88vh;
+  max-height: 100%;
   object-fit: contain;
   border-radius: 4px;
+}
+
+.lightbox__meta {
+  margin: 0;
+  display: flex;
+  gap: .8rem;
+  align-items: baseline;
+  color: #e6dade;
+  font-size: .78rem;
+  max-width: 92vw;
+}
+
+.lightbox__count {
+  font-family: var(--font-head);
+  font-weight: 700;
+  letter-spacing: .04em;
+  color: var(--club-accent);
+  white-space: nowrap;
+}
+
+.lightbox__caption {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lightbox__thumbs {
+  flex: 0 0 auto;
+  display: flex;
+  gap: .35rem;
+  max-width: 96vw;
+  overflow-x: auto;
+  padding: .3rem .2rem;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, .35) transparent;
+}
+
+.lightbox__thumb {
+  flex: 0 0 auto;
+  width: 68px;
+  height: 50px;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 4px;
+  overflow: hidden;
+  background: none;
+  cursor: pointer;
+  opacity: .5;
+  transition: opacity .12s ease, border-color .12s ease;
+}
+
+.lightbox__thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.lightbox__thumb:hover {
+  opacity: .85;
+}
+
+.lightbox__thumb.is-active {
+  opacity: 1;
+  border-color: var(--club-accent);
+}
+
+.lightbox--single .lightbox__nav,
+.lightbox--single .lightbox__thumbs,
+.lightbox--single .lightbox__count {
+  display: none;
 }
 
 .lightbox__close,
@@ -3839,6 +3928,11 @@ a.pp-sponsor:hover {
   top: .5rem;
   right: 1rem;
   font-size: 2.2rem;
+}
+
+.lightbox__nav {
+  top: 50%;
+  transform: translateY(-50%);
 }
 
 .lightbox__nav--prev {
