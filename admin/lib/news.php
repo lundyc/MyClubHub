@@ -410,8 +410,8 @@ function news_store_upload(array $file): array
     if (!is_uploaded_file($tmp)) {
         return ['ok' => false, 'error' => 'Invalid upload.'];
     }
-    if ((int) ($file['size'] ?? 0) > 8 * 1024 * 1024) {
-        return ['ok' => false, 'error' => 'Image must be 8MB or smaller.'];
+    if ((int) ($file['size'] ?? 0) > 24 * 1024 * 1024) {
+        return ['ok' => false, 'error' => 'Image must be 24MB or smaller.'];
     }
 
     $finfo = finfo_open(FILEINFO_MIME_TYPE);

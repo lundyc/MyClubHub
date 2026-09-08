@@ -181,6 +181,53 @@ $styleV = (int) (@filemtime(__DIR__ . '/assets/css/style.css') ?: time());
   .ng-lib-tile img { width: 100%; height: 96px; object-fit: cover; display: block; background: #efe9df; }
   .ng-lib-tile span { display: block; padding: .35rem .5rem; font-size: .72rem; color: #6c665c; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .ng-lib-tile.is-sel { border-color: #6d2231; box-shadow: inset 0 0 0 2px #6d2231; }
+
+  /* upload progress + result tiles */
+  .ng-tile--pending img { animation: ng-fadein .25s ease; }
+  @keyframes ng-fadein { from { opacity: 0; } to { opacity: 1; } }
+  .ng-tile--uploading, .ng-tile--error {
+    width: 150px; height: 96px; display: flex; flex-direction: column;
+    justify-content: center; gap: .3rem; padding: .55rem .6rem;
+    border: 1px solid #d7d2c8; border-radius: 6px; background: #fff;
+  }
+  .ng-tile--uploading { border-color: #6d2231; }
+  .ng-tile__name { font-size: .68rem; color: #6c665c; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ng-tile__prog { height: 7px; border-radius: 4px; background: #efe4d3; overflow: hidden; }
+  .ng-tile__bar { display: block; height: 100%; width: 0; border-radius: 4px; background: linear-gradient(90deg, #6d2231, #e0b42a); transition: width .2s ease; }
+  .ng-tile--uploading.is-indeterminate .ng-tile__prog { position: relative; }
+  .ng-tile--uploading.is-indeterminate .ng-tile__bar { width: 45%; animation: ng-indet 1.1s ease-in-out infinite; }
+  @keyframes ng-indet { 0% { margin-left: -45%; } 100% { margin-left: 100%; } }
+  .ng-tile__pct { font-size: .62rem; font-weight: 700; color: #6d2231; text-align: right; }
+  .ng-tile--error { border-color: #f0b7b7; background: #fdecec; }
+  .ng-tile__err { font-size: .68rem; color: #9a2f2f; line-height: 1.3; overflow: hidden; }
+
+  /* status line */
+  .ng-status {
+    display: flex; align-items: flex-start; gap: .5rem;
+    margin-top: .7rem; padding: .55rem .8rem; border-radius: 6px;
+    font-size: .82rem; line-height: 1.35; border: 1px solid transparent;
+  }
+  .ng-status__spin {
+    flex: 0 0 auto; width: 14px; height: 14px; margin-top: .12rem;
+    border: 2px solid currentColor; border-right-color: transparent;
+    border-radius: 50%; animation: ng-spin .7s linear infinite;
+  }
+  @keyframes ng-spin { to { transform: rotate(360deg); } }
+  .ng-status.is-busy { background: #eef4fb; border-color: #cfe0f2; color: #24597f; }
+  .ng-status.is-ok   { background: #e9f5ee; border-color: #bfe2cd; color: #1b6b3d; }
+  .ng-status.is-err  { background: #fdecec; border-color: #f0b7b7; color: #9a2f2f; }
+  .ng-status.is-ok .ng-status__spin, .ng-status.is-err .ng-status__spin { display: none; }
+
+  /* hero uploading box */
+  .ng-hero-up {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: .55rem; min-height: 120px; margin-bottom: .5rem; padding: 1rem;
+    border: 2px dashed #6d2231; border-radius: 8px; background: #faf7f1;
+  }
+  .ng-hero-up__name { font-size: .78rem; color: #6c665c; max-width: 90%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ng-hero-up__prog { width: min(320px, 80%); height: 8px; border-radius: 4px; background: #efe4d3; overflow: hidden; }
+  .ng-hero-up__bar { display: block; height: 100%; width: 0; border-radius: 4px; background: linear-gradient(90deg, #6d2231, #e0b42a); transition: width .2s ease; }
+  .ng-hero-up__pct { font-size: .74rem; font-weight: 700; color: #6d2231; }
 </style>
 
 <?php if ($errors): ?>
@@ -235,8 +282,6 @@ $styleV = (int) (@filemtime(__DIR__ . '/assets/css/style.css') ?: time());
         <?php endif; ?>
         <input type="hidden" name="image_id" value="">
 
-        <div class="ng-grid mb-2" data-ng-pending hidden></div>
-
         <label class="ng-drop" data-ng-drop role="button" tabindex="0">
           <input type="file" name="gallery[]" accept="image/*" multiple hidden data-ng-file>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V5m0 0l-4 4m4-4l4 4"/><path d="M5 19h14"/></svg>
@@ -247,8 +292,10 @@ $styleV = (int) (@filemtime(__DIR__ . '/assets/css/style.css') ?: time());
           <button type="button" class="btn btn-outline-secondary btn-sm" data-ng-open-gallery>
             Choose from Media Library
           </button>
-          <span class="small text-muted" data-ng-status></span>
         </div>
+
+        <div class="ng-grid mt-3" data-ng-pending hidden></div>
+        <div class="ng-status" data-ng-status hidden><span class="ng-status__spin" aria-hidden="true"></span><span data-ng-status-text></span></div>
       </div>
     </div>
   </div>
@@ -309,6 +356,8 @@ $styleV = (int) (@filemtime(__DIR__ . '/assets/css/style.css') ?: time());
         </div>
         <input type="hidden" id="hero_image_path" name="hero_image_path" value="<?= h((string) $data['hero_image_path']) ?>">
 
+        <div class="ng-hero-up d-none" data-ng-hero-up></div>
+
         <label class="ng-drop" data-ng-hero-drop role="button" tabindex="0">
           <input type="file" id="hero_file" accept="image/*" hidden>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V5m0 0l-4 4m4-4l4 4"/><path d="M5 19h14"/></svg>
@@ -318,8 +367,8 @@ $styleV = (int) (@filemtime(__DIR__ . '/assets/css/style.css') ?: time());
         <div class="d-flex flex-wrap gap-2 mt-2 align-items-center">
           <button type="button" class="btn btn-outline-secondary btn-sm" data-ng-open-hero>Choose from Media Library</button>
           <button type="button" class="btn btn-sm btn-link text-danger p-0 <?= $data['hero_image_path'] === '' ? 'd-none' : '' ?>" data-ng-hero-clear>Remove</button>
-          <span id="hero-status" class="small text-muted"></span>
         </div>
+        <div class="ng-status" data-ng-hero-status hidden><span class="ng-status__spin" aria-hidden="true"></span><span data-ng-hero-status-text></span></div>
 
         <label class="form-label mt-2" for="hero_caption">Caption / credit</label>
         <input class="form-control form-control-sm" id="hero_caption" name="hero_caption" value="<?= h((string) $data['hero_caption']) ?>">
@@ -379,14 +428,84 @@ $styleV = (int) (@filemtime(__DIR__ . '/assets/css/style.css') ?: time());
 (function () {
   var csrf = document.querySelector('input[name="csrf_token"]').value;
 
-  function uploadImage(file, onSuccess, onError) {
+  var esc = function (s) { return String(s).replace(/[<>&"]/g, function (c) { return { '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]; }); };
+
+  function ngHttpErr(s) {
+    if (s === 413) return 'That image is too large for the server.';
+    if (s === 401 || s === 400 || s === 419) return 'Your session expired — reload the page and try again.';
+    if (s === 0) return 'The upload was interrupted.';
+    return 'Upload failed (error ' + s + ').';
+  }
+
+  /* Downscale big photos in the browser before upload — keeps uploads fast and
+     under server limits. Returns the original file if no shrink is worthwhile. */
+  function ngPrep(file) {
+    return new Promise(function (resolve) {
+      if (!/^image\/(jpe?g|png|webp)$/i.test(file.type) || file.size < 1200000) { resolve(file); return; }
+      var url = URL.createObjectURL(file);
+      var img = new Image();
+      img.onload = function () {
+        URL.revokeObjectURL(url);
+        var MAX = 2400, w = img.naturalWidth, h = img.naturalHeight;
+        var scale = Math.min(1, MAX / Math.max(w || 1, h || 1));
+        if (scale === 1 && file.size < 4000000) { resolve(file); return; }
+        var c = document.createElement('canvas');
+        c.width = Math.max(1, Math.round(w * scale));
+        c.height = Math.max(1, Math.round(h * scale));
+        try { c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); } catch (e) { resolve(file); return; }
+        var isPng = /png/i.test(file.type);
+        c.toBlob(function (blob) {
+          if (!blob || blob.size >= file.size) { resolve(file); return; }
+          try { blob.name = (file.name || 'image').replace(/\.[^.]+$/, '') + (isPng ? '.png' : '.jpg'); } catch (e) {}
+          resolve(blob);
+        }, isPng ? 'image/png' : 'image/jpeg', 0.82);
+      };
+      img.onerror = function () { URL.revokeObjectURL(url); resolve(file); };
+      img.src = url;
+    });
+  }
+
+  /* XHR upload with real progress. cbs: {onProgress(pct), onDone(url,path), onError(msg)} */
+  function ngUpload(file, cbs) {
+    cbs = cbs || {};
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', 'news_image_upload.php', true);
+    xhr.withCredentials = true;
+    xhr.timeout = 180000;
+    if (xhr.upload) {
+      xhr.upload.onprogress = function (e) {
+        if (e.lengthComputable && cbs.onProgress) cbs.onProgress(Math.min(99, Math.round(e.loaded / e.total * 100)));
+      };
+    }
+    xhr.onload = function () {
+      var j = null; try { j = JSON.parse(xhr.responseText); } catch (e) {}
+      if (xhr.status >= 200 && xhr.status < 300 && j && j.url) { cbs.onDone && cbs.onDone(j.url, j.path); }
+      else { cbs.onError && cbs.onError((j && j.error) || ngHttpErr(xhr.status)); }
+    };
+    xhr.onerror = function () { cbs.onError && cbs.onError('Could not reach the server — check your connection and try again.'); };
+    xhr.ontimeout = function () { cbs.onError && cbs.onError('The upload timed out — try a smaller image.'); };
     var fd = new FormData();
-    fd.append('image', file);
+    fd.append('image', file, (file && file.name) || 'image.jpg');
     fd.append('csrf_token', csrf);
-    fetch('news_image_upload.php', { method: 'POST', body: fd, credentials: 'same-origin' })
-      .then(function (r) { return r.json(); })
-      .then(function (j) { j && j.url ? onSuccess(j.url, j.path) : onError((j && j.error) || 'Upload failed'); })
-      .catch(function () { onError('Upload failed'); });
+    xhr.send(fd);
+  }
+
+  /* Shape used by TinyMCE + simple callers. */
+  function uploadImage(file, onSuccess, onError, onProgress) {
+    ngPrep(file).then(function (f) {
+      ngUpload(f, { onProgress: onProgress, onDone: onSuccess, onError: onError });
+    });
+  }
+
+  /* status line: state = 'busy' | 'ok' | 'err' | falsy (hide) */
+  function ngStatus(box, text, state) {
+    if (!box) return;
+    box.classList.remove('is-busy', 'is-ok', 'is-err');
+    if (!state) { box.hidden = true; return; }
+    box.hidden = false;
+    box.classList.add('is-' + state);
+    var t = box.querySelector('[data-ng-status-text], [data-ng-hero-status-text]');
+    if (t) t.textContent = text || '';
   }
 
   tinymce.init({
@@ -426,9 +545,9 @@ $styleV = (int) (@filemtime(__DIR__ . '/assets/css/style.css') ?: time());
     automatic_uploads: true,
     images_upload_credentials: true,
     file_picker_types: 'image',
-    images_upload_handler: function (blobInfo) {
+    images_upload_handler: function (blobInfo, progress) {
       return new Promise(function (resolve, reject) {
-        uploadImage(blobInfo.blob(), resolve, function (msg) { reject({ message: msg, remove: true }); });
+        uploadImage(blobInfo.blob(), resolve, function (msg) { reject({ message: msg, remove: true }); }, progress);
       });
     },
     setup: function (ed) {
@@ -441,22 +560,42 @@ $styleV = (int) (@filemtime(__DIR__ . '/assets/css/style.css') ?: time());
   var heroFile = document.getElementById('hero_file');
   var heroDrop = document.querySelector('[data-ng-hero-drop]');
   var heroClear = document.querySelector('[data-ng-hero-clear]');
-  var heroStatus = document.getElementById('hero-status');
+  var heroStatusBox = document.querySelector('[data-ng-hero-status]');
+  var heroUpBox = document.querySelector('[data-ng-hero-up]');
   var heroPath = document.getElementById('hero_image_path');
   var heroWrap = document.getElementById('hero-preview');
 
-  function heroSay(m) { if (heroStatus) heroStatus.textContent = m || ''; }
+  function heroSay(m, state) { ngStatus(heroStatusBox, m, state || (m ? 'busy' : null)); }
   function setHero(url, path) {
     heroPath.value = path != null ? path : String(url).replace(/^\/uploads\/news\//, '');
     heroWrap.querySelector('img').src = url;
     heroWrap.classList.remove('d-none');
     if (heroClear) heroClear.classList.remove('d-none');
-    heroSay('Set — save the article to keep it.');
   }
+  function heroUpShow(name) {
+    heroUpBox.className = 'ng-hero-up';
+    heroUpBox.innerHTML =
+      '<span class="ng-hero-up__name">' + esc(name) + '</span>' +
+      '<div class="ng-hero-up__prog"><span class="ng-hero-up__bar"></span></div>' +
+      '<span class="ng-hero-up__pct">Preparing…</span>';
+    heroWrap.classList.add('d-none');
+  }
+  function heroUpHide() { heroUpBox.className = 'ng-hero-up d-none'; heroUpBox.innerHTML = ''; }
   function uploadHero(file) {
-    if (!file || !/^image\//.test(file.type)) return;
-    heroSay('Uploading ' + file.name + '…');
-    uploadImage(file, setHero, function (msg) { heroSay(msg); });
+    if (!file || !/^image\//.test(file.type)) { heroSay('Choose an image file (JPG, PNG, WebP or GIF).', 'err'); return; }
+    var name = file.name || 'image';
+    heroUpShow(name);
+    heroSay('Uploading “' + name + '”…', 'busy');
+    ngPrep(file).then(function (f) {
+      var pctEl = heroUpBox.querySelector('.ng-hero-up__pct');
+      var barEl = heroUpBox.querySelector('.ng-hero-up__bar');
+      if (pctEl) pctEl.textContent = '0%';
+      ngUpload(f, {
+        onProgress: function (p) { if (barEl) barEl.style.width = p + '%'; if (pctEl) pctEl.textContent = p + '%'; },
+        onDone: function (url, path) { heroUpHide(); setHero(url, path); heroSay('Hero image set — save the article to keep it.', 'ok'); },
+        onError: function (msg) { heroUpHide(); if (heroPath.value) heroWrap.classList.remove('d-none'); heroSay('“' + name + '” didn’t upload — ' + msg, 'err'); }
+      });
+    });
   }
 
   if (heroFile) {
@@ -486,7 +625,7 @@ $styleV = (int) (@filemtime(__DIR__ . '/assets/css/style.css') ?: time());
       heroPath.value = '';
       heroWrap.classList.add('d-none');
       heroClear.classList.add('d-none');
-      heroSay('Removed — save to apply.');
+      heroSay('Hero image removed — save to apply.', 'ok');
     });
   }
 
@@ -501,14 +640,19 @@ $styleV = (int) (@filemtime(__DIR__ . '/assets/css/style.css') ?: time());
   }
 
   /* ---- Gallery: drag-and-drop uploader + Media Library picker ---------- */
-  var form = document.querySelector('form.row.g-4') || document.querySelector('form');
   var pending = document.querySelector('[data-ng-pending]');
-  var galStatus = document.querySelector('[data-ng-status]');
+  var galStatusBox = document.querySelector('[data-ng-status]');
   var drop = document.querySelector('[data-ng-drop]');
   var dropFile = document.querySelector('[data-ng-file]');
-  var esc = function (s) { return String(s).replace(/[<>&"]/g, function (c) { return { '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]; }); };
-  var galSay = function (m) { if (galStatus) galStatus.textContent = m || ''; };
+  var galSay = function (m, state) { ngStatus(galStatusBox, m, state || (m ? 'busy' : null)); };
+  var galBusy = 0;
 
+  function galRemovable(fig) {
+    var x = fig.querySelector('.ng-tile__x');
+    if (x) x.addEventListener('click', function () { fig.remove(); if (!pending.children.length) pending.hidden = true; });
+  }
+
+  // final "picked / uploaded" tile carrying the hidden field
   function addPendingTile(fieldName, value, url) {
     if (!pending) return;
     pending.hidden = false;
@@ -516,24 +660,62 @@ $styleV = (int) (@filemtime(__DIR__ . '/assets/css/style.css') ?: time());
     fig.className = 'ng-tile ng-tile--pending';
     fig.innerHTML = '<img src="' + esc(url) + '" alt=""><button type="button" class="ng-tile__x" title="Remove">&times;</button>';
     var hidden = document.createElement('input');
-    hidden.type = 'hidden';
-    hidden.name = fieldName;
-    hidden.value = value;
+    hidden.type = 'hidden'; hidden.name = fieldName; hidden.value = value;
     fig.appendChild(hidden);
-    fig.querySelector('.ng-tile__x').addEventListener('click', function () {
-      fig.remove();
-      if (!pending.children.length) pending.hidden = true;
-    });
+    galRemovable(fig);
     pending.appendChild(fig);
   }
 
+  function galUploadingTile(name) {
+    pending.hidden = false;
+    var fig = document.createElement('figure');
+    fig.className = 'ng-tile ng-tile--uploading is-indeterminate';
+    fig.innerHTML =
+      '<span class="ng-tile__name">' + esc(name) + '</span>' +
+      '<div class="ng-tile__prog"><span class="ng-tile__bar"></span></div>' +
+      '<span class="ng-tile__pct">…</span>';
+    pending.appendChild(fig);
+    return fig;
+  }
+  function galTileDone(fig, url, path) {
+    fig.className = 'ng-tile ng-tile--pending';
+    fig.innerHTML = '<img src="' + esc(url) + '" alt=""><button type="button" class="ng-tile__x" title="Remove">&times;</button>';
+    var hidden = document.createElement('input');
+    hidden.type = 'hidden'; hidden.name = 'gallery_new[]';
+    hidden.value = path || String(url).replace(/^\/uploads\/news\//, '');
+    fig.appendChild(hidden);
+    galRemovable(fig);
+  }
+  function galTileError(fig, name, msg) {
+    fig.className = 'ng-tile ng-tile--error';
+    fig.innerHTML = '<span class="ng-tile__err">⚠ ' + esc(name) + ' — ' + esc(msg) + '</span>' +
+                    '<button type="button" class="ng-tile__x" title="Dismiss">&times;</button>';
+    galRemovable(fig);
+  }
+
   function uploadDropped(file) {
-    if (!/^image\//.test(file.type)) return;
-    galSay('Uploading ' + file.name + '…');
-    uploadImage(file, function (url) {
-      addPendingTile('gallery_new[]', String(url).replace(/^\/uploads\/news\//, ''), url);
-      galSay('Added — save the article to keep it.');
-    }, function (err) { galSay(file.name + ': ' + err); });
+    if (!/^image\//.test(file.type)) { galSay('“' + (file.name || 'that file') + '” isn’t an image.', 'err'); return; }
+    var name = file.name || 'image';
+    var fig = galUploadingTile(name);
+    galBusy++;
+    galSay('Uploading “' + name + '”…', 'busy');
+    ngPrep(file).then(function (f) {
+      var bar = fig.querySelector('.ng-tile__bar');
+      var pct = fig.querySelector('.ng-tile__pct');
+      pct.textContent = '0%';
+      ngUpload(f, {
+        onProgress: function (p) { fig.classList.remove('is-indeterminate'); bar.style.width = p + '%'; pct.textContent = p + '%'; },
+        onDone: function (url, path) {
+          galTileDone(fig, url, path);
+          if (--galBusy <= 0) galSay('Uploaded — save the article to keep it.', 'ok');
+        },
+        onError: function (msg) {
+          galTileError(fig, name, msg);
+          galBusy--;
+          galSay('“' + name + '” didn’t upload — ' + msg, 'err');
+        }
+      });
+    });
   }
 
   if (drop && dropFile) {
@@ -671,7 +853,7 @@ $styleV = (int) (@filemtime(__DIR__ . '/assets/css/style.css') ?: time());
 
       if (libMode === 'hero') {
         var m = selected[keys[0]];
-        heroSay('Linking ' + m.name + '…');
+        heroSay('Using “' + m.name + '” from the library…', 'busy');
         laddBtn.disabled = true;
         var fd = new FormData();
         fd.append('action', 'copy_from_library');
@@ -680,15 +862,15 @@ $styleV = (int) (@filemtime(__DIR__ . '/assets/css/style.css') ?: time());
         fetch('news_image_upload.php', { method: 'POST', body: fd, credentials: 'same-origin' })
           .then(function (r) { return r.json(); })
           .then(function (j) {
-            if (j && j.url) { setHero(j.url, j.path); closeLib(); }
-            else { heroSay((j && j.error) || 'Could not use that image.'); laddBtn.disabled = false; }
+            if (j && j.url) { setHero(j.url, j.path); heroSay('Hero image set — save the article to keep it.', 'ok'); closeLib(); }
+            else { heroSay((j && j.error) || 'Could not use that image.', 'err'); laddBtn.disabled = false; }
           })
-          .catch(function () { heroSay('Could not use that image.'); laddBtn.disabled = false; });
+          .catch(function () { heroSay('Could not use that image.', 'err'); laddBtn.disabled = false; });
         return;
       }
 
       keys.forEach(function (p) { addPendingTile('gallery_library[]', selected[p].path, selected[p].url); });
-      galSay(keys.length + ' library image' + (keys.length === 1 ? '' : 's') + ' will be added when you save.');
+      galSay(keys.length + ' library image' + (keys.length === 1 ? '' : 's') + ' added — save the article to keep them.', 'ok');
       selected = {}; refreshSel(); render();
       closeLib();
     });
