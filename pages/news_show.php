@@ -14,7 +14,7 @@ if ($article === null) {
 }
 
 $hero = trim((string) $article['hero_image_path']);
-$heroUrl = $hero !== '' ? uploads('news/' . $hero) : '';
+$heroUrl = $hero !== '' ? news_image_url($hero) : '';
 $published = format_date($article['published_at'], 'l j F Y');
 $bodyHtml = news_render($article);
 $gallery = news_gallery(db(), (int) $article['id']);
@@ -68,7 +68,7 @@ pub_jsonld([
         <div class="article__gallery">
           <?php foreach ($gallery as $img): ?>
             <figure>
-              <img src="<?= e(uploads('news/' . $img['file_path'])) ?>" alt="<?= e($img['caption']) ?>" loading="lazy">
+              <img src="<?= e(news_image_url((string) $img['file_path'])) ?>" alt="<?= e($img['caption']) ?>" loading="lazy">
               <?php if (trim((string) $img['caption']) !== ''): ?><figcaption><?= e($img['caption']) ?></figcaption><?php endif; ?>
             </figure>
           <?php endforeach; ?>

@@ -456,55 +456,55 @@ function news_gallery_add(PDO $pdo, int $articleId, string $path, string $captio
 }
 
 /**
- * Copy a file already in the Media Library (path relative to the Hub root,
- * e.g. "uploads/history/gallery/2016/x.jpg") into uploads/news/YYYY/MM/. Keeps
- * everything under uploads/news/ so news_images.file_path / hero_image_path and
- * the public renderer are unchanged.
- *
- * @return array{ok:bool,path?:string,url?:string,error?:string}
+ * Public URL for a stored news image path. Two shapes are supported:
+ *  - "YYYY/MM/xxxx.jpg"            — uploaded via the editor/dropzone, lives
+ *                                    under /uploads/news/
+ *  - "uploads/… | badges/… | assets/…" — referenced straight from the Media
+ *                                    Library, served from the web root as-is
+ *                                    (no copy).
  */
-function news_copy_library_image(string $sourceRelPath): array
+function news_image_url(string $path): string
 {
-    require_once __DIR__ . '/media_library.php';
-
-    $abs = hub_media_resolve($sourceRelPath);
-    if ($abs === null || !is_file($abs)) {
-        return ['ok' => false, 'error' => 'That media item could not be found.'];
+    $path = ltrim(trim($path), '/');
+    if ($path === '') {
+        return '';
     }
-    $ext = strtolower(pathinfo($abs, PATHINFO_EXTENSION));
-    if (!in_array($ext, ['jpg', 'jpeg', 'png', 'webp', 'gif'], true)) {
-        return ['ok' => false, 'error' => 'Only JPG, PNG, WebP or GIF images can be used.'];
+    if (!preg_match('#^(uploads|badges|assets)/#', $path)) {
+        $path = 'uploads/news/' . $path;
     }
-
-    $rel = date('Y/m');
-    $dir = news_uploads_dir() . '/' . $rel;
-    if (!is_dir($dir) && !mkdir($dir, 0775, true) && !is_dir($dir)) {
-        return ['ok' => false, 'error' => 'Could not prepare the news uploads folder.'];
-    }
-
-    $stem = preg_replace('/[^A-Za-z0-9_-]+/', '-', pathinfo($abs, PATHINFO_FILENAME)) ?: 'image';
-    try {
-        $name = substr(trim($stem, '-'), 0, 48) . '-' . bin2hex(random_bytes(4)) . '.' . ($ext === 'jpeg' ? 'jpg' : $ext);
-    } catch (Exception) {
-        return ['ok' => false, 'error' => 'Could not generate a filename.'];
-    }
-    if (!@copy($abs, $dir . '/' . $name)) {
-        return ['ok' => false, 'error' => 'Could not copy the image into the news folder.'];
-    }
-
-    $path = $rel . '/' . $name;
-    return ['ok' => true, 'path' => $path, 'url' => '/uploads/news/' . $path];
+    return '/' . implode('/', array_map('rawurlencode', explode('/', $path)));
 }
 
 /**
- * Copy a Media Library image into uploads/news/ and attach it to an article's
- * gallery.
+ * Validate a Media Library path (relative to the Hub root, e.g.
+ * "uploads/history/gallery/2016/x.jpg"). No copy — the path is referenced
+ * as-is; news_image_url() resolves it at render time.
+ *
+ * @return array{ok:bool,path?:string,url?:string,error?:string}
+ */
+function news_library_image_ref(string $sourceRelPath): array
+{
+    require_once __DIR__ . '/media_library.php';
+
+    $src = ltrim(trim($sourceRelPath), '/');
+    if ($src === '' || hub_media_resolve($src) === null) {
+        return ['ok' => false, 'error' => 'That media item could not be found.'];
+    }
+    $ext = strtolower(pathinfo($src, PATHINFO_EXTENSION));
+    if (!in_array($ext, ['jpg', 'jpeg', 'png', 'webp', 'gif'], true)) {
+        return ['ok' => false, 'error' => 'Only JPG, PNG, WebP or GIF images can be used.'];
+    }
+    return ['ok' => true, 'path' => $src, 'url' => news_image_url($src)];
+}
+
+/**
+ * Attach a Media Library image to an article's gallery by reference (no copy).
  *
  * @return array{ok:bool,path?:string,error?:string}
  */
 function news_gallery_add_from_library(PDO $pdo, int $articleId, string $sourceRelPath, string $caption = ''): array
 {
-    $res = news_copy_library_image($sourceRelPath);
+    $res = news_library_image_ref($sourceRelPath);
     if ($res['ok']) {
         news_gallery_add($pdo, $articleId, $res['path'], $caption);
     }

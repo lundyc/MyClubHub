@@ -94,6 +94,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $data['fixture_id'] = (int) ($_POST['fixture_id'] ?? 0) ?: null;
         $data['body_format'] = 'html';
         $bodyForEditor = (string) $data['body'];
+        // hero_image_path is either "YYYY/MM/x.jpg" (upload) or a Media Library
+        // path (uploads/… | badges/… | assets/…). Reject traversal.
+        $data['hero_image_path'] = str_contains($data['hero_image_path'], '..')
+            ? ''
+            : ltrim((string) $data['hero_image_path'], '/');
 
         if ($data['title'] === '') {
             $errors[] = 'A title is required.';
@@ -221,7 +226,7 @@ $styleV = (int) (@filemtime(__DIR__ . '/assets/css/style.css') ?: time());
           <div class="ng-grid mb-3">
             <?php foreach ($gallery as $img): ?>
               <figure class="ng-tile">
-                <img src="/uploads/news/<?= h((string) $img['file_path']) ?>" alt="">
+                <img src="<?= h(news_image_url((string) $img['file_path'])) ?>" alt="">
                 <button type="button" class="ng-tile__x" title="Remove" name="form_action" value="gallery_delete" formnovalidate
                         onclick="this.form.image_id.value='<?= (int) $img['id'] ?>'">&times;</button>
               </figure>
@@ -300,7 +305,7 @@ $styleV = (int) (@filemtime(__DIR__ . '/assets/css/style.css') ?: time());
         <p class="text-muted small">The big image at the top of the article and on cards. Pick from the Media Library or drop a new photo in.</p>
 
         <div id="hero-preview" class="mb-2 <?= $data['hero_image_path'] === '' ? 'd-none' : '' ?>">
-          <img src="/uploads/news/<?= h((string) $data['hero_image_path']) ?>" alt="" style="width:100%;border-radius:8px;border:1px solid #d7d2c8">
+          <img src="<?= h(news_image_url((string) $data['hero_image_path'])) ?>" alt="" style="width:100%;border-radius:8px;border:1px solid #d7d2c8">
         </div>
         <input type="hidden" id="hero_image_path" name="hero_image_path" value="<?= h((string) $data['hero_image_path']) ?>">
 
@@ -380,7 +385,7 @@ $styleV = (int) (@filemtime(__DIR__ . '/assets/css/style.css') ?: time());
     fd.append('csrf_token', csrf);
     fetch('news_image_upload.php', { method: 'POST', body: fd, credentials: 'same-origin' })
       .then(function (r) { return r.json(); })
-      .then(function (j) { j && j.url ? onSuccess(j.url) : onError((j && j.error) || 'Upload failed'); })
+      .then(function (j) { j && j.url ? onSuccess(j.url, j.path) : onError((j && j.error) || 'Upload failed'); })
       .catch(function () { onError('Upload failed'); });
   }
 
@@ -441,8 +446,8 @@ $styleV = (int) (@filemtime(__DIR__ . '/assets/css/style.css') ?: time());
   var heroWrap = document.getElementById('hero-preview');
 
   function heroSay(m) { if (heroStatus) heroStatus.textContent = m || ''; }
-  function setHero(url) {
-    heroPath.value = String(url).replace(/^\/uploads\/news\//, '');
+  function setHero(url, path) {
+    heroPath.value = path != null ? path : String(url).replace(/^\/uploads\/news\//, '');
     heroWrap.querySelector('img').src = url;
     heroWrap.classList.remove('d-none');
     if (heroClear) heroClear.classList.remove('d-none');
@@ -649,9 +654,14 @@ $styleV = (int) (@filemtime(__DIR__ . '/assets/css/style.css') ?: time());
     }
 
     modalEl.addEventListener('shown.bs.modal', loadCatalogue);
+    // a11y: don't let focus stay inside the modal when Bootstrap hides it
+    modalEl.addEventListener('hide.bs.modal', function () {
+      if (modalEl.contains(document.activeElement)) { document.activeElement.blur(); }
+    });
     lsearch.addEventListener('input', render);
     lcat.addEventListener('change', render);
     function closeLib() {
+      if (modalEl.contains(document.activeElement)) { document.activeElement.blur(); }
       if (window.bootstrap) { bootstrap.Modal.getOrCreateInstance(modalEl).hide(); }
     }
 
@@ -661,7 +671,7 @@ $styleV = (int) (@filemtime(__DIR__ . '/assets/css/style.css') ?: time());
 
       if (libMode === 'hero') {
         var m = selected[keys[0]];
-        heroSay('Copying ' + m.name + '…');
+        heroSay('Linking ' + m.name + '…');
         laddBtn.disabled = true;
         var fd = new FormData();
         fd.append('action', 'copy_from_library');
@@ -670,7 +680,7 @@ $styleV = (int) (@filemtime(__DIR__ . '/assets/css/style.css') ?: time());
         fetch('news_image_upload.php', { method: 'POST', body: fd, credentials: 'same-origin' })
           .then(function (r) { return r.json(); })
           .then(function (j) {
-            if (j && j.url) { setHero(j.url); closeLib(); }
+            if (j && j.url) { setHero(j.url, j.path); closeLib(); }
             else { heroSay((j && j.error) || 'Could not use that image.'); laddBtn.disabled = false; }
           })
           .catch(function () { heroSay('Could not use that image.'); laddBtn.disabled = false; });

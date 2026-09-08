@@ -47,9 +47,9 @@ if ($action === 'catalogue') {
     exit;
 }
 
-/* Copy a chosen Media Library image into uploads/news/ (used by the hero picker). */
+/* Reference a chosen Media Library image (no copy) — used by the hero picker. */
 if ($action === 'copy_from_library') {
-    $res = news_copy_library_image((string) ($_POST['source'] ?? ''));
+    $res = news_library_image_ref((string) ($_POST['source'] ?? ''));
     if (!$res['ok']) {
         http_response_code(422);
         echo json_encode(['error' => $res['error']]);
