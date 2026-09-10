@@ -93,7 +93,7 @@ if (!$played) {
     $showLeagueTable = pub_is_league_fixture((string) ($fixture['competition'] ?? '')) && $ourRow && $oppRow;
     $preview = [
         'weather'  => pub_weather_forecast($fixture),
-        'h2h'      => pub_head_to_head($fixture),
+        'h2h'      => pub_head_to_head($fixture, 10),
         'showLeagueTable' => $showLeagueTable,
         'ourRow'   => $ourRow,
         'oppRow'   => $oppRow,
@@ -308,7 +308,6 @@ pub_jsonld([
     <?php if (!$played):
         $usShort = club('club_short_name', 'Saltcoats Vics');
         $oppLabel = (string) ($fixture['opponent_name'] ?? $fixture['opponent'] ?? 'their opponents');
-        $w = $preview['weather'] ?? null;
         $h2h = $preview['h2h'] ?? null;
     ?>
       <div class="mc-panel">
@@ -318,23 +317,6 @@ pub_jsonld([
            on <?= e(format_date($fixture['match_date'], 'l j F')) ?><?= $ko ? ', ' . e($ko) . ' kick-off' : '' ?><?= $venue ? ' at ' . e($venue) : '' ?>.</p>
         <p><a class="btn btn--sm" href="/tickets">Match tickets</a></p>
       </div>
-
-      <?php if ($w): ?>
-        <div class="mc-panel mc-weather">
-          <h2>Weather forecast</h2>
-          <div class="mc-weather__head">
-            <span class="mc-weather__emoji" aria-hidden="true"><?= $w['emoji'] ?></span>
-            <span class="mc-weather__temp"><?= $w['temp'] !== null ? (int) $w['temp'] : (int) $w['temp_max'] ?>&deg;</span>
-            <span class="mc-weather__cond"><?= e($w['label']) ?></span>
-          </div>
-          <dl class="mc-weather__stats">
-            <div><dt>High / Low</dt><dd><?= (int) $w['temp_max'] ?>&deg; / <?= (int) $w['temp_min'] ?>&deg;</dd></div>
-            <div><dt>Chance of rain</dt><dd><?= (int) $w['precip'] ?>%</dd></div>
-            <div><dt>Wind</dt><dd><?= (int) $w['wind'] ?> mph</dd></div>
-          </dl>
-          <p class="mc-weather__note"><?= $w['at_kickoff'] ? 'Around kick-off' : 'On the day' ?> &middot; <?= e($w['place']) ?> &middot; forecast, may change</p>
-        </div>
-      <?php endif; ?>
 
       <?php if ($preview['showLeagueTable']):
           $lrows = [$preview['ourRow'], $preview['oppRow']];
@@ -402,27 +384,46 @@ pub_jsonld([
       <?php if ($h2h): ?>
         <div class="mc-panel mc-h2h">
           <h2>Head-to-head</h2>
-          <p class="mc-h2h__summary">
-            Last <?= (int) $h2h['played'] ?> meeting<?= $h2h['played'] === 1 ? '' : 's' ?>:
-            <b class="mc-h2h__w"><?= (int) $h2h['w'] ?> W</b>
-            <b class="mc-h2h__d"><?= (int) $h2h['d'] ?> D</b>
-            <b class="mc-h2h__l"><?= (int) $h2h['l'] ?> L</b>
-            <span class="mc-h2h__goals">&middot; <?= (int) $h2h['gf'] ?>&ndash;<?= (int) $h2h['ga'] ?> goals</span>
-          </p>
+          <div class="mc-h2h__head">
+            <span class="mc-h2h__crest"><?php if ($ourCrest): ?><img src="<?= e($ourCrest) ?>" alt="<?= e($usShort) ?>" width="44" height="44" loading="lazy"><?php endif; ?></span>
+            <div class="mc-h2h__tally">
+              <span class="mc-h2h__stat mc-h2h__stat--w"><b><?= (int) $h2h['w'] ?></b><span>Wins</span></span>
+              <span class="mc-h2h__stat mc-h2h__stat--d"><b><?= (int) $h2h['d'] ?></b><span>Draws</span></span>
+              <span class="mc-h2h__stat mc-h2h__stat--l"><b><?= (int) $h2h['l'] ?></b><span>Wins</span></span>
+            </div>
+            <span class="mc-h2h__crest"><?php if ($oppCrest): ?><img src="<?= e($oppCrest) ?>" alt="<?= e($oppLabel) ?>" width="44" height="44" loading="lazy"><?php endif; ?></span>
+          </div>
+          <p class="mc-h2h__meta"><?= (int) $h2h['played'] ?> meeting<?= $h2h['played'] === 1 ? '' : 's' ?> &middot; goals <?= (int) $h2h['gf'] ?>&ndash;<?= (int) $h2h['ga'] ?></p>
           <ul class="mc-h2h__list">
             <?php foreach ($h2h['meetings'] as $m):
-                $slugOk = $m['slug'] !== '';
-                $line = '<span class="mc-h2h__date">' . e(format_date($m['date'], 'j M Y')) . '</span>'
-                    . '<span class="mc-h2h__va">' . ($m['is_home'] ? 'H' : 'A') . '</span>'
-                    . '<span class="mc-h2h__score chip chip--' . e($m['result']) . '">' . (int) $m['us'] . '&ndash;' . (int) $m['them'] . '</span>'
-                    . '<span class="mc-h2h__comp">' . e($m['competition']) . '</span>';
+                $homeName  = $m['is_home'] ? $usShort : $oppLabel;
+                $awayName  = $m['is_home'] ? $oppLabel : $usShort;
+                $homeCrestU = $m['is_home'] ? $ourCrest : $oppCrest;
+                $awayCrestU = $m['is_home'] ? $oppCrest : $ourCrest;
+                $hs = $m['is_home'] ? (int) $m['us'] : (int) $m['them'];
+                $as = $m['is_home'] ? (int) $m['them'] : (int) $m['us'];
+                $res = strtolower((string) $m['result']) ?: 'd';
+                $tag = $m['slug'] !== '' ? 'a' : 'div';
+                $href = $m['slug'] !== '' ? ' href="' . e(url('club/results/' . $m['slug'])) . '"' : '';
             ?>
-              <li>
-                <?php if ($slugOk): ?>
-                  <a href="<?= e(url('club/results/' . $m['slug'])) ?>"><?= $line ?></a>
-                <?php else: ?>
-                  <span><?= $line ?></span>
-                <?php endif; ?>
+              <li class="mc-h2h__match">
+                <<?= $tag ?> class="mc-h2h__link"<?= $href ?>>
+                  <div class="mc-h2h__when">
+                    <span class="mc-h2h__date"><?= e(format_date($m['date'], 'j M Y')) ?></span>
+                    <span class="mc-h2h__comp"><?= e($m['competition'] ?: 'Match') ?></span>
+                  </div>
+                  <div class="mc-h2h__row">
+                    <div class="mc-h2h__side mc-h2h__side--home">
+                      <span class="mc-h2h__tname"><?= e($homeName) ?></span>
+                      <?php if ($homeCrestU): ?><img class="mc-h2h__ticon" src="<?= e($homeCrestU) ?>" alt="" width="22" height="22" loading="lazy"><?php endif; ?>
+                    </div>
+                    <span class="mc-h2h__result mc-h2h__result--<?= e($res) ?>"><?= $hs ?> - <?= $as ?></span>
+                    <div class="mc-h2h__side mc-h2h__side--away">
+                      <?php if ($awayCrestU): ?><img class="mc-h2h__ticon" src="<?= e($awayCrestU) ?>" alt="" width="22" height="22" loading="lazy"><?php endif; ?>
+                      <span class="mc-h2h__tname"><?= e($awayName) ?></span>
+                    </div>
+                  </div>
+                </<?= $tag ?>>
               </li>
             <?php endforeach; ?>
           </ul>
@@ -640,6 +641,23 @@ pub_jsonld([
         <?php if ($played && $outcome['outcome']): ?><div><dt>Result</dt><dd><?= e($outcome['label']) ?> <?= (int) $outcome['us'] ?>&ndash;<?= (int) $outcome['them'] ?></dd></div><?php endif; ?>
       </dl>
     </div>
+
+    <?php if (!$played && ($w = $preview['weather'] ?? null)): ?>
+      <div class="mc-panel mc-weather">
+        <h2>Weather forecast</h2>
+        <div class="mc-weather__head">
+          <span class="mc-weather__emoji" aria-hidden="true"><?= $w['emoji'] ?></span>
+          <span class="mc-weather__temp"><?= $w['temp'] !== null ? (int) $w['temp'] : (int) $w['temp_max'] ?>&deg;</span>
+          <span class="mc-weather__cond"><?= e($w['label']) ?></span>
+        </div>
+        <dl class="mc-weather__stats">
+          <div><dt>High / Low</dt><dd><?= (int) $w['temp_max'] ?>&deg; / <?= (int) $w['temp_min'] ?>&deg;</dd></div>
+          <div><dt>Chance of rain</dt><dd><?= (int) $w['precip'] ?>%</dd></div>
+          <div><dt>Wind</dt><dd><?= (int) $w['wind'] ?> mph</dd></div>
+        </dl>
+        <p class="mc-weather__note"><?= $w['at_kickoff'] ? 'Around kick-off' : 'On the day' ?> &middot; <?= e($w['place']) ?> &middot; forecast, may change</p>
+      </div>
+    <?php endif; ?>
 
     <?php if ($moreNews): ?>
       <div class="mc-panel">

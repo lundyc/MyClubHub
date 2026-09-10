@@ -499,6 +499,10 @@ $documentTitle = $documentTitle !== '' ? $documentTitle . ' – ' . APP_NAME : A
                             <?php endif; ?>
                             <li class="nav-item"><a class="nav-link <?= activePage('index.php') ?>"<?= hub_nav_current(['index.php']) ?> href="/admin/index.php"><i class="fa-solid fa-house me-1" aria-hidden="true"></i>Club overview</a></li>
                             <li class="nav-item"><a class="nav-link <?= activePage('club_reminders.php') ?>"<?= hub_nav_current(['club_reminders.php']) ?> href="/admin/club_reminders.php"><i class="fa-solid fa-bell me-1" aria-hidden="true"></i>Reminders</a></li>
+                            <?php if (hub_auth_has_capability('football_ops')): ?>
+                                <!-- Temporary historical PDF importer entry. -->
+                                <li class="nav-item"><a class="nav-link <?= activePage('pdf_importer.php') ?>"<?= hub_nav_current(['pdf_importer.php']) ?> href="/admin/pdf_importer.php"><i class="fa-solid fa-file-pdf me-1" aria-hidden="true"></i>PDF Importer <span class="badge bg-secondary ms-1">Temporary</span></a></li>
+                            <?php endif; ?>
                         </ul>
                     </section>
 

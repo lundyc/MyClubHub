@@ -754,7 +754,26 @@ function matches_save_all(array $matches): bool
         return false;
     }
 
-    return file_put_contents(MATCHES_DATA_FILE, $json . PHP_EOL, LOCK_EX) !== false;
+    // The historical importer updates one entry under this same lock. Atomic
+    // replacement also prevents public readers seeing a partially written file.
+    $lock = @fopen(MATCHES_DATA_FILE . '.lock', 'c');
+    if (!$lock || !flock($lock, LOCK_EX)) {
+        if (is_resource($lock)) fclose($lock);
+        return false;
+    }
+    $temporary = null;
+    try {
+        $temporary = tempnam(dirname(MATCHES_DATA_FILE), '.matches-');
+        if ($temporary === false) return false;
+        $content = $json . PHP_EOL;
+        if (file_put_contents($temporary, $content) !== strlen($content)) return false;
+        chmod($temporary, is_file(MATCHES_DATA_FILE) ? (fileperms(MATCHES_DATA_FILE) & 0777) : 0664);
+        return rename($temporary, MATCHES_DATA_FILE);
+    } finally {
+        if ($temporary && is_file($temporary)) @unlink($temporary);
+        flock($lock, LOCK_UN);
+        fclose($lock);
+    }
 }
 
 /**

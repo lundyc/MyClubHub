@@ -31,6 +31,7 @@ const HUB_CAPABILITIES = [
  * @var array<string, list<string>>
  */
 const HUB_PAGE_CAPABILITIES = [
+    'pdf_importer.php' => ['football_ops'], // Temporary historical importer.
     // Cross-club overview
     'club_reminders.php' => ['finance', 'football_ops', 'tickets_ops', 'secretary_ops'],
 

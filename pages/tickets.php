@@ -88,10 +88,34 @@ $clubShort = club('club_short_name', club('club_name', 'Saltcoats Victoria FC'))
 $tkt_crest_light = static fn (): string => function_exists('club_crest') ? club_crest() : '';
 $tkt_crest_dark  = static fn (): string => function_exists('club_crest_reverse') ? club_crest_reverse() : (function_exists('club_crest') ? club_crest() : '');
 $tkt_opp_crest   = static function (array $g): string {
-    if (function_exists('pub_opponent_crest')) {
-        return pub_opponent_crest($g['opponent_logo'] ?? '', (string) ($g['opponent'] ?? ''));
+    if (!function_exists('pub_opponent_crest')) {
+        return '';
     }
-    return '';
+    $logo = (string) ($g['opponent_logo'] ?? '');
+    $name = (string) ($g['opponent'] ?? '');
+
+    // getTicketedHomeFixtures() selects `f.*` only — no join to match_opponents —
+    // so the badge path isn't in the row. Resolve it from opponent_id the way
+    // the fixtures/results pages do, otherwise pub_opponent_crest() only has the
+    // club name to go on and misses any uploaded (non-slug) badge.
+    if ($logo === '' && !empty($g['opponent_id'])) {
+        static $oppCache = [];
+        $oid = (int) $g['opponent_id'];
+        if (!array_key_exists($oid, $oppCache)) {
+            try {
+                $st = db()->prepare('SELECT logo_path, clubname FROM match_opponents WHERE id = :id LIMIT 1');
+                $st->execute([':id' => $oid]);
+                $oppCache[$oid] = $st->fetch(PDO::FETCH_ASSOC) ?: [];
+            } catch (Throwable) {
+                $oppCache[$oid] = [];
+            }
+        }
+        $logo = (string) ($oppCache[$oid]['logo_path'] ?? '');
+        if ($name === '') {
+            $name = (string) ($oppCache[$oid]['clubname'] ?? '');
+        }
+    }
+    return pub_opponent_crest($logo, $name);
 };
 $tkt_monogram = static function (string $name): string {
     $parts = preg_split('/\s+/', trim($name)) ?: [];
