@@ -236,6 +236,51 @@
     tktRender();
   }
 
+  /* Policy tabs — show one document at a time, deep-linkable via #slug ---- */
+  var policyTabs = doc.querySelector("[data-policytabs]");
+  if (policyTabs) {
+    var pTabs = Array.prototype.slice.call(policyTabs.querySelectorAll(".policytabs__tab"));
+    var pPanels = Array.prototype.slice.call(policyTabs.querySelectorAll(".policydoc"));
+    var pIds = pPanels.map(function (panel) { return panel.id; });
+
+    var pActivate = function (id, moveFocus) {
+      if (pIds.indexOf(id) === -1) id = pIds[0];
+      if (!id) return;
+      pPanels.forEach(function (panel) { panel.hidden = panel.id !== id; });
+      pTabs.forEach(function (tab) {
+        var on = tab.getAttribute("href") === "#" + id;
+        tab.classList.toggle("is-active", on);
+        if (on) tab.setAttribute("aria-current", "page");
+        else tab.removeAttribute("aria-current");
+      });
+      if (moveFocus) {
+        var active = doc.getElementById(id);
+        if (active) {
+          active.setAttribute("tabindex", "-1");
+          active.focus({ preventScroll: true });
+        }
+      }
+    };
+
+    pTabs.forEach(function (tab) {
+      tab.addEventListener("click", function (e) {
+        e.preventDefault();
+        var id = tab.getAttribute("href").slice(1);
+        if (window.history && history.pushState) history.pushState(null, "", "#" + id);
+        else location.hash = id;
+        pActivate(id, true);
+        if (window.matchMedia("(max-width: 820px)").matches) {
+          policyTabs.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+      });
+    });
+
+    var pFromHash = function () { pActivate((location.hash || "").replace("#", ""), false); };
+    window.addEventListener("hashchange", pFromHash);
+    window.addEventListener("popstate", pFromHash);
+    pFromHash();
+  }
+
   /* Product image gallery ------------------------------------------------- */
   var galleryMain = doc.querySelector("[data-gallery-main]");
   if (galleryMain) {

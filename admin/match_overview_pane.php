@@ -8,6 +8,11 @@ if (!hub_auth_has_capability('football_ops')) {
     http_response_code(403);
     exit('Access denied.');
 }
+// Matchday Staffing & Volunteers and the Matchday Checklist are hidden for now.
+// Flip these back to true (and nothing else) to restore both cards.
+$showMatchdayStaffing = false;
+$showMatchdayChecklist = false;
+
 $overviewOpponent = trim((string)($fixture['opponent'] ?? 'Opponent')) ?: 'Opponent';
 $overviewIsHome = (int)($fixture['is_home'] ?? 1) === 1;
 $overviewHomeTeam = $overviewIsHome ? 'Saltcoats Victoria' : $overviewOpponent;
@@ -69,6 +74,24 @@ $overviewEventLabels = [
   </div>
 </div>
 
+<?php if (isset($_GET['imported'])): ?>
+  <div class="alert alert-success">Match report imported. The Starting XI, substitutes and match events below have been updated.</div>
+<?php endif; ?>
+
+<div class="card shadow-sm mb-4">
+  <div class="card-body p-4 d-flex flex-wrap justify-content-between align-items-center gap-3">
+    <div>
+      <div class="small fw-semibold text-uppercase text-muted mb-1">COMET</div>
+      <h2 class="h4 mb-1">Import match report</h2>
+      <div class="text-muted small">Pull the Starting XI, substitutes, goals, cards and substitutions straight from the COMET PDF. You review everything before it saves.</div>
+    </div>
+    <a class="btn btn-brand" href="match_report_import.php?fixture_id=<?= (int)$fixture['id'] ?>&amp;season_id=<?= (int)$seasonId ?>">
+      <i class="fa-solid fa-file-import me-2" aria-hidden="true"></i>Import from PDF
+    </a>
+  </div>
+</div>
+
+<?php if ($showMatchdayStaffing): ?>
 <?php if (isset($_GET['staffing_saved'])): ?>
   <div class="alert alert-success">Matchday staffing updated.</div>
 <?php endif; ?>
@@ -196,7 +219,9 @@ $overviewEventLabels = [
     </form>
   </div>
 </div>
+<?php endif; /* $showMatchdayStaffing */ ?>
 
+<?php if ($showMatchdayChecklist): ?>
 <?php
 $checklistDoneCount = 0;
 foreach ($checklistItems as $checklistItem) {
@@ -374,6 +399,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 </script>
+<?php endif; /* $showMatchdayChecklist */ ?>
 
 <div class="row g-4 mb-4">
   <div class="col-12 col-xl-8">

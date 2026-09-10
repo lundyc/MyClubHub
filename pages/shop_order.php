@@ -43,7 +43,7 @@ set_meta(['title' => 'Order ' . (string) $order['order_ref']]);
         <?php elseif ($cancelled): ?>
           <h1>Order <?= e((string) $order['status']) ?></h1>
         <?php else: ?>
-          <h1>Payment processing</h1>
+          <h1><?= empty($order['stripe_checkout_session_id']) ? 'Awaiting payment' : 'Payment processing' ?></h1>
         <?php endif; ?>
         <p><?= e((string) $order['order_ref']) ?></p>
       </div>
@@ -52,7 +52,11 @@ set_meta(['title' => 'Order ' . (string) $order['order_ref']]);
         <?php if ($paid): ?>
           <p>We've received your payment in full and emailed a confirmation to <strong><?= e((string) $order['customer_email']) ?></strong>.</p>
         <?php elseif (!$cancelled): ?>
+          <?php if (empty($order['stripe_checkout_session_id'])): ?>
+          <div class="notice notice--warn"><p>Your order has been recorded and is awaiting payment. Please pay using the method agreed with the club.</p></div>
+          <?php else: ?>
           <div class="notice notice--warn"><p>Your payment is still being confirmed. This page will update once it's done — refresh in a moment, or check the email we'll send you.</p></div>
+          <?php endif; ?>
         <?php endif; ?>
 
         <h2>Your order</h2>
@@ -63,7 +67,7 @@ set_meta(['title' => 'Order ' . (string) $order['order_ref']]);
           </div>
         <?php endforeach; ?>
         <?php if ((float) $order['discount_total'] > 0): ?>
-          <div class="kv"><span>Discount (<?= e((string) $order['discount_code']) ?>)</span><span>−<?= e(gbp((float) $order['discount_total'])) ?></span></div>
+          <div class="kv"><span>Discount / credit <?= e((string) $order['discount_code']) ?></span><span>−<?= e(gbp((float) $order['discount_total'])) ?></span></div>
         <?php endif; ?>
         <div class="kv kv--total"><span><?= $paid ? 'Total paid' : 'Total' ?></span><span><?= e(gbp((float) $order['total'])) ?></span></div>
         <?php if ((float) $order['amount_refunded'] > 0): ?>

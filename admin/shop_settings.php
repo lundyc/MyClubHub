@@ -164,7 +164,7 @@ foreach ($codes as $c) {
         <div class="mt-3"><button class="btn btn-dark" type="submit">Save settings</button></div>
     </form>
 
-    <hr class="my-4">
+    <hr class="my-4" id="discount-codes">
 
     <div class="row g-3">
         <div class="col-lg-5">

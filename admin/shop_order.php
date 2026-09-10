@@ -15,14 +15,23 @@ $isAdmin = hub_auth_is_admin();
 $id = (int) ($_GET['id'] ?? $_POST['id'] ?? 0);
 
 if ($isAdmin && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
-    $back = '/shop_order.php?id=' . $id;
+    $back = '/admin/shop_order.php?id=' . $id;
     if (!csrf_check()) {
         header('Location: ' . $back . '&e=' . rawurlencode('Session expired — try again.'));
         exit;
     }
     $action = (string) ($_POST['action'] ?? '');
     try {
-        if ($action === 'mark_paid') {
+        if (!shop_get_order($pdo, $id)) { throw new RuntimeException('Order not found.'); }
+        if ($action === 'add_note') {
+            shop_add_order_event($pdo, $id, (string) ($_POST['timeline_note'] ?? ''));
+            auditLog($pdo, 'shop_order_timeline_note', 'Timeline note added to shop order #' . $id);
+            $m = 'Timeline note added.';
+        } elseif ($action === 'update_dates') {
+            shop_update_order_dates($pdo, $id, $_POST);
+            auditLog($pdo, 'shop_order_timeline_updated', 'Timeline dates updated for shop order #' . $id);
+            $m = 'Timeline updated.';
+        } elseif ($action === 'mark_paid') {
             shop_mark_order_paid($pdo, $id, null);
             auditLog($pdo, 'shop_order_marked_paid', 'Shop order #' . $id . ' marked paid manually');
             $m = 'Order marked as paid.';
@@ -36,7 +45,8 @@ if ($isAdmin && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
             $m = 'Flagged as sent to VSN.';
         } elseif ($action === 'resend_email') {
             $ok = shop_send_confirmation_email($pdo, $id, true);
-            $m = $ok ? 'Confirmation email re-sent.' : 'Could not send the email.';
+            if (!$ok) { throw new RuntimeException('Could not send the email. Please check the customer email address and mail settings.'); }
+            $m = 'Order email sent to the customer.';
         } elseif ($action === 'cancel') {
             shop_cancel_order($pdo, $id, trim((string) ($_POST['reason'] ?? 'Cancelled by admin')));
             auditLog($pdo, 'shop_order_cancelled', 'Shop order #' . $id . ' cancelled');
@@ -80,6 +90,17 @@ if (!$order) {
 }
 $items = shop_order_items($pdo, $id);
 $settings = shop_get_settings($pdo);
+shop_order_event_schema($pdo);
+$eventQuery = $pdo->prepare('SELECT * FROM shop_order_events WHERE order_id = ? ORDER BY id DESC');
+$eventQuery->execute([$id]);
+$events = $eventQuery->fetchAll(PDO::FETCH_ASSOC);
+$lastEmailAt = $order['confirmation_email_sent_at'];
+foreach ($events as $event) {
+    if (in_array($event['note'], ['Order summary emailed to customer (awaiting payment).', 'Paid order confirmation emailed to customer.'], true)) {
+        $lastEmailAt = $event['created_at'];
+        break;
+    }
+}
 $remainingRefund = round((float) $order['total'] - (float) $order['amount_refunded'], 2);
 $fmt = static fn($dt) => $dt ? (new DateTimeImmutable((string) $dt))->format('d/m/Y H:i') : '—';
 
@@ -121,7 +142,7 @@ function shop_status_badge(string $status): string
                     <tfoot>
                         <tr><td colspan="2" class="text-end">Subtotal</td><td class="text-end"><?= gbp((float) $order['subtotal']) ?></td></tr>
                         <?php if ((float) $order['discount_total'] > 0): ?>
-                            <tr><td colspan="2" class="text-end">Discount (<?= h((string) $order['discount_code']) ?>)</td><td class="text-end">−<?= gbp((float) $order['discount_total']) ?></td></tr>
+                            <tr><td colspan="2" class="text-end">Discount / credit <?= h((string) $order['discount_code']) ?></td><td class="text-end">−<?= gbp((float) $order['discount_total']) ?></td></tr>
                         <?php endif; ?>
                         <tr class="fw-bold"><td colspan="2" class="text-end">Total</td><td class="text-end"><?= gbp((float) $order['total']) ?></td></tr>
                         <?php if ((float) $order['amount_refunded'] > 0): ?>
@@ -142,9 +163,29 @@ function shop_status_badge(string $status): string
                     <div class="col-sm-6"><dl class="row mb-0 small">
                         <dt class="col-6 text-muted">Collected</dt><dd class="col-6"><?= h($fmt($order['collected_at'])) ?></dd>
                         <dt class="col-6 text-muted">Cancelled</dt><dd class="col-6"><?= h($fmt($order['cancelled_at'])) ?></dd>
-                        <dt class="col-6 text-muted">Email sent</dt><dd class="col-6"><?= h($fmt($order['confirmation_email_sent_at'])) ?></dd>
+                        <dt class="col-6 text-muted">Email sent</dt><dd class="col-6"><?= h($fmt($lastEmailAt)) ?></dd>
                     </dl></div>
                 </div>
+                <hr>
+                <details class="mb-3"><summary>Edit timeline dates</summary>
+                    <p class="small text-muted mt-2">Correct recorded dates below. Use the order actions to record payment, collection or sending to VSN.</p>
+                    <form method="post" class="row g-2">
+                        <?= csrf_field() ?><input type="hidden" name="action" value="update_dates">
+                        <?php foreach (['created_at' => 'Placed', 'paid_at' => 'Paid', 'vsn_ordered_at' => 'Sent to VSN', 'collected_at' => 'Collected', 'cancelled_at' => 'Cancelled'] as $field => $label): ?>
+                            <?php if (!empty($order[$field])): ?><label class="col-sm-6"><?= h($label) ?><input class="form-control" type="datetime-local" name="<?= h($field) ?>" value="<?= h((new DateTimeImmutable($order[$field]))->format('Y-m-d\TH:i')) ?>" required></label><?php endif; ?>
+                        <?php endforeach; ?>
+                        <div class="col-12"><button class="btn btn-outline-secondary">Save timeline dates</button></div>
+                    </form>
+                </details>
+                <form method="post" class="mb-3">
+                    <?= csrf_field() ?><input type="hidden" name="action" value="add_note">
+                    <label class="form-label" for="timeline-note">Add internal timeline note</label>
+                    <textarea class="form-control mb-2" id="timeline-note" name="timeline_note" rows="2" maxlength="4000" required placeholder="e.g. Bank transfer arranged; awaiting receipt"></textarea>
+                    <button class="btn btn-outline-secondary">Add timeline note</button>
+                </form>
+                <?php foreach ($events as $event): ?>
+                    <div class="border-top py-2 small"><strong><?= h($fmt($event['created_at'])) ?></strong><div style="white-space:pre-line"><?= h($event['note']) ?></div></div>
+                <?php endforeach; ?>
                 <?php if (($order['customer_note'] ?? '') !== ''): ?>
                     <hr><div class="small"><strong>Note:</strong> <span style="white-space:pre-line"><?= h((string) $order['customer_note']) ?></span></div>
                 <?php endif; ?>
@@ -197,7 +238,7 @@ function shop_status_badge(string $status): string
                         </form>
                     <?php endif; ?>
 
-                    <?php if (in_array((string) $order['status'], ['paid', 'collected'], true)): ?>
+                    <?php if (in_array((string) $order['status'], ['pending_payment', 'paid', 'collected'], true)): ?>
                         <?php if (empty($order['vsn_ordered_at'])): ?>
                             <form method="post">
                                 <?= csrf_field() ?><input type="hidden" name="action" value="mark_vsn_ordered"><input type="hidden" name="id" value="<?= $id ?>">
@@ -206,7 +247,7 @@ function shop_status_badge(string $status): string
                         <?php endif; ?>
                         <form method="post">
                             <?= csrf_field() ?><input type="hidden" name="action" value="resend_email"><input type="hidden" name="id" value="<?= $id ?>">
-                            <button class="btn btn-outline-secondary w-100" type="submit">Re-send confirmation email</button>
+                            <button class="btn btn-outline-secondary w-100" type="submit"><?= $order['status'] === 'pending_payment' ? 'Email order summary (awaiting payment)' : 'Email payment confirmation' ?></button>
                         </form>
                     <?php endif; ?>
                 </div>

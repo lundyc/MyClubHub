@@ -107,3 +107,58 @@ function pub_ordinal(int $n): string
         : ([1 => 'st', 2 => 'nd', 3 => 'rd'][$n % 10] ?? 'th');
     return $n . $suffix;
 }
+
+/** Squash a club name to a comparison key ("Giffnock SC" -> "giffnock"). */
+function pub_norm_club(string $name): string
+{
+    $n = strtolower(trim($name));
+    $n = preg_replace('/\b(a?fc|f\.?c\.?|jfc|junior football club|association football club|football club)\b/', ' ', $n) ?? $n;
+    return preg_replace('/[^a-z0-9]+/', '', $n) ?? '';
+}
+
+/** The WOSFL table row for a club name, matched loosely, or null. */
+function pub_league_find_row(string $name): ?array
+{
+    $target = pub_norm_club($name);
+    if ($target === '') {
+        return null;
+    }
+    $rows = pub_league_table()['rows'];
+    foreach ($rows as $row) {
+        if (pub_norm_club((string) ($row['club'] ?? '')) === $target) {
+            return $row;
+        }
+    }
+    // "Giffnock" vs "Giffnock SC" etc. — one is a long prefix of the other.
+    foreach ($rows as $row) {
+        $rc = pub_norm_club((string) ($row['club'] ?? ''));
+        if ($rc === '') {
+            continue;
+        }
+        [$short, $long] = strlen($rc) <= strlen($target) ? [$rc, $target] : [$target, $rc];
+        if (strlen($short) >= 7 && str_starts_with($long, $short)) {
+            return $row;
+        }
+    }
+    return null;
+}
+
+/** Does this competition string look like the league (not a cup / friendly)? */
+function pub_is_league_fixture(string $competition): bool
+{
+    $c = strtolower(trim($competition));
+    if ($c === '') {
+        return false;
+    }
+    foreach (['cup', 'trophy', 'shield', 'friendly', 'final', 'play-off', 'playoff'] as $needle) {
+        if (str_contains($c, $needle)) {
+            return false;
+        }
+    }
+    $title = strtolower(pub_league_config()['title']);
+    return str_contains($c, 'wosfl')
+        || str_contains($c, 'west of scotland')
+        || str_contains($c, 'division')
+        || str_contains($c, 'league')
+        || ($title !== '' && str_contains($c, $title));
+}

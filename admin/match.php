@@ -189,7 +189,7 @@ $staffingStatuses = matchday_staffing_statuses();
                     <div class="d-flex gap-2">
                               <a href="matches.php" class="btn btn-outline-secondary">Back to Fixtures</a>
                               <?php if (!$isNew): ?>
-                                        <a href="match_starting_11.php?fixture_id=<?= (int)$fixture['id'] ?>&season_id=<?= (int)$seasonId ?>" class="btn btn-outline-secondary">Starting 11</a>
+                                        <a href="match_lineups.php?fixture_id=<?= (int)$fixture['id'] ?>&season_id=<?= (int)$seasonId ?>" class="btn btn-outline-secondary">Line-ups</a>
                                         <a href="match_graphics.php?fixture_id=<?= (int)$fixture['id'] ?>&season_id=<?= (int)$seasonId ?>" class="btn btn-brand">Match Graphics</a>
                                         <form method="post" action="match_delete.php" onsubmit="return confirm('Delete this fixture? This will remove the fixture and its linked sponsorships.');" class="d-inline">
                                                   <?= csrf_field() ?>
@@ -204,9 +204,6 @@ $staffingStatuses = matchday_staffing_statuses();
 
 <?php if (isset($_GET['saved'])): ?>
           <div class="alert alert-success">Fixture saved.</div>
-<?php endif; ?>
-<?php if (isset($_GET['score_saved'])): ?>
-          <div class="alert alert-success">Half-time and full-time scores saved.</div>
 <?php endif; ?>
 <?php if (isset($_GET['opponent_added'])): ?>
           <div class="alert alert-success">Opponent added and selected.</div>
@@ -248,46 +245,38 @@ $staffingStatuses = matchday_staffing_statuses();
                                                             <div>
                                                                       <div class="fixture-panel-kicker">Scoreline</div>
                                                                       <h5 class="fixture-panel-title">Quick Score</h5>
-                                                                      <div class="text-muted small">Enter either score directly. Saving a full-time score marks the fixture as played.</div>
+                                                                      <div class="text-muted small">Enter either score, then use <strong>Save Changes</strong> below. A full-time score marks the fixture as played.</div>
                                                             </div>
                                                             <a href="match_graphics.php?fixture_id=<?= (int)$fixture['id'] ?>&season_id=<?= (int)$seasonId ?>" class="btn btn-outline-secondary btn-sm">Open Match Graphics</a>
                                                   </div>
-                                                  <form method="post" action="match_score_save.php">
-                                                            <?= csrf_field() ?>
-                                                            <input type="hidden" name="fixture_id" value="<?= (int)$fixture['id'] ?>">
-                                                            <input type="hidden" name="season_id" value="<?= (int)$seasonId ?>">
-                                                            <div class="row g-3 align-items-end">
-                                                                      <div class="col-lg-5">
-                                                                                <div class="fw-semibold mb-2">Half Time</div>
-                                                                                <div class="row g-2">
-                                                                                          <label class="col-6">
-                                                                                                    <span class="form-label small"><?= h($scoreHomeTeam) ?></span>
-                                                                                                    <input type="number" name="half_time_home_score" class="form-control" min="0" max="99" inputmode="numeric" value="<?= $fixture['half_time_home_score'] !== null ? (int)$fixture['half_time_home_score'] : '' ?>">
-                                                                                          </label>
-                                                                                          <label class="col-6">
-                                                                                                    <span class="form-label small"><?= h($scoreAwayTeam) ?></span>
-                                                                                                    <input type="number" name="half_time_away_score" class="form-control" min="0" max="99" inputmode="numeric" value="<?= $fixture['half_time_away_score'] !== null ? (int)$fixture['half_time_away_score'] : '' ?>">
-                                                                                          </label>
-                                                                                </div>
-                                                                      </div>
-                                                                      <div class="col-lg-5">
-                                                                                <div class="fw-semibold mb-2">Full Time</div>
-                                                                                <div class="row g-2">
-                                                                                          <label class="col-6">
-                                                                                                    <span class="form-label small"><?= h($scoreHomeTeam) ?></span>
-                                                                                                    <input type="number" name="full_time_home_score" class="form-control" min="0" max="99" inputmode="numeric" value="<?= $fixture['full_time_home_score'] !== null ? (int)$fixture['full_time_home_score'] : '' ?>">
-                                                                                          </label>
-                                                                                          <label class="col-6">
-                                                                                                    <span class="form-label small"><?= h($scoreAwayTeam) ?></span>
-                                                                                                    <input type="number" name="full_time_away_score" class="form-control" min="0" max="99" inputmode="numeric" value="<?= $fixture['full_time_away_score'] !== null ? (int)$fixture['full_time_away_score'] : '' ?>">
-                                                                                          </label>
-                                                                                </div>
-                                                                      </div>
-                                                                      <div class="col-lg-2">
-                                                                                <button type="submit" class="btn btn-brand w-100">Save Score</button>
+                                                  <div class="row g-3 align-items-end">
+                                                            <div class="col-lg-6">
+                                                                      <div class="fw-semibold mb-2">Half Time</div>
+                                                                      <div class="row g-2">
+                                                                                <label class="col-6">
+                                                                                          <span class="form-label small"><?= h($scoreHomeTeam) ?></span>
+                                                                                          <input type="number" form="fixtureSaveForm" name="half_time_home_score" class="form-control" min="0" max="99" inputmode="numeric" value="<?= $fixture['half_time_home_score'] !== null ? (int)$fixture['half_time_home_score'] : '' ?>">
+                                                                                </label>
+                                                                                <label class="col-6">
+                                                                                          <span class="form-label small"><?= h($scoreAwayTeam) ?></span>
+                                                                                          <input type="number" form="fixtureSaveForm" name="half_time_away_score" class="form-control" min="0" max="99" inputmode="numeric" value="<?= $fixture['half_time_away_score'] !== null ? (int)$fixture['half_time_away_score'] : '' ?>">
+                                                                                </label>
                                                                       </div>
                                                             </div>
-                                                  </form>
+                                                            <div class="col-lg-6">
+                                                                      <div class="fw-semibold mb-2">Full Time</div>
+                                                                      <div class="row g-2">
+                                                                                <label class="col-6">
+                                                                                          <span class="form-label small"><?= h($scoreHomeTeam) ?></span>
+                                                                                          <input type="number" form="fixtureSaveForm" name="full_time_home_score" class="form-control" min="0" max="99" inputmode="numeric" value="<?= $fixture['full_time_home_score'] !== null ? (int)$fixture['full_time_home_score'] : '' ?>">
+                                                                                </label>
+                                                                                <label class="col-6">
+                                                                                          <span class="form-label small"><?= h($scoreAwayTeam) ?></span>
+                                                                                          <input type="number" form="fixtureSaveForm" name="full_time_away_score" class="form-control" min="0" max="99" inputmode="numeric" value="<?= $fixture['full_time_away_score'] !== null ? (int)$fixture['full_time_away_score'] : '' ?>">
+                                                                                </label>
+                                                                      </div>
+                                                            </div>
+                                                  </div>
                                         </div>
                               </div>
                     <?php endif; ?>
@@ -399,21 +388,13 @@ $staffingStatuses = matchday_staffing_statuses();
                                         </form>
                                         <?php if (!$isNew): ?>
                                         <?php require_once __DIR__ . '/lib/member_matches.php'; ensureMemberMatchSchema($pdo); ?>
-                                        <?php if (isset($_GET['veo_saved'])): ?><div class="alert alert-success mt-3 mb-0">VEO link saved.</div><?php endif; ?>
-                                        <?php if (isset($_GET['veo_error'])): ?><div class="alert alert-danger mt-3 mb-0">Enter a valid URL.</div><?php endif; ?>
-                                        <form method="post" action="match_veo_save.php" class="row g-2 align-items-end mt-3">
-                                                  <?= csrf_field() ?>
-                                                  <input type="hidden" name="fixture_id" value="<?= (int)$fixture['id'] ?>">
-                                                  <input type="hidden" name="season_id" value="<?= (int)$seasonId ?>">
-                                                  <div class="col-md-9">
+                                        <div class="row g-2 align-items-end mt-1">
+                                                  <div class="col-12">
                                                             <label class="form-label">VEO footage link</label>
-                                                            <input type="url" name="veo_url" class="form-control" placeholder="https://app.veo.co/matches/..." value="<?= h((string)($fixture['veo_url'] ?? '')) ?>">
+                                                            <input type="url" form="fixtureSaveForm" name="veo_url" class="form-control" placeholder="https://app.veo.co/matches/..." value="<?= h((string)($fixture['veo_url'] ?? '')) ?>">
                                                             <div class="form-text">Shown to season ticket holders on this match's summary page.</div>
                                                   </div>
-                                                  <div class="col-md-3">
-                                                            <button type="submit" class="btn btn-outline-secondary w-100">Save VEO link</button>
-                                                  </div>
-                                        </form>
+                                        </div>
                                         <?php endif; ?>
                                         <div class="mt-3 d-flex justify-content-between align-items-center gap-2 flex-wrap">
                                                   <div>
@@ -598,16 +579,16 @@ $staffingStatuses = matchday_staffing_statuses();
                                         <div class="fixture-starting11-toolbar">
                                                   <div>
                                                             <div class="fixture-panel-kicker">Team sheet</div>
-                                                            <h2 class="fixture-panel-title">Starting 11</h2>
+                                                            <h2 class="fixture-panel-title">Line-ups</h2>
                                                   </div>
-                                                  <a class="btn btn-outline-secondary btn-sm" href="match_starting_11.php?fixture_id=<?= (int)$fixture['id'] ?>&amp;season_id=<?= (int)$seasonId ?>">
+                                                  <a class="btn btn-outline-secondary btn-sm" href="match_lineups.php?fixture_id=<?= (int)$fixture['id'] ?>&amp;season_id=<?= (int)$seasonId ?>">
                                                             <i class="fa-solid fa-up-right-from-square me-1" aria-hidden="true"></i>Open full editor
                                                   </a>
                                         </div>
                                         <iframe
                                                   class="fixture-starting11-frame"
-                                                  src="match_starting_11.php?fixture_id=<?= (int)$fixture['id'] ?>&amp;season_id=<?= (int)$seasonId ?>&amp;embedded=1"
-                                                  title="Starting 11 editor"
+                                                  src="match_lineups.php?fixture_id=<?= (int)$fixture['id'] ?>&amp;season_id=<?= (int)$seasonId ?>&amp;embedded=1"
+                                                  title="Line-ups editor"
                                                   loading="lazy"
                                         ></iframe>
                               </div>

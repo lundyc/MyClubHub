@@ -1157,6 +1157,21 @@ function shop_validate_discount(PDO $pdo, string $code, float $subtotal): array
  * }> $lines  already validated & priced server-side
  * @param array{discount_code?:string, terms_accepted?:bool} $meta
  */
+function shop_manual_credit(string $raw, string $reason, float $available): float
+{
+    if (!preg_match('/^\d{1,7}(?:\.\d{1,2})?$/D', $raw)) {
+        throw new RuntimeException('Enter a valid credit amount with up to two decimal places.');
+    }
+    $credit = round((float) $raw, 2);
+    if ($credit > $available) {
+        throw new RuntimeException('Credit cannot exceed the items total after discount.');
+    }
+    if ($credit > 0 && trim($reason) === '') {
+        throw new RuntimeException('Enter a reason for the credit.');
+    }
+    return $credit;
+}
+
 function shop_create_order(PDO $pdo, array $customer, array $lines, array $meta = []): array
 {
     if (!$lines) {
@@ -1172,6 +1187,15 @@ function shop_create_order(PDO $pdo, array $customer, array $lines, array $meta 
 
     $discount = shop_validate_discount($pdo, (string) ($meta['discount_code'] ?? ''), $subtotal);
     $discountAmount = $discount['ok'] ? $discount['amount'] : 0.0;
+    // Only the authenticated admin entry point supplies manual_credit.
+    $credit = shop_manual_credit((string) ($meta['manual_credit'] ?? '0'),
+        (string) ($meta['credit_reason'] ?? ''), round($subtotal - $discountAmount, 2));
+    if ($credit > 0) {
+        $customer['note'] = trim((string) ($customer['note'] ?? '')) . "\nCredit applied: " . gbp($credit)
+            . ' — ' . trim((string) $meta['credit_reason']);
+        $discountAmount = round($discountAmount + $credit, 2);
+    }
+
 
     // Delivery only ever applies if the setting is actually on — even if a
     // stale/tampered form posts fulfilment_method=delivery while it's off,
@@ -1646,28 +1670,17 @@ function shop_order_items_email_rows(array $items): string
     return $rows;
 }
 
-function shop_send_confirmation_email(PDO $pdo, int $orderId, bool $force = false): bool
+function shop_order_email_content(PDO $pdo, array $order): array
 {
-    $order = shop_get_order($pdo, $orderId);
-    if (!$order || !in_array((string) $order['status'], ['paid', 'collected'], true)) {
-        return false;
-    }
-    if (!$force && !empty($order['confirmation_email_sent_at'])) {
-        return true;
-    }
-    $email = trim((string) $order['customer_email']);
-    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        return false;
-    }
-
-    $items = shop_order_items($pdo, $orderId);
+    $pending = (string) $order['status'] === 'pending_payment';
+    $items = shop_order_items($pdo, (int) $order['id']);
     $collectionPoint = (string) ($order['collection_point'] ?: shop_setting($pdo, 'collection_point', SHOP_COLLECTION_POINT_DEFAULT));
     $collectionDetails = shop_setting($pdo, 'collection_details', '');
     $lead = shop_setting($pdo, 'lead_time', SHOP_LEAD_TIME_DEFAULT);
 
     $summaryRows = shop_order_items_email_rows($items);
     if ((float) $order['discount_total'] > 0) {
-        $summaryRows .= '<tr><td colspan="2" style="padding:8px 0;color:#4a4046;">Discount (' . h((string) $order['discount_code']) . ')</td>
+        $summaryRows .= '<tr><td colspan="2" style="padding:8px 0;color:#4a4046;">Discount / credit ' . h((string) $order['discount_code']) . '</td>
             <td style="padding:8px 0;text-align:right;color:#4a4046;">&minus;' . h(gbp((float) $order['discount_total'])) . '</td></tr>';
     }
 
@@ -1694,19 +1707,41 @@ function shop_send_confirmation_email(PDO $pdo, int $orderId, bool $force = fals
         . ($collectionDetails !== '' ? '<br>' . h($collectionDetails) : '') . '</div>';
 
     $body = '<p style="margin:0 0 16px;font-size:16px;line-height:1.55;">Hi ' . h((string) $order['customer_name']) . ',</p>'
-        . '<p style="margin:0 0 20px;font-size:16px;line-height:1.55;color:#4a4046;">Thanks for your order. We\'ve received your payment in full. Here are the details for <strong>' . h((string) $order['order_ref']) . '</strong>.</p>'
+        . '<p style="margin:0 0 20px;font-size:16px;line-height:1.55;color:#4a4046;">' . ($pending ? 'Thanks for your order. Payment is still outstanding. Please pay using the method agreed with the club. Here are the details for' : 'Thanks for your order. We\'ve received your payment in full. Here are the details for') . ' <strong>' . h((string) $order['order_ref']) . '</strong>.</p>'
         . '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;margin:0 0 12px;">' . $summaryRows . '</table>'
-        . '<p style="margin:0 0 4px;color:#4b0818;font-size:18px;font-weight:900;">Total paid: ' . h(gbp((float) $order['total'])) . '</p>'
+        . '<p style="margin:0 0 4px;color:#4b0818;font-size:18px;font-weight:900;">' . ($pending ? 'Amount to pay: ' : 'Total paid: ') . h(gbp((float) $order['total'])) . '</p>'
         . $timeline
         . $fulfilmentBlock;
 
     $subject = 'Your Saltcoats Victoria FC Club Shop order ' . (string) $order['order_ref'];
-    $html = shop_email_wrapper($subject, 'Your Club Shop order confirmation.', 'Order confirmed', (string) $order['order_ref'], $body);
+    $html = shop_email_wrapper($subject,  $pending ? 'Your Club Shop order — awaiting payment.' : 'Your Club Shop order confirmation.', $pending ? 'Awaiting payment' : 'Order confirmed', (string) $order['order_ref'], $body);
+    return ['subject' => $subject, 'html' => $html];
+}
+
+function shop_send_confirmation_email(PDO $pdo, int $orderId, bool $force = false): bool
+{
+    $order = shop_get_order($pdo, $orderId);
+    if (!$order || !in_array((string) $order['status'], ['pending_payment', 'paid', 'collected'], true)) {
+        return false;
+    }
+    if ($order['status'] === 'pending_payment' && !$force) { return false; }
+    if (!$force && !empty($order['confirmation_email_sent_at'])) {
+        return true;
+    }
+    $email = trim((string) $order['customer_email']);
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        return false;
+    }
+
+    $message = shop_order_email_content($pdo, $order);
+    $subject = $message['subject'];
+    $html = $message['html'];
     $sent = shop_send_mail($email, $subject, $html);
-    if ($sent) {
+    if ($sent && $order['status'] !== 'pending_payment') {
         $pdo->prepare('UPDATE shop_orders SET confirmation_email_sent_at = COALESCE(confirmation_email_sent_at, NOW()) WHERE id = :id')
             ->execute([':id' => $orderId]);
     }
+    if ($sent) { shop_add_order_event($pdo, $orderId, $order['status'] === 'pending_payment' ? 'Order summary emailed to customer (awaiting payment).' : 'Paid order confirmation emailed to customer.'); }
     return $sent;
 }
 
@@ -1737,5 +1772,58 @@ function shop_send_admin_notification(PDO $pdo, int $orderId): void
     $html = shop_email_wrapper($subject, 'New Club Shop order.', 'New order', (string) $order['order_ref'], $body);
     foreach ($recipients as $to) {
         shop_send_mail($to, $subject, $html);
+    }
+}
+
+
+/** Internal order timeline, separate from customer-facing notes. */
+function shop_order_event_schema(PDO $pdo): void
+{
+    static $done = false;
+    if ($done) { return; }
+    $pdo->exec("CREATE TABLE IF NOT EXISTS shop_order_events (
+        id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        order_id INT UNSIGNED NOT NULL,
+        note TEXT NOT NULL,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        KEY idx_shop_order_events (order_id, id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    $done = true;
+}
+
+function shop_add_order_event(PDO $pdo, int $orderId, string $note): void
+{
+    $note = trim($note);
+    if ($note === '' || mb_strlen($note) > 4000) { throw new RuntimeException('Enter a timeline note of up to 4,000 characters.'); }
+    shop_order_event_schema($pdo);
+    $pdo->prepare('INSERT INTO shop_order_events (order_id, note) VALUES (?, ?)')->execute([$orderId, $note]);
+}
+
+function shop_update_order_dates(PDO $pdo, int $orderId, array $dates): void
+{
+    $order = shop_get_order($pdo, $orderId);
+    if (!$order) { throw new RuntimeException('Order not found.'); }
+    $changes = []; $params = []; $details = [];
+    foreach (['created_at', 'paid_at', 'vsn_ordered_at', 'collected_at', 'cancelled_at'] as $field) {
+        if (empty($order[$field]) || !array_key_exists($field, $dates)) { continue; }
+        $raw = (string) $dates[$field];
+        $date = DateTimeImmutable::createFromFormat('!Y-m-d\TH:i', $raw);
+        if (!$date || $date->format('Y-m-d\TH:i') !== $raw || $date > new DateTimeImmutable('now')) {
+            throw new RuntimeException('Enter valid timeline dates that are not in the future.');
+        }
+        $new = $date->format('Y-m-d H:i:s');
+        if (substr((string) $order[$field], 0, 16) === substr($new, 0, 16)) { continue; }
+        $changes[] = "$field = ?"; $params[] = $new;
+        $details[] = str_replace('_', ' ', $field) . ': ' . $order[$field] . ' → ' . $new;
+    }
+    if ($changes) {
+        shop_order_event_schema($pdo);
+        $pdo->beginTransaction();
+        try {
+            $params[] = $orderId;
+            $pdo->prepare('UPDATE shop_orders SET ' . implode(', ', $changes) . ' WHERE id = ?')->execute($params);
+            shop_add_order_event($pdo, $orderId, "Timeline dates updated.\n" . implode("\n", $details));
+            $pdo->commit();
+        } catch (Throwable $e) { if ($pdo->inTransaction()) { $pdo->rollBack(); } throw $e; }
     }
 }

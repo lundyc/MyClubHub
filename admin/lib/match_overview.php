@@ -45,6 +45,9 @@ function matchOverviewEventTitle(array $event, string $opponent): string
           $knownPlayer = $player !== '' && strcasecmp($player, 'Unknown Player') !== 0;
 
           if ($type === 'goal') {
+                    if (!empty($event['own_goal'])) {
+                              return 'Own goal for ' . $teamName . ($knownPlayer ? ' — ' . $player : '');
+                    }
                     return 'Goal for ' . $teamName . ($knownPlayer ? ' — ' . $player : '');
           }
           if ($type === 'substitution') {

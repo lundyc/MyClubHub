@@ -185,6 +185,42 @@ function pub_competitions_in_season(int $seasonId): array
 }
 
 /**
+ * Fixture IDs that currently have match tickets on sale online — at least one
+ * active fixture package sitting on an active template. Queried once and cached
+ * for the request so the fixtures list can flag rows without an N+1.
+ *
+ * @return array<int,true> set keyed by fixture id
+ */
+function pub_ticketed_fixture_ids(): array
+{
+    static $ids = null;
+    if ($ids !== null) {
+        return $ids;
+    }
+    $ids = [];
+    try {
+        $rows = db()->query(
+            'SELECT DISTINCT ftp.fixture_id
+               FROM fixture_ticket_packages ftp
+               JOIN match_ticket_packages p ON p.id = ftp.package_id
+              WHERE ftp.is_active = 1 AND p.is_active = 1'
+        )->fetchAll(PDO::FETCH_COLUMN);
+        foreach ($rows as $fid) {
+            $ids[(int) $fid] = true;
+        }
+    } catch (Throwable $e) {
+        $ids = []; // ticket schema not present — treat as "none on sale"
+    }
+    return $ids;
+}
+
+/** Whether online match tickets are on sale for a given fixture. */
+function pub_fixture_has_tickets(int $fixtureId): bool
+{
+    return isset(pub_ticketed_fixture_ids()[$fixtureId]);
+}
+
+/**
  * @param array{season_id?:int,competition?:string,type?:'upcoming'|'results'|'all'} $opts
  * @return list<array<string,mixed>>
  */
@@ -273,9 +309,11 @@ function pub_match_events(int $fixtureId): array
         $label = match ($type) {
             'goal' => !empty($e['own_goal']) ? 'Own goal' : 'Goal',
             'card' => ((string) ($e['card_type'] ?? '') === 'red' ? 'Red card' : 'Yellow card'),
+            'yellow_card' => 'Yellow card',
+            'red_card' => 'Red card',
             'substitution', 'sub' => 'Substitution',
             'penalty_miss' => 'Penalty missed',
-            default => ucfirst($type ?: 'Event'),
+            default => ucfirst(str_replace('_', ' ', $type ?: 'Event')),
         };
         $out[] = [
             'minute' => (string) ($e['minute'] ?? ''),
@@ -306,6 +344,105 @@ function pub_match_lineup(int $fixtureId): array
     ];
 }
 
+/**
+ * Both-teams match record (starting XI, subs, events) from the Hub's normalised
+ * matchday_* tables — the store the COMET PDF importer / Matchday Record editor
+ * writes to. Returns null when the tables or a fixture's rows are absent, so
+ * callers fall back to the legacy svfc-only projection (pub_match_lineup /
+ * pub_match_events, which read admin/data/matches.json).
+ *
+ * @return array{
+ *   lineups: array{us: array<int,array<string,mixed>>, opp: array<int,array<string,mixed>>},
+ *   captain: array{us:string, opp:string},
+ *   events: list<array{minute:string,type:string,label:string,side:'us'|'opp',player:string,detail:string}>
+ * }|null
+ */
+function pub_match_record(int $fixtureId): ?array
+{
+    static $cache = [];
+    if (array_key_exists($fixtureId, $cache)) {
+        return $cache[$fixtureId];
+    }
+    if ($fixtureId <= 0) {
+        return $cache[$fixtureId] = null;
+    }
+
+    try {
+        $ls = db()->prepare(
+            'SELECT side, player_name, shirt_number, position_label, is_starting, is_captain
+               FROM matchday_lineups
+              WHERE fixture_id = :f
+              ORDER BY side ASC, is_starting DESC, sort_order ASC, shirt_number ASC, id ASC'
+        );
+        $ls->execute([':f' => $fixtureId]);
+        $lineRows = $ls->fetchAll();
+        if (!$lineRows) {
+            return $cache[$fixtureId] = null;
+        }
+
+        $es = db()->prepare(
+            'SELECT minute, minute_extra, side, type, player_name, secondary_player_name,
+                    own_goal, card_type
+               FROM matchday_events
+              WHERE fixture_id = :f
+              ORDER BY minute ASC, minute_extra ASC, sequence ASC, id ASC'
+        );
+        $es->execute([':f' => $fixtureId]);
+        $eventRows = $es->fetchAll();
+    } catch (Throwable) {
+        return $cache[$fixtureId] = null; // tables not present on this install
+    }
+
+    $key = static fn (string $side): string => $side === 'svfc' ? 'us' : 'opp';
+
+    $lineups = ['us' => [], 'opp' => []];
+    $captain = ['us' => '', 'opp' => ''];
+    foreach ($lineRows as $r) {
+        $k = $key((string) $r['side']);
+        $name = (string) $r['player_name'];
+        $lineups[$k][] = [
+            'name' => $name,
+            'number' => $r['shirt_number'] !== null ? (int) $r['shirt_number'] : null,
+            'pos' => trim((string) ($r['position_label'] ?? '')),
+            'captain' => (bool) $r['is_captain'],
+            'starting' => (bool) $r['is_starting'],
+        ];
+        if ($r['is_captain'] && $captain[$k] === '') {
+            $captain[$k] = $name;
+        }
+    }
+
+    $events = [];
+    foreach ($eventRows as $r) {
+        $type = (string) $r['type'];
+        $isOG = (bool) $r['own_goal'] || $type === 'own_goal';
+        $min = $r['minute'] !== null ? (string) (int) $r['minute'] : '';
+        if ($min !== '' && (int) $r['minute_extra'] > 0) {
+            $min .= '+' . (int) $r['minute_extra'];
+        }
+        $label = match (true) {
+            $isOG => 'Own goal',
+            $type === 'goal', $type === 'penalty_scored' => 'Goal',
+            $type === 'yellow_card' => 'Yellow card',
+            $type === 'second_yellow' => 'Second yellow',
+            $type === 'red_card' => 'Red card',
+            $type === 'substitution' => 'Substitution',
+            $type === 'penalty_missed' => 'Penalty missed',
+            default => ucfirst(str_replace('_', ' ', $type ?: 'Event')),
+        };
+        $events[] = [
+            'minute' => $min,
+            'type' => ($type === 'own_goal' || $type === 'penalty_scored') ? 'goal' : $type,
+            'label' => $label,
+            'side' => $key((string) $r['side']),
+            'player' => (string) $r['player_name'],
+            'detail' => (string) $r['secondary_player_name'],
+        ];
+    }
+
+    return $cache[$fixtureId] = ['lineups' => $lineups, 'captain' => $captain, 'events' => $events];
+}
+
 /** Match photos for a fixture (from the Hub match_photos table). */
 function pub_match_photos(int $fixtureId, int $limit = 24): array
 {
@@ -316,4 +453,349 @@ function pub_match_photos(int $fixtureId, int $limit = 24): array
     );
     $stmt->execute([':f' => $fixtureId]);
     return $stmt->fetchAll();
+}
+
+/* -------------------------------------------------------------------------
+ * Upcoming-fixture preview extras: weather, head-to-head, form
+ * ---------------------------------------------------------------------- */
+
+/** Hub cache dir (writable by the web user; shared with the WOSFL scraper). */
+function pub_pref_cache_dir(): string
+{
+    return HUB_ROOT . '/cache';
+}
+
+/** GET a JSON endpoint, fail-soft. Short timeouts — this runs during render. */
+function pub_http_json(string $url, int $timeout = 4): ?array
+{
+    if (!function_exists('curl_init')) {
+        return null;
+    }
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_CONNECTTIMEOUT => min(3, $timeout),
+        CURLOPT_TIMEOUT => $timeout,
+        CURLOPT_FOLLOWLOCATION => true,
+        CURLOPT_MAXREDIRS => 2,
+        CURLOPT_USERAGENT => 'SaltcoatsVicsSite/1.0 (+https://myclubhub.co.uk)',
+        CURLOPT_HTTPHEADER => ['Accept: application/json'],
+    ]);
+    $body = curl_exec($ch);
+    $code = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+    curl_close($ch);
+    if (!is_string($body) || $code < 200 || $code >= 300) {
+        return null;
+    }
+    $data = json_decode($body, true);
+    return is_array($data) ? $data : null;
+}
+
+/**
+ * Head-to-head vs this fixture's opponent, from the results archive
+ * (history_matches — scores are stored our-team-first).
+ *
+ * @return array{played:int,w:int,d:int,l:int,gf:int,ga:int,meetings:list<array<string,mixed>>}|null
+ */
+function pub_head_to_head(array $fixture, int $limit = 6): ?array
+{
+    $opp = trim((string) ($fixture['opponent_name'] ?? $fixture['opponent'] ?? ''));
+    if ($opp === '') {
+        return null;
+    }
+    try {
+        $rows = db()->query(
+            "SELECT match_date, season, competition, is_home, opponent,
+                    home_score, away_score, result, slug, has_report
+             FROM history_matches
+             WHERE home_score IS NOT NULL AND away_score IS NOT NULL AND opponent <> ''
+             ORDER BY match_date DESC, id DESC"
+        )->fetchAll();
+    } catch (Throwable) {
+        return null;
+    }
+
+    $target = pub_norm_club($opp);
+    $aliases = [
+        'irvinevics' => 'irvinevictoria',
+        'lugarbothwellthistle' => 'lugarboswellthistle',
+        'ardrossanwintonrovers' => 'wintonrovers',
+        'murikirkjuniors' => 'muirkirk',
+    ];
+    $isMatch = static function (string $name) use ($target, $aliases): bool {
+        $n = pub_norm_club($name);
+        if ($n === '' || $target === '') {
+            return false;
+        }
+        if ($n === $target) {
+            return true;
+        }
+        if (($aliases[$n] ?? null) === $target || ($aliases[$target] ?? null) === $n) {
+            return true;
+        }
+        [$short, $long] = strlen($n) <= strlen($target) ? [$n, $target] : [$target, $n];
+        return strlen($short) >= 8 && str_starts_with($long, $short);
+    };
+
+    $meetings = [];
+    $w = $d = $l = $gf = $ga = 0;
+    foreach ($rows as $r) {
+        if (!$isMatch((string) $r['opponent'])) {
+            continue;
+        }
+        $us = (int) $r['home_score'];
+        $them = (int) $r['away_score'];
+        $res = strtoupper((string) $r['result']) ?: ($us > $them ? 'W' : ($us < $them ? 'L' : 'D'));
+        $res === 'W' ? $w++ : ($res === 'L' ? $l++ : $d++);
+        $gf += $us;
+        $ga += $them;
+        if (count($meetings) < max(1, $limit)) {
+            $meetings[] = [
+                'date' => (string) $r['match_date'],
+                'season' => (string) $r['season'],
+                'competition' => (string) $r['competition'],
+                'is_home' => (bool) $r['is_home'],
+                'us' => $us,
+                'them' => $them,
+                'result' => $res,
+                'slug' => (string) $r['slug'],
+                'has_report' => (bool) $r['has_report'],
+            ];
+        }
+    }
+
+    if (!$meetings) {
+        return null;
+    }
+    return [
+        'played' => $w + $d + $l,
+        'w' => $w, 'd' => $d, 'l' => $l,
+        'gf' => $gf, 'ga' => $ga,
+        'meetings' => $meetings,
+    ];
+}
+
+/** Town-level coordinates for the WOSFL grounds (fine for a weather forecast). */
+function pub_known_venue_coords(): array
+{
+    return [
+        'saltcoatsvictoria'     => ['lat' => 55.6336, 'lon' => -4.7721, 'label' => 'Saltcoats'],
+        'eastkilbridethistle'   => ['lat' => 55.7645, 'lon' => -4.1770, 'label' => 'East Kilbride'],
+        'eastkilbrideym'        => ['lat' => 55.7645, 'lon' => -4.1770, 'label' => 'East Kilbride'],
+        'glenvale'              => ['lat' => 55.8451, 'lon' => -4.4284, 'label' => 'Paisley'],
+        'royalalbert'           => ['lat' => 55.7375, 'lon' => -3.9724, 'label' => 'Larkhall'],
+        'carlukerovers'         => ['lat' => 55.7348, 'lon' => -3.8403, 'label' => 'Carluke'],
+        'westparkunited'        => ['lat' => 55.9345, 'lon' => -4.6903, 'label' => 'Port Glasgow'],
+        'kellorovers'           => ['lat' => 55.3807, 'lon' => -3.9924, 'label' => 'Kirkconnel'],
+        'glasgowperthshire'     => ['lat' => 55.8636, 'lon' => -4.2369, 'label' => 'Glasgow'],
+        'eglinton'              => ['lat' => 55.6541, 'lon' => -4.6957, 'label' => 'Kilwinning'],
+        'valeofleven'           => ['lat' => 55.9879, 'lon' => -4.5824, 'label' => 'Alexandria'],
+        'giffnock'              => ['lat' => 55.8062, 'lon' => -4.2929, 'label' => 'Giffnock'],
+        'giffnocksc'            => ['lat' => 55.8062, 'lon' => -4.2929, 'label' => 'Giffnock'],
+        'lugarboswellthistle'   => ['lat' => 55.4656, 'lon' => -4.2288, 'label' => 'Lugar'],
+        'newmainsunited'        => ['lat' => 55.7897, 'lon' => -3.8760, 'label' => 'Newmains'],
+        'irvinevictoria'        => ['lat' => 55.6156, 'lon' => -4.6649, 'label' => 'Irvine'],
+        'stanthonys'            => ['lat' => 55.9485, 'lon' => -4.7572, 'label' => 'Greenock'],
+    ];
+}
+
+/** Place-name guesses to geocode an unknown away ground by. */
+function pub_place_candidates(array $fixture): array
+{
+    $out = [];
+    $venue = trim((string) ($fixture['venue'] ?? ''));
+    if ($venue !== '' && str_word_count($venue) <= 2
+        && !preg_match('/\b(park|stadium|ground|field|stad|complex|centre|arena)\b/i', $venue)
+    ) {
+        $out[] = $venue;
+    }
+
+    $opp = trim((string) ($fixture['opponent_name'] ?? $fixture['opponent'] ?? ''));
+    $stop = ['fc', 'afc', 'jfc', 'united', 'rovers', 'thistle', 'athletic', 'juniors',
+        'junior', 'victoria', 'vics', 'vale', 'of', 'the', 'town', 'city', 'club', 'sc',
+        'ym', 'y', 'm', 'albert', 'royal', 'st', 'saints', 'academy', 'amateurs', 'violet',
+        'boswell', 'bothwell'];
+    $tokens = array_values(array_filter(
+        preg_split('/\s+/', strtolower(preg_replace('/[^a-z0-9 ]+/i', ' ', $opp) ?? '')),
+        static fn (string $t): bool => $t !== '' && !in_array($t, $stop, true)
+    ));
+    if ($tokens) {
+        $out[] = ucwords(implode(' ', $tokens));
+    }
+    if ($opp !== '') {
+        $out[] = $opp;
+    }
+    return array_values(array_unique($out));
+}
+
+/** {lat,lon,label} for a fixture's venue, or null. Cached in the Hub cache dir. */
+function pub_venue_coords(array $fixture): ?array
+{
+    $isHome = (bool) $fixture['is_home'];
+    $opp = trim((string) ($fixture['opponent_name'] ?? $fixture['opponent'] ?? ''));
+    $file = pub_pref_cache_dir() . '/pub_venue_coords.json';
+    $store = is_file($file) ? (json_decode((string) @file_get_contents($file), true) ?: []) : [];
+    if (!is_array($store)) {
+        $store = [];
+    }
+    $key = $isHome ? 'home' : ('opp:' . pub_norm_club($opp));
+
+    if (isset($store[$key]['lat'], $store[$key]['lon'])) {
+        return ['lat' => (float) $store[$key]['lat'], 'lon' => (float) $store[$key]['lon'], 'label' => (string) ($store[$key]['label'] ?? '')];
+    }
+    if (isset($store[$key]['miss']) && (time() - (int) $store[$key]['miss']) < 604800) {
+        return null; // don't re-hammer geocoders for a week
+    }
+
+    $hit = null;
+    if (!$isHome) {
+        $hit = pub_known_venue_coords()[pub_norm_club($opp)] ?? null;
+    }
+    if ($hit === null && $isHome) {
+        if (preg_match('/([A-Za-z]{1,2}\d[A-Za-z\d]?)\s*(\d[A-Za-z]{2})/', (string) club('ground_address'), $m)) {
+            $j = pub_http_json('https://api.postcodes.io/postcodes/' . rawurlencode($m[1] . ' ' . $m[2]));
+            if (isset($j['result']['latitude'])) {
+                $ward = trim((string) ($j['result']['admin_ward'] ?? ''));
+                $town = $ward !== '' ? trim((string) preg_split('/\s+(and|&|,)\s+/i', $ward)[0]) : '';
+                $hit = [
+                    'lat' => (float) $j['result']['latitude'],
+                    'lon' => (float) $j['result']['longitude'],
+                    'label' => $town !== '' ? $town : (string) ($j['result']['admin_district'] ?? club('ground_name')),
+                ];
+            }
+        }
+    }
+    if ($hit === null && !$isHome) {
+        foreach (pub_place_candidates($fixture) as $cand) {
+            $j = pub_http_json('https://api.postcodes.io/places?limit=5&q=' . rawurlencode($cand));
+            foreach ((array) ($j['result'] ?? []) as $r) {
+                if (!isset($r['latitude'], $r['longitude'])) {
+                    continue;
+                }
+                $scottish = ($r['region'] ?? '') === 'Scotland' || ($r['country'] ?? '') === 'Scotland';
+                if ($scottish || $hit === null) {
+                    $hit = ['lat' => (float) $r['latitude'], 'lon' => (float) $r['longitude'], 'label' => (string) ($r['name_1'] ?? $cand)];
+                }
+                if ($scottish) {
+                    break 2;
+                }
+            }
+        }
+    }
+
+    $store[$key] = $hit ? ($hit + ['ts' => time()]) : ['miss' => time()];
+    @file_put_contents($file, json_encode($store, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES), LOCK_EX);
+    return $hit ? ['lat' => $hit['lat'], 'lon' => $hit['lon'], 'label' => $hit['label']] : null;
+}
+
+/** WMO weather code -> short label + emoji. */
+function pub_wmo(int $code): array
+{
+    return match (true) {
+        $code === 0 => ['label' => 'Clear', 'emoji' => "\u{2600}\u{FE0F}"],
+        $code === 1 => ['label' => 'Mainly clear', 'emoji' => "\u{1F324}\u{FE0F}"],
+        $code === 2 => ['label' => 'Partly cloudy', 'emoji' => "\u{26C5}"],
+        $code === 3 => ['label' => 'Overcast', 'emoji' => "\u{2601}\u{FE0F}"],
+        $code === 45 || $code === 48 => ['label' => 'Fog', 'emoji' => "\u{1F32B}\u{FE0F}"],
+        $code >= 51 && $code <= 57 => ['label' => 'Drizzle', 'emoji' => "\u{1F326}\u{FE0F}"],
+        $code >= 61 && $code <= 64 || $code === 80 || $code === 81 => ['label' => 'Rain', 'emoji' => "\u{1F327}\u{FE0F}"],
+        $code === 65 || $code === 82 => ['label' => 'Heavy rain', 'emoji' => "\u{1F327}\u{FE0F}"],
+        $code === 66 || $code === 67 => ['label' => 'Freezing rain', 'emoji' => "\u{1F327}\u{FE0F}"],
+        $code >= 71 && $code <= 77 || $code === 85 || $code === 86 => ['label' => 'Snow', 'emoji' => "\u{2744}\u{FE0F}"],
+        $code >= 95 => ['label' => 'Thunderstorm', 'emoji' => "\u{26C8}\u{FE0F}"],
+        default => ['label' => 'Unsettled', 'emoji' => "\u{1F325}\u{FE0F}"],
+    };
+}
+
+/**
+ * Match-day forecast for an upcoming fixture (Open-Meteo), or null when it's
+ * out of range / no coordinates / the API is unreachable. Cached ~3h.
+ *
+ * @return array{label:string,emoji:string,temp:?int,temp_max:int,temp_min:int,precip:int,wind:int,at_kickoff:bool,place:string,days_out:int}|null
+ */
+function pub_weather_forecast(array $fixture): ?array
+{
+    $date = trim((string) $fixture['match_date']);
+    $koTime = trim((string) ($fixture['kickoff_time'] ?? '')) ?: '15:00';
+    $ts = strtotime($date . ' ' . $koTime);
+    if ($date === '' || $ts === false) {
+        return null;
+    }
+    $daysOut = (int) floor(($ts - time()) / 86400);
+    if ($daysOut < 0 || $daysOut > 14) {
+        return null;
+    }
+
+    $coords = pub_venue_coords($fixture);
+    if ($coords === null) {
+        return null;
+    }
+
+    $lat = number_format($coords['lat'], 3, '.', '');
+    $lon = number_format($coords['lon'], 3, '.', '');
+    $cacheFile = pub_pref_cache_dir() . '/pub_weather_' . str_replace(['.', '-'], ['p', 'm'], $lat . '_' . $lon) . '.json';
+
+    $data = null;
+    if (is_file($cacheFile) && (time() - (int) @filemtime($cacheFile)) < 10800) {
+        $data = json_decode((string) @file_get_contents($cacheFile), true) ?: null;
+    }
+    if (!is_array($data)) {
+        $url = 'https://api.open-meteo.com/v1/forecast?latitude=' . $lat . '&longitude=' . $lon
+            . '&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,wind_speed_10m_max'
+            . '&hourly=temperature_2m,weather_code,precipitation_probability,wind_speed_10m'
+            . '&wind_speed_unit=mph&timezone=' . rawurlencode('Europe/London') . '&forecast_days=16';
+        $data = pub_http_json($url, 5);
+        if (!is_array($data)) {
+            return null;
+        }
+        @file_put_contents($cacheFile, json_encode($data), LOCK_EX);
+    }
+
+    $daily = $data['daily'] ?? [];
+    $di = array_search($date, (array) ($daily['time'] ?? []), true);
+    if ($di === false) {
+        return null;
+    }
+    $hourly = $data['hourly'] ?? [];
+    $hi = array_search($date . 'T' . substr($koTime, 0, 2) . ':00', (array) ($hourly['time'] ?? []), true);
+
+    $pick = static fn (array $arr, $idx, $fallback) => ($idx !== false && isset($arr[$idx]) && $arr[$idx] !== null) ? $arr[$idx] : $fallback;
+
+    $code = (int) $pick((array) ($hourly['weather_code'] ?? []), $hi, $daily['weather_code'][$di] ?? 3);
+    $wmo = pub_wmo($code);
+
+    return [
+        'label' => $wmo['label'],
+        'emoji' => $wmo['emoji'],
+        'temp' => ($hi !== false && isset($hourly['temperature_2m'][$hi])) ? (int) round((float) $hourly['temperature_2m'][$hi]) : null,
+        'temp_max' => (int) round((float) ($daily['temperature_2m_max'][$di] ?? 0)),
+        'temp_min' => (int) round((float) ($daily['temperature_2m_min'][$di] ?? 0)),
+        'precip' => (int) $pick((array) ($hourly['precipitation_probability'] ?? []), $hi, $daily['precipitation_probability_max'][$di] ?? 0),
+        'wind' => (int) round((float) $pick((array) ($hourly['wind_speed_10m'] ?? []), $hi, $daily['wind_speed_10m_max'][$di] ?? 0)),
+        'at_kickoff' => $hi !== false,
+        'place' => (string) $coords['label'],
+        'days_out' => $daysOut,
+    ];
+}
+
+/**
+ * Our last few results as W/D/L, oldest-first, each linking to its match page.
+ * @return list<array{outcome:string,href:string,label:string}>
+ */
+function pub_our_form(int $limit = 5): array
+{
+    $out = [];
+    foreach (pub_recent_results($limit) as $f) {
+        $o = pub_fixture_outcome($f);
+        if ($o['outcome'] === null) {
+            continue;
+        }
+        $opp = (string) ($f['opponent_name'] ?: $f['opponent'] ?: 'TBC');
+        $out[] = [
+            'outcome' => $o['outcome'],
+            'href' => url('match/' . (int) $f['id']),
+            'label' => ($f['is_home'] ? 'v ' : 'at ') . $opp . ' ' . (int) $o['us'] . "\u{2013}" . (int) $o['them'],
+        ];
+    }
+    return array_reverse($out);
 }

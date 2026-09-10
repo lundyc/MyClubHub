@@ -10,6 +10,7 @@ require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/lib/functions.php';
 require_once __DIR__ . '/lib/google_calendar.php';
 require_once __DIR__ . '/lib/match_sponsorship.php';
+require_once __DIR__ . '/lib/member_matches.php';
 require_once __DIR__ . '/lib/audit.php';
 
 header('Content-Type: text/html; charset=utf-8');
@@ -37,6 +38,49 @@ $opponent = trim($_POST['opponent'] ?? '');
 $status = trim($_POST['status'] ?? 'scheduled');
 $notes = trim($_POST['notes'] ?? '');
 $isHome = ((string)($_POST['is_home'] ?? '1') === '1') ? 1 : 0;
+$veoUrl = trim((string)($_POST['veo_url'] ?? ''));
+
+// Half-time / full-time scores are now part of this form (no separate Save Score
+// button). Same parsing rules as the old match_score_save.php endpoint.
+$parseScorePair = static function (string $homeKey, string $awayKey): array {
+          $homeRaw = trim((string)($_POST[$homeKey] ?? ''));
+          $awayRaw = trim((string)($_POST[$awayKey] ?? ''));
+          if ($homeRaw === '' && $awayRaw === '') {
+                    return [null, null];
+          }
+          if ($homeRaw === '' || $awayRaw === '') {
+                    throw new InvalidArgumentException('Enter both teams’ scores, or leave both boxes blank.');
+          }
+          if (!ctype_digit($homeRaw) || !ctype_digit($awayRaw)) {
+                    throw new InvalidArgumentException('Scores must be whole numbers.');
+          }
+          $home = (int)$homeRaw;
+          $away = (int)$awayRaw;
+          if ($home > 99 || $away > 99) {
+                    throw new InvalidArgumentException('Scores must be between 0 and 99.');
+          }
+          return [$home, $away];
+};
+
+try {
+          [$halfTimeHome, $halfTimeAway] = $parseScorePair('half_time_home_score', 'half_time_away_score');
+          [$fullTimeHome, $fullTimeAway] = $parseScorePair('full_time_home_score', 'full_time_away_score');
+          if (
+                    $halfTimeHome !== null
+                    && $fullTimeHome !== null
+                    && ($fullTimeHome < $halfTimeHome || $fullTimeAway < $halfTimeAway)
+          ) {
+                    throw new InvalidArgumentException('A full-time score cannot be lower than the half-time score.');
+          }
+} catch (InvalidArgumentException $e) {
+          http_response_code(400);
+          exit(htmlspecialchars($e->getMessage(), ENT_QUOTES, 'UTF-8'));
+}
+
+if ($veoUrl !== '' && !filter_var($veoUrl, FILTER_VALIDATE_URL)) {
+          http_response_code(400);
+          exit('Enter a valid VEO link, or leave it blank.');
+}
 
 if ($seasonId <= 0) {
           exit('Missing season.');
@@ -63,6 +107,11 @@ if (!in_array($status, ['scheduled', 'played', 'postponed', 'cancelled'], true))
           $status = 'scheduled';
 }
 
+// A full-time score means the match has been played.
+if ($fullTimeHome !== null && $status === 'scheduled') {
+          $status = 'played';
+}
+
 $opponentRow = null;
 if ($opponentId > 0) {
           $opponentRow = getMatchOpponentById($pdo, $opponentId);
@@ -82,6 +131,8 @@ if ($matchDate === '' || $opponentId <= 0 || $opponent === '') {
 if ($opponent === '' || $opponentId <= 0) {
           exit('Opponent is required.');
 }
+
+ensureMemberMatchSchema($pdo); // guarantees the veo_url column exists
 
 $pdo->beginTransaction();
 try {
@@ -103,7 +154,12 @@ try {
                                   venue = :venue,
                                   is_home = :is_home,
                                   status = :status,
-                                  notes = :notes
+                                  notes = :notes,
+                                  half_time_home_score = :half_time_home,
+                                  half_time_away_score = :half_time_away,
+                                  full_time_home_score = :full_time_home,
+                                  full_time_away_score = :full_time_away,
+                                  veo_url = :veo_url
                               WHERE id = :id
                                 AND season_id = :season_id
                               LIMIT 1
@@ -120,15 +176,20 @@ try {
                               ':is_home' => $isHome,
                               ':status' => $status,
                               ':notes' => $notes !== '' ? $notes : null,
+                              ':half_time_home' => $halfTimeHome,
+                              ':half_time_away' => $halfTimeAway,
+                              ':full_time_home' => $fullTimeHome,
+                              ':full_time_away' => $fullTimeAway,
+                              ':veo_url' => $veoUrl !== '' ? $veoUrl : null,
                               ':id' => $fixtureId,
                               ':season_id' => $seasonId,
                     ]);
           } else {
                     $stmt = $pdo->prepare("
                               INSERT INTO match_fixtures
-                                        (season_id, opponent_id, match_date, kickoff_time, opponent, competition, competition_season_id, competition_stage, venue, is_home, status, notes)
+                                        (season_id, opponent_id, match_date, kickoff_time, opponent, competition, competition_season_id, competition_stage, venue, is_home, status, notes, half_time_home_score, half_time_away_score, full_time_home_score, full_time_away_score, veo_url)
                               VALUES
-                                        (:season_id, :opponent_id, :match_date, :kickoff_time, :opponent, :competition, :competition_season_id, :competition_stage, :venue, :is_home, :status, :notes)
+                                        (:season_id, :opponent_id, :match_date, :kickoff_time, :opponent, :competition, :competition_season_id, :competition_stage, :venue, :is_home, :status, :notes, :half_time_home, :half_time_away, :full_time_home, :full_time_away, :veo_url)
                     ");
                     $stmt->execute([
                               ':season_id' => $seasonId,
@@ -143,6 +204,11 @@ try {
                               ':is_home' => $isHome,
                               ':status' => $status,
                               ':notes' => $notes !== '' ? $notes : null,
+                              ':half_time_home' => $halfTimeHome,
+                              ':half_time_away' => $halfTimeAway,
+                              ':full_time_home' => $fullTimeHome,
+                              ':full_time_away' => $fullTimeAway,
+                              ':veo_url' => $veoUrl !== '' ? $veoUrl : null,
                     ]);
                     $fixtureId = (int)$pdo->lastInsertId();
           }

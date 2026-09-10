@@ -11,8 +11,11 @@ $homeCrest = $fixture['is_home'] ? club_crest() : $oppCrest; // light rows
 $awayCrest = $fixture['is_home'] ? $oppCrest : club_crest();
 $ko = format_time($fixture['kickoff_time'] ?? '');
 $href = url('match/' . (int) $fixture['id']);
+$showTickets = !$played && $fixture['is_home'] && pub_fixture_has_tickets((int) $fixture['id']);
 ?>
-<a class="fxrow<?= $played && $outcome['outcome'] ? ' fxrow--' . strtolower($outcome['outcome']) : '' ?>" href="<?= e($href) ?>">
+<div class="fxrow<?= $played && $outcome['outcome'] ? ' fxrow--' . strtolower($outcome['outcome']) : '' ?>">
+  <a class="fxrow__link" href="<?= e($href) ?>" aria-label="<?= e($teams['home'] . ' v ' . $teams['away']) ?> — match centre"></a>
+
   <span class="fxrow__date">
     <b><?= e(format_date($fixture['match_date'], 'D j M')) ?></b>
     <span><?= $played ? e($fixture['competition'] ?: '') : e($ko ?: 'TBC') ?></span>
@@ -39,8 +42,10 @@ $href = url('match/' . (int) $fixture['id']);
   <span class="fxrow__meta">
     <?php if ($played && $outcome['outcome']): ?>
       <span class="chip chip--<?= e($outcome['outcome']) ?>"><?= e($outcome['outcome']) ?></span>
+    <?php elseif ($showTickets): ?>
+      <a class="fxrow__tickets" href="<?= e(url('tickets') . '?fixture_id=' . (int) $fixture['id']) ?>">Buy tickets</a>
     <?php else: ?>
       <span class="fxrow__ha"><?= $fixture['is_home'] ? 'H' : 'A' ?></span>
     <?php endif; ?>
   </span>
-</a>
+</div>

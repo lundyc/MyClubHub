@@ -22,22 +22,16 @@ function renderFixtureTabs(int $fixtureId, int $seasonId, string $activeTab, boo
                               'href' => 'match.php?id=' . $fixtureId . '&season_id=' . $seasonId . '&tab=sponsorships',
                               'target' => '#fixture-sponsorships-pane',
                     ],
-                    'next_match' => [
-                              'label' => 'Next Match',
-                              'icon' => 'fa-bullhorn',
-                              'href' => 'match_next_match.php?fixture_id=' . $fixtureId . '&season_id=' . $seasonId,
-                              'target' => '',
-                    ],
                     'starting11' => [
-                              'label' => 'Starting 11',
-                              'icon' => 'fa-users',
+                              'label' => 'Line-ups',
+                              'icon' => 'fa-people-group',
                               'href' => 'match.php?id=' . $fixtureId . '&season_id=' . $seasonId . '&tab=starting11',
                               'target' => '#fixture-starting11-pane',
                     ],
                     'graphics' => [
                               'label' => 'Events',
-                              'icon' => 'fa-wand-magic-sparkles',
-                              'href' => 'match_graphics.php?fixture_id=' . $fixtureId . '&season_id=' . $seasonId,
+                              'icon' => 'fa-stopwatch',
+                              'href' => 'match_record_events.php?fixture_id=' . $fixtureId . '&season_id=' . $seasonId,
                               'target' => '',
                     ],
                     'media' => [

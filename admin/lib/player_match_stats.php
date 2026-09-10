@@ -7,6 +7,13 @@ function hub_player_stats_normalize_name(string $name): string
     return mb_strtolower($name, 'UTF-8');
 }
 
+/** Own-goal events identify the benefiting team, not the scorer's team. */
+function hub_player_stats_is_club_player_event(array $event): bool
+{
+    $team = (string)($event['team'] ?? '');
+    return !empty($event['own_goal']) ? $team === 'opponent' : $team === 'svfc';
+}
+
 function hub_player_stats_event_minute(mixed $value): int
 {
     $minute = trim((string)$value);
@@ -19,6 +26,7 @@ function hub_player_stats_event_minute(mixed $value): int
 
 /**
  * Calculate season totals from the fixture lineups and Match Graphics timeline.
+ * Optional preloaded fixtures/events allow filtered stats without repeated queries.
  *
  * @return array{
  *   appearances: int,
@@ -36,7 +44,9 @@ function hub_player_match_stats(
     PDO $pdo,
     int $seasonId,
     string $playerName,
-    string $matchesDataFile
+    string $matchesDataFile,
+    ?array $fixtures = null,
+    ?array $matchEvents = null
 ): array {
     $stats = [
         'appearances' => 0,
@@ -54,8 +64,8 @@ function hub_player_match_stats(
         return $stats;
     }
 
-    $eventsByFixture = [];
-    if (is_file($matchesDataFile)) {
+    $eventsByFixture = $matchEvents ?? [];
+    if ($matchEvents === null && is_file($matchesDataFile)) {
         $decoded = json_decode((string)file_get_contents($matchesDataFile), true);
         if (is_array($decoded)) {
             foreach ($decoded as $match) {
@@ -72,18 +82,25 @@ function hub_player_match_stats(
         }
     }
 
-    $stmt = $pdo->prepare("
-        SELECT id, is_home, status,
-               starting11_starters_json, starting11_substitutes_json,
-               full_time_home_score, full_time_away_score
-        FROM match_fixtures
-        WHERE season_id = :season_id
-          AND status = 'played'
-        ORDER BY match_date ASC, kickoff_time ASC, id ASC
-    ");
-    $stmt->execute([':season_id' => $seasonId]);
+    if ($fixtures === null) {
+        $stmt = $pdo->prepare("
+            SELECT id, is_home, status,
+                   starting11_starters_json, starting11_substitutes_json,
+                   full_time_home_score, full_time_away_score
+            FROM match_fixtures
+            WHERE season_id = :season_id
+              AND status = 'played'
+            ORDER BY match_date ASC, kickoff_time ASC, id ASC
+        ");
+        $stmt->execute([':season_id' => $seasonId]);
 
-    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $fixture) {
+        $fixtures = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    foreach ($fixtures as $fixture) {
+        if (($fixture['status'] ?? '') !== 'played') {
+            continue;
+        }
         $starters = json_decode((string)($fixture['starting11_starters_json'] ?? '[]'), true);
         $substitutes = json_decode((string)($fixture['starting11_substitutes_json'] ?? '[]'), true);
         $starters = is_array($starters) ? array_values($starters) : [];
@@ -105,7 +122,7 @@ function hub_player_match_stats(
             }
         }
 
-        $events = $eventsByFixture[(int)$fixture['id']] ?? [];
+        $events = array_values(array_filter($eventsByFixture[(int)$fixture['id']] ?? [], 'is_array'));
         usort($events, static fn(array $left, array $right): int =>
             (int)($left['sequence'] ?? 0) <=> (int)($right['sequence'] ?? 0)
         );
@@ -132,7 +149,7 @@ function hub_player_match_stats(
                 $hasFullTimeEvent = true;
             }
             if ($team === 'svfc' && $eventPlayer === $normalizedPlayerName) {
-                if ($isScoringEvent) {
+                if ($isScoringEvent && empty($event['own_goal'])) {
                     $stats['goals']++;
                 }
                 if ($type === 'yellow_card' || ($type === 'card' && (string)($event['card_type'] ?? '') === 'yellow')) {

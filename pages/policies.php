@@ -36,18 +36,22 @@ set_meta([
     <?php if (!$policies): ?>
       <div class="emptystate"><p>Policy documents will be published here soon.</p></div>
     <?php else: ?>
-      <nav class="chipnav" aria-label="Jump to a policy">
-        <?php foreach ($policies as $p): ?>
-          <a class="chipnav__item" href="#<?= e($p['slug']) ?>"><?= e($p['label']) ?></a>
-        <?php endforeach; ?>
-      </nav>
+      <div class="policytabs" data-policytabs>
+        <nav class="policytabs__nav" aria-label="Policies">
+          <?php foreach ($policies as $p): ?>
+            <a class="policytabs__tab" href="#<?= e($p['slug']) ?>"><?= e($p['label']) ?></a>
+          <?php endforeach; ?>
+        </nav>
 
-      <?php foreach ($policies as $p): ?>
-        <section class="policydoc aboutblock" id="<?= e($p['slug']) ?>">
-          <h2 class="squad-heading"><?= e($p['label']) ?></h2>
-          <div class="prose"><?= $p['html'] /* sanitised */ ?></div>
-        </section>
-      <?php endforeach; ?>
+        <div class="policytabs__panels">
+          <?php foreach ($policies as $p): ?>
+            <section class="policydoc aboutblock" id="<?= e($p['slug']) ?>" aria-labelledby="h-<?= e($p['slug']) ?>">
+              <h2 class="squad-heading" id="h-<?= e($p['slug']) ?>"><?= e($p['label']) ?></h2>
+              <div class="prose"><?= $p['html'] /* sanitised */ ?></div>
+            </section>
+          <?php endforeach; ?>
+        </div>
+      </div>
     <?php endif; ?>
   </div>
 </div>

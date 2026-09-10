@@ -61,7 +61,7 @@ if (($_GET['export'] ?? '') === 'csv') {
 $pageHero = [
     'eyebrow' => 'Shop',
     'title' => 'Orders',
-    'subtitle' => 'Every order placed through the online shop.',
+    'subtitle' => 'Online and manually recorded shop orders.',
     'actions' => [['label' => 'Back to shop', 'href' => '/shop_overview.php', 'class' => 'btn btn-outline-light btn-sm']],
 ];
 require_once __DIR__ . '/header.php';
@@ -87,6 +87,10 @@ function shop_status_badge(string $status): string
 <div class="shop-admin-page">
     <nav class="hub-breadcrumb" aria-label="Breadcrumb"><a href="/admin/shop_overview.php">Shop</a> <i class="fa-solid fa-chevron-right" aria-hidden="true"></i> <span aria-current="page">Orders</span></nav>
 
+    <div class="d-flex gap-2 mb-3">
+        <a class="btn btn-dark" href="/admin/shop_order_new.php">Add manual order</a>
+        <a class="btn btn-outline-secondary" href="/admin/shop_settings.php#discount-codes">Discount codes</a>
+    </div>
     <form class="card hub-panel p-3 mb-3" method="get">
         <div class="row g-2 align-items-end">
             <div class="col-md-3"><label class="form-label">Status</label>
