@@ -31,6 +31,7 @@ if (!$product || (int) $product['is_active'] !== 1) {
 }
 
 $groups = shop_product_groups(db(), (int) $product['id'], true);
+$related = shop_related_products(db(), $product, 4);
 $gallery = shop_product_gallery(db(), $product);
 $close = shop_product_preorder_close(db(), $product);
 $closed = $close !== null && new DateTimeImmutable('now') > $close;
@@ -172,6 +173,26 @@ set_meta([
       <div class="pdp__desc prose">
         <h2>Product details</h2>
         <?= nl2br(e((string) $product['description'])) ?>
+      </div>
+    <?php endif; ?>
+
+    <?php if ($related): ?>
+      <div class="pdp__related">
+        <h2>You might also like</h2>
+        <div class="prodgrid">
+          <?php foreach ($related as $rp): ?>
+            <?php $rimg = trim((string) ($rp['image_path'] ?? '')); ?>
+            <a class="prodcard" href="<?= e(url('shop/p/' . rawurlencode((string) $rp['slug']))) ?>">
+              <div class="prodcard__media<?= $rimg === '' ? ' is-placeholder' : '' ?>"
+                   <?= $rimg !== '' ? 'style="background-image:url(\'' . e($rimg) . '\')"' : '' ?>></div>
+              <div class="prodcard__body">
+                <span class="prodcard__cat"><?= e((string) $rp['category_name']) ?></span>
+                <span class="prodcard__name"><?= e((string) $rp['name']) ?></span>
+                <span class="prodcard__price"><?= e(gbp((float) $rp['price'])) ?></span>
+              </div>
+            </a>
+          <?php endforeach; ?>
+        </div>
       </div>
     <?php endif; ?>
   </div>

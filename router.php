@@ -26,6 +26,7 @@ function public_routes(): array
         'fixtures'    => 'fixtures',
         'results'     => 'results',
         'table'       => 'table',
+        'table/pdf'   => 'table_pdf',
         'match/{id}'  => 'match',
 
         // Club shop — presentation ported into the site design; all cart /

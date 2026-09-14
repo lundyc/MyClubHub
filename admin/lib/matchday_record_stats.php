@@ -62,6 +62,9 @@ function matchday_stats_fixture(PDO $pdo, int $fixtureId): array
     $assists = [];
     $cards = ['svfc' => [], 'opponent' => []];
     foreach ($events as $e) {
+            if (($e['participant_type'] ?? 'player') === 'staff') {
+                continue;
+            }
         $cat = $types[(string) $e['type']]['category'] ?? 'other';
         $proj = $types[(string) $e['type']]['projects_to'] ?? '';
         if ($proj === 'goal' && (string) $e['side'] === 'svfc' && trim((string) $e['secondary_player_name']) !== '' && (int) $e['own_goal'] === 0) {
@@ -194,6 +197,9 @@ function matchday_stats_season(PDO $pdo, int $seasonId): array
             $meta = $types[(string) $e['type']] ?? null;
             $proj = $meta['projects_to'] ?? '';
             $cat = $meta['category'] ?? 'other';
+                    if (($e['participant_type'] ?? 'player') === 'staff') {
+                        continue;
+                    }
             $name = trim((string) $e['player_name']);
             $lid = $e['player_lineup_id'] ? (int) $e['player_lineup_id'] : 0;
             $pid = $lid && isset($lineupById[$lid]) && $lineupById[$lid]['player_id'] ? (int) $lineupById[$lid]['player_id'] : null;

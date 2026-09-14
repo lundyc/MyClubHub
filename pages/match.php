@@ -83,6 +83,7 @@ $album   = pub_gallery_for_fixture((int) $fixture['id']);
 $related = news_for_fixture(db(), (int) $fixture['id']);
 $report   = $related[0] ?? null;           // newest linked article == match report
 $moreNews = array_slice($related, 1);
+$archiveReport = $played ? pub_fixture_history_report((int) $fixture['id']) : null;   // old written report, migrated from the results archive
 $veo = trim((string) ($fixture['veo_url'] ?? ''));
 
 /* --- upcoming-fixture preview extras (weather / H2H / league / form) ----- */
@@ -127,11 +128,15 @@ $evMap = [
     'us'  => ['on' => [], 'off' => [], 'cards' => []],
     'opp' => ['on' => [], 'off' => [], 'cards' => []],
 ];
+$evMap['us']['goals'] = [];
+$evMap['opp']['goals'] = [];
 $oppSubs = []; // only used for the placeholder column (opponent XI unknown)
 foreach ($timeline as $ev) {
     $side = $ev['side'] === 'us' ? 'us' : 'opp';
     $isCard = stripos($ev['label'], 'card') !== false || stripos($ev['label'], 'yellow') !== false;
-    if ($ev['type'] === 'substitution' || $ev['type'] === 'sub') {
+  if ($ev['type'] === 'goal') {
+    if ($ev['player'] !== '') { $evMap[$side]['goals'][$ev['player']][] = $ev; }
+  } elseif ($ev['type'] === 'substitution' || $ev['type'] === 'sub') {
         if ($ev['player'] !== '') { $evMap[$side]['off'][$ev['player']] = $ev['minute']; }
         if ($ev['detail'] !== '') { $evMap[$side]['on'][$ev['detail']] = $ev['minute']; }
         if ($side === 'opp') {
@@ -141,6 +146,22 @@ foreach ($timeline as $ev) {
         $evMap[$side]['cards'][$ev['player']][] = $ev;
     }
 }
+
+  $ftHome = $fixture['full_time_home_score'];
+  $ftAway = $fixture['full_time_away_score'];
+  if (($ftHome === null || $ftAway === null) && $timeline) {
+    $derivedHome = $derivedAway = 0;
+    foreach ($timeline as $ev) {
+      if ($ev['type'] !== 'goal') { continue; }
+      if (($ev['side'] === 'us') === (bool) $fixture['is_home']) {
+        $derivedHome++;
+      } else {
+        $derivedAway++;
+      }
+    }
+    $ftHome ??= $derivedHome;
+    $ftAway ??= $derivedAway;
+  }
 
 /* --- do we hold any shirt numbers for the XI we're about to show? -------- */
 $anyNums = false;
@@ -155,7 +176,7 @@ foreach (['us', 'opp'] as $s) {
 $lineupRow = static function (array $p, string $who, bool $anyNums, bool $subList) use ($findPlayer, $renderName, $evMap): void {
     $isUs = $who === 'us';
     $name = $p['name'];
-    $grp = $p['pos'] !== '' ? $p['pos'] : ($isUs && ($sp = $findPlayer($name)) ? (string) ($sp['group'] ?? '') : '');
+    $goals = $evMap[$who]['goals'][$name] ?? [];
     $cards = $evMap[$who]['cards'][$name] ?? [];
     $off = $evMap[$who]['off'][$name] ?? null;
     $on = $evMap[$who]['on'][$name] ?? null;
@@ -164,14 +185,16 @@ $lineupRow = static function (array $p, string $who, bool $anyNums, bool $subLis
       <?php if ($anyNums): ?><span class="match-lineups__num"><?= $p['number'] !== null ? (int) $p['number'] : '' ?></span><?php endif; ?>
       <span class="match-lineups__name">
         <span class="match-lineups__name-text"><?= $renderName($name, $isUs) ?></span>
-        <?php if ($grp !== ''): ?><span class="match-lineups__pos"><?= e($grp) ?></span><?php endif; ?>
         <?php if ($p['captain']): ?><span class="match-lineups__c" title="Captain">C</span><?php endif; ?>
       </span>
-      <?php if ($cards || ($subList ? $on !== null : $off !== null)): ?>
+      <?php if ($goals || $cards || ($subList ? $on !== null : $off !== null)): ?>
         <span class="match-lineups__events">
           <?php if ($subList && $on !== null): ?>
             <span class="match-lineups__event"><span class="match-lineups__event-minute"><?= e($on !== '' ? $on . "'" : '') ?></span><?= mc_arrow('on') ?><span class="sr-only">Substituted on</span></span>
           <?php endif; ?>
+          <?php foreach ($goals as $goal): ?>
+            <span class="match-lineups__event"><span class="match-lineups__event-minute"><?= e($goal['minute'] !== '' ? $goal['minute'] . "'" : '') ?></span><?= mc_glyph(strcasecmp($goal['label'], 'Own goal') === 0 ? 'own_goal' : 'goal') ?><span class="sr-only"><?= e($goal['label']) ?></span></span>
+          <?php endforeach; ?>
           <?php foreach ($cards as $c): $cm = stripos($c['label'], 'red') !== false ? 'red' : 'yellow'; ?>
             <span class="match-lineups__event"><span class="match-lineups__event-minute"><?= e($c['minute'] !== '' ? $c['minute'] . "'" : '') ?></span><span class="mc-card mc-card--<?= $cm ?>" aria-label="<?= e($c['label']) ?>"></span></span>
           <?php endforeach; ?>
@@ -285,8 +308,10 @@ pub_jsonld([
       </div>
       <div class="mc-hero__mid">
         <?php if ($played): ?>
-          <b class="mc-hero__score"><?= (int) $fixture['full_time_home_score'] ?> &ndash; <?= (int) $fixture['full_time_away_score'] ?></b>
-          <?php if ($fixture['half_time_home_score'] !== null): ?>
+          <b class="mc-hero__score"><?= (int) $ftHome ?> &ndash; <?= (int) $ftAway ?></b>
+          <?php if ($outcome['decided_by_penalties']): ?>
+            <span class="mc-hero__pens">(Pens <?= (int) $fixture['home_penalties'] ?>&ndash;<?= (int) $fixture['away_penalties'] ?>)</span>
+          <?php elseif ($fixture['half_time_home_score'] !== null): ?>
             <span class="mc-hero__ht">HT <?= (int) $fixture['half_time_home_score'] ?>&ndash;<?= (int) $fixture['half_time_away_score'] ?></span>
           <?php endif; ?>
         <?php else: ?>
@@ -403,8 +428,9 @@ pub_jsonld([
                 $hs = $m['is_home'] ? (int) $m['us'] : (int) $m['them'];
                 $as = $m['is_home'] ? (int) $m['them'] : (int) $m['us'];
                 $res = strtolower((string) $m['result']) ?: 'd';
-                $tag = $m['slug'] !== '' ? 'a' : 'div';
-                $href = $m['slug'] !== '' ? ' href="' . e(url('club/results/' . $m['slug'])) . '"' : '';
+                $mUrl = (string) ($m['url'] ?? '');
+                $tag = $mUrl !== '' ? 'a' : 'div';
+                $href = $mUrl !== '' ? ' href="' . e($mUrl) . '"' : '';
             ?>
               <li class="mc-h2h__match">
                 <<?= $tag ?> class="mc-h2h__link"<?= $href ?>>
@@ -520,7 +546,10 @@ pub_jsonld([
             </div>
           <?php endforeach; ?>
           <?php if ($played): ?>
-            <div class="match-timeline__break match-timeline__break--ft"><span>Full-time &middot; <?= (int) $fixture['full_time_home_score'] ?> &ndash; <?= (int) $fixture['full_time_away_score'] ?></span></div>
+            <div class="match-timeline__break match-timeline__break--ft"><span>Full-time &middot; <?= (int) $ftHome ?> &ndash; <?= (int) $ftAway ?></span></div>
+            <?php if ($outcome['decided_by_penalties']): ?>
+              <div class="match-timeline__break match-timeline__break--pens"><span>(PEN <?= (int) $fixture['home_penalties'] ?>-<?= (int) $fixture['away_penalties'] ?>)</span></div>
+            <?php endif; ?>
           <?php endif; ?>
         </div>
       </div>
@@ -577,6 +606,18 @@ pub_jsonld([
                         </div>
                       <?php endforeach; ?>
                     <?php endif; ?>
+                    <?php $scorers = []; foreach ($evMap[$who]['goals'] as $playerGoals) { $scorers = array_merge($scorers, $playerGoals); } ?>
+                    <?php if ($scorers): ?>
+                      <div class="match-lineups__label">Goals</div>
+                      <?php foreach ($scorers as $scorer): ?>
+                        <div class="match-lineups__row match-lineups__row--subline">
+                          <span class="match-lineups__name">
+                            <span class="match-lineups__name-text"><?= e($scorer['player']) ?></span>
+                          </span>
+                          <span class="match-lineups__events"><span class="match-lineups__event"><span class="match-lineups__event-minute"><?= e($scorer['minute'] !== '' ? $scorer['minute'] . "'" : '') ?></span><?= mc_glyph(strcasecmp($scorer['label'], 'Own goal') === 0 ? 'own_goal' : 'goal') ?><span class="sr-only"><?= e($scorer['label']) ?></span></span></span>
+                        </div>
+                      <?php endforeach; ?>
+                    <?php endif; ?>
                     <p class="match-lineups__empty">Full line-up not published for this match.</p>
                   <?php endif; ?>
                 </div>
@@ -605,13 +646,32 @@ pub_jsonld([
       </div>
     <?php endif; ?>
 
+    <?php if ($archiveReport):
+        $arScorers = trim((string) $archiveReport['scorers_text']);
+        $arHtml = trim((string) $archiveReport['report_html']);
+    ?>
+      <div class="mc-panel mc-report mc-report--archive">
+        <h2>Match report</h2>
+        <?php if ($arScorers !== ''): ?>
+          <p class="mc-report__scorers"><strong><?= e(club('club_short_name', 'Saltcoats Vics')) ?> scorers:</strong> <?= nl2br(e($arScorers)) ?></p>
+        <?php endif; ?>
+        <?php if ($arHtml !== ''): ?>
+          <div class="prose">
+            <?php if ($archiveReport['report_by'] !== ''): ?><p class="mc-report__by">Report by <?= e($archiveReport['report_by']) ?></p><?php endif; ?>
+            <?= $arHtml /* sanitised at import by tools/import_svfc_history.php */ ?>
+          </div>
+        <?php endif; ?>
+        <p class="mc-report__note">From the club’s results archive.</p>
+      </div>
+    <?php endif; ?>
+
     <?php if ($photos || $album): ?>
       <div class="mc-panel">
         <h2>Gallery</h2>
         <?php if ($photos): ?>
           <div class="mc-gallery">
             <?php foreach ($photos as $ph): ?>
-              <img src="<?= e(uploads('matches/' . $ph['filename'])) ?>" alt="" loading="lazy">
+              <img src="<?= e(uploads('matches/gallery/' . (int) $fixture['id'] . '/' . $ph['filename'])) ?>" alt="" loading="lazy">
             <?php endforeach; ?>
           </div>
         <?php endif; ?>

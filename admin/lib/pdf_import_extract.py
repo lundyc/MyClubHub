@@ -50,12 +50,17 @@ def extract(path):
         for side in rosters:
             for block in groups.get(section, {}).get(side, []):
                 text = ' '.join(block['text'].split())
-                m = re.fullmatch(r'(\d{1,2})\s+(.+?)\s+(?:(GK|CP|G|C|T)\s+)?(\d{5,12})\s+(SCO|N/A|[A-Z]{3})', text)
+                # A player can carry more than one marker, e.g. "Adam Love CP T 812345 SCO"
+                # (captain AND trialist) or "Andrew Finnigan GK T ...". Capture the whole run.
+                m = re.fullmatch(
+                    r'(\d{1,2})\s+(.+?)\s+(?:((?:GK|CP|G|C|T)(?:\s+(?:GK|CP|G|C|T))*)\s+)?(\d{5,12})\s+(SCO|N/A|[A-Z]{3})',
+                    text)
                 if not m:
                     if re.match(r'^\d', text):
                         warnings.append('Unreadable player row on page %s: %s' % (block['page'], text))
                     continue
-                rosters[side].append({'number': int(m[1]), 'name': m[2], 'marker': m[3] or '',
+                marker = ' '.join((m[3] or '').split())
+                rosters[side].append({'number': int(m[1]), 'name': m[2], 'marker': marker,
                                       'registration_id': m[4], 'nationality': m[5], 'starting': starting,
                                       'page': block['page'], 'rect': block['rect']})
     return {'raw_text': '\n'.join(raw), 'groups': groups, 'rosters': rosters,

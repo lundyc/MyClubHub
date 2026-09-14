@@ -5,9 +5,11 @@ require_once __DIR__ . '/../admin/db.php';
 require_once __DIR__ . '/../admin/lib/functions.php';
 require_once __DIR__ . '/../admin/lib/pos.php';
 require_once __DIR__ . '/../admin/lib/pos_controls.php';
+require_once __DIR__ . '/../admin/lib/invoices.php';
 
 pos_ensure_schema($pdo);
 pos_controls_ensure_schema($pdo);
+invoices_ensure_schema($pdo);
 $actor = pos_require_actor($pdo);
 if (!pos_actor_is_manager($pdo)) {
     http_response_code(403);
@@ -46,6 +48,13 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                 pos_cancel_pending_cash_sale($pdo, $saleId, $actor);
                 pos_audit_event($pdo, 'pos_sale_cancelled', 'Cancelled pending cash POS sale #' . $saleId);
                 $notice = 'Pending cash sale cancelled.';
+            } elseif ($action === 'generate_invoice') {
+                $result = invoices_generate_for_pos_sale($pdo, $saleId, (string) ($actor['name'] ?? ''));
+                if ($result['errors']) {
+                    throw new RuntimeException(implode(' ', $result['errors']));
+                }
+                pos_audit_event($pdo, 'invoice_generated', 'Generated invoice for POS sale #' . $saleId);
+                $notice = 'Invoice generated.';
             }
         } catch (Throwable $e) {
             $error = $e->getMessage();
@@ -134,6 +143,11 @@ require_once __DIR__ . '/../admin/header.php';
                         <dt class="col-5">Receipt</dt><dd class="col-7"><?= h((string) ($sale['receipt_number'] ?: '-')) ?></dd>
                         <dt class="col-5">Payment ref</dt><dd class="col-7"><?= h((string) ($sale['payment_reference'] ?: '-')) ?></dd>
                     </dl>
+                </div>
+            </section>
+            <section class="card hub-panel mt-3">
+                <div class="card-body">
+                    <?= invoices_render_admin_section(invoices_list_for_source($pdo, 'pos_sale', $saleId), '<form method="post">' . csrf_field() . '<input type="hidden" name="id" value="' . (int) $saleId . '"><input type="hidden" name="action" value="generate_invoice"><button type="submit" class="btn btn-outline-primary btn-sm">Generate invoice</button></form>') ?>
                 </div>
             </section>
         </div>

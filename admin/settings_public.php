@@ -125,6 +125,17 @@ $color = static function (string $key, string $label) use ($s): void {
 
   <div class="col-lg-6">
     <div class="card hub-section h-100"><div class="card-body">
+      <h2 class="h6 mb-3">Invoicing</h2>
+      <p class="text-muted small">Shown on the letterhead of every generated invoice (sponsorship agreements, shop and ticket orders). Leave blank to omit — the club has no VAT registration recorded in the system.</p>
+      <?php
+      $text('company_number', 'Company / charity number');
+      $text('bank_details', 'Bank transfer details', 'Shown at the foot of the invoice, e.g. sort code and account number');
+      ?>
+    </div></div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="card hub-section h-100"><div class="card-body">
       <h2 class="h6 mb-3">Social &amp; advanced</h2>
       <?php
       $text('social_facebook', 'Facebook URL');

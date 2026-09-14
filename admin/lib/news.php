@@ -306,6 +306,9 @@ function news_save(PDO $pdo, ?int $id, array $data, ?int $userId = null): int
         $set = implode(', ', array_map(static fn ($k) => "$k = :$k", array_keys($fields)));
         $stmt = $pdo->prepare("UPDATE news_articles SET $set WHERE id = :id");
         $stmt->execute($fields + [':id' => $id]);
+        if ($fields['is_featured'] === 1) {
+            news_enforce_featured_limit($pdo);
+        }
         return $id;
     }
 
@@ -313,7 +316,32 @@ function news_save(PDO $pdo, ?int $id, array $data, ?int $userId = null): int
     $cols = implode(', ', array_keys($fields));
     $vals = implode(', ', array_map(static fn ($k) => ":$k", array_keys($fields)));
     $pdo->prepare("INSERT INTO news_articles ($cols) VALUES ($vals)")->execute($fields);
-    return (int) $pdo->lastInsertId();
+    $newId = (int) $pdo->lastInsertId();
+    if ($fields['is_featured'] === 1) {
+        news_enforce_featured_limit($pdo);
+    }
+    return $newId;
+}
+
+/**
+ * Keeps at most $limit featured articles. When saving pushes the count over
+ * the limit, the oldest-featured ones (by published_at, falling back to
+ * created_at) are unfeatured first — the just-saved article is exempt only
+ * by virtue of being the newest, same as any other.
+ */
+function news_enforce_featured_limit(PDO $pdo, int $limit = 3): void
+{
+    news_ensure_schema($pdo);
+    $pdo->exec(
+        'UPDATE news_articles SET is_featured = 0 WHERE is_featured = 1 AND id NOT IN (
+            SELECT id FROM (
+                SELECT id FROM news_articles
+                WHERE is_featured = 1
+                ORDER BY COALESCE(published_at, created_at) DESC, id DESC
+                LIMIT ' . max(1, $limit) . '
+            ) keep
+        )'
+    );
 }
 
 function news_delete(PDO $pdo, int $id): void

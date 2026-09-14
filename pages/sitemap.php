@@ -23,8 +23,11 @@ foreach (club_pages_menu(db()) as $cp) {
 foreach (squad_public_players(db()) as $pl) {
     $urls[] = [$loc('team/' . $pl['slug']), null, 'monthly'];
 }
-foreach (pub_fixtures(['type' => 'all']) as $fx) {
-    $urls[] = [$loc('match/' . (int) $fx['id']), null, 'weekly'];
+foreach (pub_seasons() as $s) {
+    $freq = $s['is_current'] ? 'weekly' : 'yearly';
+    foreach (pub_fixtures(['season_id' => (int) $s['id'], 'type' => 'all']) as $fx) {
+        $urls[] = [$loc('match/' . (int) $fx['id']), null, $freq];
+    }
 }
 
 echo '<?xml version="1.0" encoding="UTF-8"?>' . "\n";

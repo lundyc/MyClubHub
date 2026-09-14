@@ -89,7 +89,7 @@ function shop_status_badge(string $status): string
 
     <div class="d-flex gap-2 mb-3">
         <a class="btn btn-dark" href="/admin/shop_order_new.php">Add manual order</a>
-        <a class="btn btn-outline-secondary" href="/admin/shop_settings.php#discount-codes">Discount codes</a>
+        <a class="btn btn-outline-secondary" href="/admin/shop_discount_codes.php">Discount codes</a>
     </div>
     <form class="card hub-panel p-3 mb-3" method="get">
         <div class="row g-2 align-items-end">
@@ -114,21 +114,23 @@ function shop_status_badge(string $status): string
         </div>
     </form>
 
-    <section class="card hub-panel table-responsive">
-        <table class="table align-middle mb-0">
-            <thead><tr><th>Ref</th><th>Placed</th><th>Customer</th><th class="text-end">Items</th><th class="text-end">Total</th><th>Status</th><th></th></tr></thead>
+    <?php $showScheduleCol = shop_scheduling_enabled($pdo); ?>
+    <section class="card hub-panel">
+        <table class="table align-middle mb-0 hub-data-table hub-data-table--responsive">
+            <thead><tr><th>Ref</th><th>Placed</th><th>Customer</th><?php if ($showScheduleCol): ?><th>Requested date</th><?php endif; ?><th class="text-end">Items</th><th class="text-end">Total</th><th>Status</th><th></th></tr></thead>
             <tbody>
-            <?php if (!$orders): ?><tr><td colspan="7" class="text-muted text-center py-4">No orders match.</td></tr><?php endif; ?>
+            <?php if (!$orders): ?><tr><td colspan="<?= $showScheduleCol ? 8 : 7 ?>" class="text-muted text-center py-4">No orders match.</td></tr><?php endif; ?>
             <?php foreach ($orders as $o): ?>
                 <tr>
-                    <td class="fw-bold"><a class="text-decoration-none" href="/admin/shop_order.php?id=<?= (int) $o['id'] ?>"><?= h((string) $o['order_ref']) ?></a>
+                    <td data-label="Ref" class="fw-bold"><a class="text-decoration-none" href="/admin/shop_order.php?id=<?= (int) $o['id'] ?>"><?= h((string) $o['order_ref']) ?></a>
                         <?php if ((int) $o['is_preorder'] === 1): ?><span class="badge text-bg-warning ms-1">Pre-order</span><?php endif; ?></td>
-                    <td class="small text-muted"><?= h((new DateTimeImmutable((string) $o['created_at']))->format('d/m/Y H:i')) ?></td>
-                    <td><?= h((string) $o['customer_name']) ?><div class="small text-muted"><?= h((string) $o['customer_email']) ?></div></td>
-                    <td class="text-end"><?= (int) $o['item_count'] ?></td>
-                    <td class="text-end fw-bold"><?= gbp((float) $o['total']) ?><?php if ((float) $o['amount_refunded'] > 0): ?><div class="small text-warning">−<?= gbp((float) $o['amount_refunded']) ?></div><?php endif; ?></td>
-                    <td><?= shop_status_badge((string) $o['status']) ?></td>
-                    <td class="text-end"><a class="btn btn-sm btn-outline-secondary" href="/admin/shop_order.php?id=<?= (int) $o['id'] ?>">Open</a></td>
+                    <td data-label="Placed" class="small text-muted"><?= h((new DateTimeImmutable((string) $o['created_at']))->format('d/m/Y H:i')) ?></td>
+                    <td data-label="Customer"><?= h((string) $o['customer_name']) ?><div class="small text-muted"><?= h((string) $o['customer_email']) ?></div></td>
+                    <?php if ($showScheduleCol): ?><td data-label="Requested date" class="small"><?= !empty($o['requested_date']) ? h((new DateTimeImmutable((string) $o['requested_date']))->format('d/m/Y')) : '—' ?></td><?php endif; ?>
+                    <td data-label="Items" class="text-end"><?= (int) $o['item_count'] ?></td>
+                    <td data-label="Total" class="text-end fw-bold"><?= gbp((float) $o['total']) ?><?php if ((float) $o['amount_refunded'] > 0): ?><div class="small text-warning">−<?= gbp((float) $o['amount_refunded']) ?></div><?php endif; ?></td>
+                    <td data-label="Status"><?= shop_status_badge((string) $o['status']) ?></td>
+                    <td data-label="Actions" class="text-end"><a class="btn btn-sm btn-outline-secondary" href="/admin/shop_order.php?id=<?= (int) $o['id'] ?>">Open</a></td>
                 </tr>
             <?php endforeach; ?>
             </tbody>

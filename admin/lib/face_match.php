@@ -62,7 +62,16 @@ function face_match_run(array $references, array $queryPaths, string $mode, int 
     $pythonBin = __DIR__ . '/../tools/facematch_venv/bin/python';
     $script = __DIR__ . '/../tools/face_match.py';
     $timeoutBin = '/usr/bin/timeout';
-    if (!is_file($pythonBin) || !is_file($script) || !is_file($timeoutBin)) {
+    // Under the web server's PHP-FPM pool, open_basedir is scoped to the vhost
+    // (+ /tmp). /usr/bin/timeout lives outside it outright, and the venv's
+    // python is a symlink chain that resolves to /usr/bin/python3 — also
+    // outside it — so is_file() (which follows symlinks) reports false for
+    // both even though they're perfectly runnable. proc_open() executing a
+    // path is NOT subject to open_basedir the way filesystem checks are, so
+    // skip the pre-check for anything outside the vhost and let proc_open
+    // itself fail (returning null below) if a path is genuinely missing.
+    // Only $script — a real file inside the vhost — is safe to pre-check.
+    if (!is_file($script)) {
         return null;
     }
 

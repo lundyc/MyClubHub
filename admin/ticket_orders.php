@@ -10,8 +10,10 @@ $pageHero = [
 require_once __DIR__ . '/header.php';
 require_once __DIR__ . '/lib/match_tickets.php';
 require_once __DIR__ . '/lib/audit.php';
+require_once __DIR__ . '/lib/invoices.php';
 hub_auth_require_permission('tickets.view');
 ensureMatchTicketSchema($pdo);
+invoices_ensure_schema($pdo);
 
 $seasonId = (int) ($_GET['season_id'] ?? ($seasonContext['season_id'] ?? 0));
 $orderId = max(0, (int) ($_GET['id'] ?? ($_POST['order_id'] ?? 0)));
@@ -49,6 +51,15 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                 }
                 auditLog($pdo, 'ticket_order_email_resent', "Resent ticket confirmation email for match ticket order #{$orderId}");
                 header('Location: /admin/ticket_orders.php?id=' . $orderId . '&email_sent=1');
+                exit;
+            }
+            if ($action === 'generate_invoice') {
+                $result = invoices_generate_for_match_ticket_order($pdo, $orderId, (string) ($currentUser['display_name'] ?? $currentUser['username'] ?? $currentUser['email'] ?? ''));
+                if ($result['errors']) {
+                    throw new RuntimeException(implode(' ', $result['errors']));
+                }
+                auditLog($pdo, 'invoice_generated', "Generated invoice for match ticket order #{$orderId}");
+                header('Location: /admin/ticket_orders.php?id=' . $orderId . '&invoice_generated=1');
                 exit;
             }
         } catch (Throwable $exception) {
@@ -113,6 +124,7 @@ if ($orderId > 0) {
     <?php if (isset($_GET['cancelled'])): ?><div class="alert alert-success">Order cancelled.</div><?php endif; ?>
     <?php if (isset($_GET['refunded'])): ?><div class="alert alert-success">Order refunded.</div><?php endif; ?>
     <?php if (isset($_GET['email_sent'])): ?><div class="alert alert-success">Ticket email sent.</div><?php endif; ?>
+    <?php if (isset($_GET['invoice_generated'])): ?><div class="alert alert-success">Invoice generated.</div><?php endif; ?>
     <?php if ($errors): ?><div class="alert alert-danger"><?= h(implode(' ', $errors)) ?></div><?php endif; ?>
 
     <div class="row g-3">
@@ -200,6 +212,12 @@ if ($orderId > 0) {
                         <span>Total</span>
                         <span><?= gbp((float) $order['total_amount']) ?></span>
                     </div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm border-0 mb-3">
+                <div class="card-body">
+                    <?= invoices_render_admin_section(invoices_list_for_source($pdo, 'match_ticket_order', (int) $order['id']), '<form method="post">' . csrf_field() . '<input type="hidden" name="order_id" value="' . (int) $order['id'] . '"><input type="hidden" name="action" value="generate_invoice"><button type="submit" class="btn btn-outline-primary btn-sm">Generate invoice</button></form>') ?>
                 </div>
             </div>
 

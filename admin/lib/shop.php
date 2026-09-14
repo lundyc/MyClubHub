@@ -57,6 +57,19 @@ function shop_ensure_schema(PDO $pdo): void
         UNIQUE KEY uq_shop_categories_slug (slug)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 
+    // Subcategories — one level deep (a category with a parent can't itself
+    // be chosen as a parent). Added after the table shipped.
+    $categoryColumns = [];
+    foreach ($pdo->query('SHOW COLUMNS FROM shop_categories') as $row) {
+        $categoryColumns[(string) $row['Field']] = true;
+    }
+    if (!isset($categoryColumns['parent_id'])) {
+        $pdo->exec("ALTER TABLE shop_categories ADD COLUMN parent_id INT UNSIGNED NULL AFTER id");
+        $pdo->exec("ALTER TABLE shop_categories ADD KEY idx_shop_categories_parent (parent_id)");
+        $pdo->exec("ALTER TABLE shop_categories ADD CONSTRAINT fk_shop_categories_parent
+            FOREIGN KEY (parent_id) REFERENCES shop_categories (id) ON DELETE SET NULL");
+    }
+
     $pdo->exec("CREATE TABLE IF NOT EXISTS shop_products (
         id INT UNSIGNED NOT NULL AUTO_INCREMENT,
         category_id INT UNSIGNED NOT NULL,
@@ -245,6 +258,13 @@ function shop_ensure_schema(PDO $pdo): void
         $pdo->exec("ALTER TABLE shop_orders ADD COLUMN delivery_address TEXT NULL AFTER delivery_fee");
     }
 
+    // Collection/delivery date scheduling (off by default — see
+    // shop_scheduling_enabled()). The customer's chosen date, if any.
+    if (!isset($orderColumns['requested_date'])) {
+        $pdo->exec("ALTER TABLE shop_orders ADD COLUMN requested_date DATE NULL AFTER delivery_address");
+        $pdo->exec("ALTER TABLE shop_orders ADD KEY idx_shop_orders_requested_date (requested_date)");
+    }
+
     shop_seed_defaults($pdo);
 }
 
@@ -264,6 +284,14 @@ function shop_seed_defaults(PDO $pdo): void
         'preorder_close_at'   => SHOP_PREORDER_CLOSE_DEFAULT,
         'preorder_intro'      => 'Pre-order now and pay today. Orders close on 14 September 2026, after which the full order is placed with VSN. '
             . 'VSN manufacturing typically takes ' . SHOP_LEAD_TIME_DEFAULT . ' from that date. All orders are collected from ' . SHOP_COLLECTION_POINT_DEFAULT . ' — no delivery is available.',
+        'low_stock_alerts_enabled' => '1',
+        'low_stock_threshold' => '3',
+        'schedule_enabled'      => '0',
+        'schedule_days'         => '1,2,3,4,5,6,7',
+        'schedule_lead_days'    => '1',
+        'schedule_window_days'  => '30',
+        'schedule_cutoff_time'  => '15:00',
+        'schedule_max_per_day'  => '',
         'terms'               => "By placing this order you agree that:\n"
             . "• Payment is taken in full today.\n"
             . "• Pre-order kit orders close on 14 September 2026. After that date the combined order is placed with VSN and items can no longer be added or changed.\n"
@@ -418,6 +446,93 @@ function shop_delivery_fee(PDO $pdo): float
 }
 
 /* -------------------------------------------------------------------------
+ * Collection/delivery date scheduling
+ * ---------------------------------------------------------------------- */
+
+function shop_scheduling_enabled(PDO $pdo): bool
+{
+    return shop_setting($pdo, 'schedule_enabled', '0') === '1';
+}
+
+/** @return list<int> ISO weekdays (1=Monday..7=Sunday) the shop accepts orders for */
+function shop_scheduling_days(PDO $pdo): array
+{
+    $days = [];
+    foreach (explode(',', shop_setting($pdo, 'schedule_days', '1,2,3,4,5,6,7')) as $d) {
+        $d = (int) trim($d);
+        if ($d >= 1 && $d <= 7) {
+            $days[$d] = $d;
+        }
+    }
+    return $days ? array_values($days) : [1, 2, 3, 4, 5, 6, 7];
+}
+
+/**
+ * How many orders already exist for a given date (any non-cancelled status),
+ * for the "maximum orders per day" cap.
+ */
+function shop_orders_on_date(PDO $pdo, string $date): int
+{
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM shop_orders WHERE requested_date = :d AND status <> 'cancelled'");
+    $stmt->execute([':d' => $date]);
+    return (int) $stmt->fetchColumn();
+}
+
+/**
+ * The list of collection/delivery dates customers can currently choose from:
+ * allowed weekdays only, starting after the lead time (and today's cut-off
+ * time, if still within lead-time-0 range), stopping at the booking window,
+ * and skipping any date that has hit its per-day order cap.
+ *
+ * @return list<string> Y-m-d dates, in order
+ */
+function shop_available_collection_dates(PDO $pdo): array
+{
+    $allowedDays = shop_scheduling_days($pdo);
+    $leadDays = max(0, (int) shop_setting($pdo, 'schedule_lead_days', '1'));
+    $windowDays = max(1, (int) shop_setting($pdo, 'schedule_window_days', '30'));
+    $maxPerDayRaw = trim((string) shop_setting($pdo, 'schedule_max_per_day', ''));
+    $maxPerDay = $maxPerDayRaw === '' ? null : max(0, (int) $maxPerDayRaw);
+    $cutoff = trim((string) shop_setting($pdo, 'schedule_cutoff_time', '15:00'));
+
+    $now = new DateTimeImmutable('now');
+    $start = $now->setTime(0, 0);
+    if ($leadDays === 0) {
+        // Same-day allowed only before the cut-off time.
+        [$h, $m] = array_pad(array_map('intval', explode(':', $cutoff)), 2, 0);
+        if ($now > $now->setTime($h, $m)) {
+            $leadDays = 1;
+        }
+    }
+    $start = $start->modify('+' . $leadDays . ' days');
+
+    $dates = [];
+    for ($i = 0; $i < $windowDays + $leadDays; $i++) {
+        $day = $start->modify('+' . $i . ' days');
+        if ($day < $start) {
+            continue;
+        }
+        if (!in_array((int) $day->format('N'), $allowedDays, true)) {
+            continue;
+        }
+        $ymd = $day->format('Y-m-d');
+        if ($maxPerDay !== null && shop_orders_on_date($pdo, $ymd) >= $maxPerDay) {
+            continue;
+        }
+        $dates[] = $ymd;
+        if (count($dates) >= $windowDays) {
+            break;
+        }
+    }
+    return $dates;
+}
+
+function shop_is_collection_date_available(PDO $pdo, string $date): bool
+{
+    return in_array($date, shop_available_collection_dates($pdo), true);
+}
+
+/* -------------------------------------------------------------------------
  * Small helpers
  * ---------------------------------------------------------------------- */
 
@@ -524,13 +639,63 @@ function shop_handle_image_upload(array $file, string $subdir): ?string
 function shop_get_categories(PDO $pdo, bool $includeInactive = false): array
 {
     shop_ensure_schema($pdo);
-    $sql = 'SELECT c.*, (SELECT COUNT(*) FROM shop_products p WHERE p.category_id = c.id) AS product_count
-            FROM shop_categories c';
+    $sql = 'SELECT c.*, parent.name AS parent_name,
+            (SELECT COUNT(*) FROM shop_products p WHERE p.category_id = c.id) AS product_count
+            FROM shop_categories c
+            LEFT JOIN shop_categories parent ON parent.id = c.parent_id';
     if (!$includeInactive) {
         $sql .= ' WHERE c.is_active = 1';
     }
-    $sql .= ' ORDER BY c.sort_order, c.name';
+    $sql .= ' ORDER BY COALESCE(parent.sort_order, c.sort_order), COALESCE(parent.name, c.name), c.parent_id IS NULL DESC, c.sort_order, c.name';
     return $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);
+}
+
+/**
+ * Top-level categories, each with its active subcategories nested under
+ * 'children'. Used for the storefront category nav.
+ * @return list<array<string,mixed>>
+ */
+function shop_category_tree(PDO $pdo, bool $includeInactive = false): array
+{
+    $flat = shop_get_categories($pdo, $includeInactive);
+    $byId = [];
+    foreach ($flat as $cat) {
+        $cat['children'] = [];
+        $byId[(int) $cat['id']] = $cat;
+    }
+    $tree = [];
+    foreach ($byId as $id => $cat) {
+        $parentId = (int) ($cat['parent_id'] ?? 0);
+        if ($parentId > 0 && isset($byId[$parentId])) {
+            $byId[$parentId]['children'][] = $cat;
+        } else {
+            $tree[] = $cat;
+        }
+    }
+    // Rebuild top-level list with the (now populated) children from $byId.
+    $result = [];
+    foreach ($tree as $cat) {
+        $cat['children'] = $byId[(int) $cat['id']]['children'];
+        $result[] = $cat;
+    }
+    return $result;
+}
+
+/**
+ * A category id plus every subcategory id beneath it (or just itself, for a
+ * subcategory / leaf category) — used so filtering by a parent category also
+ * shows its subcategories' products.
+ * @return list<int>
+ */
+function shop_category_ids_with_children(PDO $pdo, int $categoryId): array
+{
+    $ids = [$categoryId];
+    $stmt = $pdo->prepare('SELECT id FROM shop_categories WHERE parent_id = :p');
+    $stmt->execute([':p' => $categoryId]);
+    foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $childId) {
+        $ids[] = (int) $childId;
+    }
+    return $ids;
 }
 
 function shop_get_category(PDO $pdo, int $id): ?array
@@ -556,9 +721,25 @@ function shop_save_category(PDO $pdo, ?int $id, array $data): int
     }
     $slugInput = trim((string) ($data['slug'] ?? ''));
     $slug = shop_unique_slug($pdo, 'shop_categories', $slugInput !== '' ? $slugInput : $name, $id);
+
+    $parentId = (int) ($data['parent_id'] ?? 0);
+    if ($parentId > 0) {
+        if ($id && $parentId === $id) {
+            throw new HubFieldValidationException('parent_id', 'A category cannot be its own parent.');
+        }
+        $parent = shop_get_category($pdo, $parentId);
+        if (!$parent) {
+            throw new HubFieldValidationException('parent_id', 'Choose a valid parent category.');
+        }
+        if ((int) ($parent['parent_id'] ?? 0) > 0) {
+            throw new HubFieldValidationException('parent_id', 'A subcategory cannot itself have subcategories.');
+        }
+    }
+
     $params = [
         ':name' => $name,
         ':slug' => $slug,
+        ':parent_id' => $parentId > 0 ? $parentId : null,
         ':description' => trim((string) ($data['description'] ?? '')) ?: null,
         ':image_path' => trim((string) ($data['image_path'] ?? '')) ?: null,
         ':sort_order' => (int) ($data['sort_order'] ?? 0),
@@ -566,7 +747,7 @@ function shop_save_category(PDO $pdo, ?int $id, array $data): int
     ];
     if ($id) {
         $params[':id'] = $id;
-        $sql = 'UPDATE shop_categories SET name=:name, slug=:slug, description=:description, image_path=:image_path,
+        $sql = 'UPDATE shop_categories SET name=:name, slug=:slug, parent_id=:parent_id, description=:description, image_path=:image_path,
                 sort_order=:sort_order, is_active=:is_active WHERE id=:id';
         // Keep the existing image if none supplied.
         if ($params[':image_path'] === null) {
@@ -574,10 +755,19 @@ function shop_save_category(PDO $pdo, ?int $id, array $data): int
             $sql = str_replace(', image_path=:image_path', '', $sql);
         }
         $pdo->prepare($sql)->execute($params);
+        // A category with children can't itself become a subcategory.
+        if ($parentId > 0) {
+            $childCount = $pdo->prepare('SELECT COUNT(*) FROM shop_categories WHERE parent_id = :id');
+            $childCount->execute([':id' => $id]);
+            if ((int) $childCount->fetchColumn() > 0) {
+                $pdo->prepare('UPDATE shop_categories SET parent_id = NULL WHERE id = :id')->execute([':id' => $id]);
+                throw new RuntimeException('This category has its own subcategories, so it cannot be made a subcategory itself.');
+            }
+        }
         return $id;
     }
-    $pdo->prepare('INSERT INTO shop_categories (name, slug, description, image_path, sort_order, is_active)
-        VALUES (:name, :slug, :description, :image_path, :sort_order, :is_active)')->execute($params);
+    $pdo->prepare('INSERT INTO shop_categories (name, slug, parent_id, description, image_path, sort_order, is_active)
+        VALUES (:name, :slug, :parent_id, :description, :image_path, :sort_order, :is_active)')->execute($params);
     return (int) $pdo->lastInsertId();
 }
 
@@ -587,6 +777,11 @@ function shop_delete_category(PDO $pdo, int $id): void
     $count->execute([':id' => $id]);
     if ((int) $count->fetchColumn() > 0) {
         throw new RuntimeException('Move or delete this category\'s products first.');
+    }
+    $children = $pdo->prepare('SELECT COUNT(*) FROM shop_categories WHERE parent_id = :id');
+    $children->execute([':id' => $id]);
+    if ((int) $children->fetchColumn() > 0) {
+        throw new RuntimeException('Move or delete this category\'s subcategories first.');
     }
     $pdo->prepare('DELETE FROM shop_categories WHERE id = :id')->execute([':id' => $id]);
 }
@@ -611,8 +806,14 @@ function shop_get_products(PDO $pdo, array $filters = []): array
         $where[] = 'p.is_featured = 1';
     }
     if (!empty($filters['category_id'])) {
-        $where[] = 'p.category_id = :cat';
-        $params[':cat'] = (int) $filters['category_id'];
+        $categoryIds = shop_category_ids_with_children($pdo, (int) $filters['category_id']);
+        $placeholders = [];
+        foreach ($categoryIds as $i => $catId) {
+            $ph = ':cat' . $i;
+            $placeholders[] = $ph;
+            $params[$ph] = $catId;
+        }
+        $where[] = 'p.category_id IN (' . implode(',', $placeholders) . ')';
     }
     if (!empty($filters['search'])) {
         $where[] = '(p.name LIKE :q OR p.summary LIKE :q)';
@@ -751,6 +952,22 @@ function shop_delete_product(PDO $pdo, int $id): void
         throw new RuntimeException('This product has paid orders, so it has been hidden from the shop rather than deleted.');
     }
     $pdo->prepare('DELETE FROM shop_products WHERE id = :id')->execute([':id' => $id]);
+}
+
+/**
+ * Other active products in the same category, for the product page's
+ * "You might also like" strip.
+ * @return list<array<string,mixed>>
+ */
+function shop_related_products(PDO $pdo, array $product, int $limit = 4): array
+{
+    $stmt = $pdo->prepare('SELECT p.*, c.name AS category_name, c.slug AS category_slug
+        FROM shop_products p JOIN shop_categories c ON c.id = p.category_id
+        WHERE p.category_id = :cat AND p.id <> :id AND p.is_active = 1 AND c.is_active = 1
+        ORDER BY p.sort_order, p.name
+        LIMIT ' . max(1, $limit));
+    $stmt->execute([':cat' => (int) $product['category_id'], ':id' => (int) $product['id']]);
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
 /* -------------------------------------------------------------------------
@@ -1172,6 +1389,73 @@ function shop_manual_credit(string $raw, string $reason, float $available): floa
     return $credit;
 }
 
+/**
+ * Atomically reserve stock for one product line, inside the caller's
+ * transaction (uses a locking read so two simultaneous checkouts for the
+ * last item can't both succeed). Unlimited-stock items (stock_qty IS NULL)
+ * are a no-op. Throws if there isn't enough left.
+ */
+function shop_reserve_product_stock(PDO $pdo, int $productId, int $qty, string $label): void
+{
+    $row = $pdo->prepare('SELECT stock_qty FROM shop_products WHERE id = :id FOR UPDATE');
+    $row->execute([':id' => $productId]);
+    $current = $row->fetchColumn();
+    if ($current === false) {
+        throw new RuntimeException($label . ' is no longer available.');
+    }
+    if ($current === null) {
+        return;
+    }
+    $before = (int) $current;
+    $stmt = $pdo->prepare('UPDATE shop_products SET stock_qty = stock_qty - :q WHERE id = :id AND stock_qty >= :q2');
+    $stmt->execute([':q' => $qty, ':id' => $productId, ':q2' => $qty]);
+    if ($stmt->rowCount() === 0) {
+        throw new RuntimeException('Sorry, there isn\'t enough stock left of ' . $label . '.');
+    }
+    shop_maybe_send_low_stock_alert($pdo, $label, $before, $before - $qty);
+}
+
+/** Same as shop_reserve_product_stock() but for a modifier option's own stock. */
+function shop_reserve_option_stock(PDO $pdo, int $optionId, int $qty, string $label): void
+{
+    $row = $pdo->prepare('SELECT stock_qty FROM shop_modifier_options WHERE id = :id FOR UPDATE');
+    $row->execute([':id' => $optionId]);
+    $current = $row->fetchColumn();
+    if ($current === false) {
+        throw new RuntimeException($label . ' is no longer available.');
+    }
+    if ($current === null) {
+        return;
+    }
+    $before = (int) $current;
+    $stmt = $pdo->prepare('UPDATE shop_modifier_options SET stock_qty = stock_qty - :q WHERE id = :id AND stock_qty >= :q2');
+    $stmt->execute([':q' => $qty, ':id' => $optionId, ':q2' => $qty]);
+    if ($stmt->rowCount() === 0) {
+        throw new RuntimeException('Sorry, there isn\'t enough stock left of ' . $label . '.');
+    }
+    shop_maybe_send_low_stock_alert($pdo, $label, $before, $before - $qty);
+}
+
+/**
+ * Reverse a stock reservation (order cancelled/expired before payment).
+ * Safe to call even for unlimited-stock items (stock_qty IS NOT NULL guard).
+ */
+function shop_release_order_stock(PDO $pdo, int $orderId): void
+{
+    foreach (shop_order_items($pdo, $orderId) as $item) {
+        if ($item['product_id'] !== null) {
+            $pdo->prepare('UPDATE shop_products SET stock_qty = stock_qty + :q WHERE id = :id AND stock_qty IS NOT NULL')
+                ->execute([':q' => (int) $item['quantity'], ':id' => (int) $item['product_id']]);
+        }
+        foreach ((array) json_decode((string) ($item['options_json'] ?? '[]'), true) as $opt) {
+            if (!empty($opt['option_id'])) {
+                $pdo->prepare('UPDATE shop_modifier_options SET stock_qty = stock_qty + :q WHERE id = :id AND stock_qty IS NOT NULL')
+                    ->execute([':q' => (int) $item['quantity'], ':id' => (int) $opt['option_id']]);
+            }
+        }
+    }
+}
+
 function shop_create_order(PDO $pdo, array $customer, array $lines, array $meta = []): array
 {
     if (!$lines) {
@@ -1208,6 +1492,17 @@ function shop_create_order(PDO $pdo, array $customer, array $lines, array $meta 
     }
     $deliveryFee = $fulfilmentMethod === 'delivery' ? shop_delivery_fee($pdo) : 0.0;
 
+    // Only the public checkout enforces "must be a currently-available date"
+    // (meta['enforce_schedule'] = true) — admin-entered orders (phone/cash
+    // sales, the manual-order form, tests) may set any date, or none, since
+    // staff know when they're actually able to fulfil it.
+    $requestedDate = trim((string) ($meta['requested_date'] ?? '')) ?: null;
+    if (!empty($meta['enforce_schedule']) && shop_scheduling_enabled($pdo)) {
+        if ($requestedDate === null || !shop_is_collection_date_available($pdo, $requestedDate)) {
+            throw new RuntimeException('Please choose an available ' . ($fulfilmentMethod === 'delivery' ? 'delivery' : 'collection') . ' date.');
+        }
+    }
+
     $total = round(max(0.0, $subtotal - $discountAmount) + $deliveryFee, 2);
 
     $collectionPoint = shop_setting($pdo, 'collection_point', SHOP_COLLECTION_POINT_DEFAULT);
@@ -1224,11 +1519,11 @@ function shop_create_order(PDO $pdo, array $customer, array $lines, array $meta 
         $pdo->prepare('INSERT INTO shop_orders
             (order_ref, access_token, customer_name, customer_email, customer_phone, status, subtotal,
              discount_code, discount_total, total, currency, is_preorder, fulfilment_method, collection_point,
-             delivery_fee, delivery_address, batch_note, customer_note, marketing_opt_in, terms_accepted_at)
+             delivery_fee, delivery_address, requested_date, batch_note, customer_note, marketing_opt_in, terms_accepted_at)
             VALUES
             (:ref, :token, :name, :email, :phone, \'pending_payment\', :subtotal,
              :discount_code, :discount_total, :total, \'GBP\', :is_preorder, :fulfilment_method, :collection_point,
-             :delivery_fee, :delivery_address, :batch_note, :note, :marketing, :terms_at)')
+             :delivery_fee, :delivery_address, :requested_date, :batch_note, :note, :marketing, :terms_at)')
             ->execute([
                 ':ref' => $ref,
                 ':token' => $token,
@@ -1244,6 +1539,7 @@ function shop_create_order(PDO $pdo, array $customer, array $lines, array $meta 
                 ':collection_point' => $collectionPoint,
                 ':delivery_fee' => $deliveryFee,
                 ':delivery_address' => $deliveryAddress !== '' ? $deliveryAddress : null,
+                ':requested_date' => $requestedDate ?: null,
                 ':batch_note' => $batchNote,
                 ':note' => trim((string) ($customer['note'] ?? '')) ?: null,
                 ':marketing' => !empty($customer['marketing_opt_in']) ? 1 : 0,
@@ -1256,6 +1552,15 @@ function shop_create_order(PDO $pdo, array $customer, array $lines, array $meta 
             VALUES (:order_id, :product_id, :product_name, :options_label, :options_json, :base_price, :unit_price, :quantity, :line_total, :is_preorder)');
         foreach ($lines as $line) {
             $qty = max(1, (int) $line['quantity']);
+            if (!empty($line['product_id'])) {
+                shop_reserve_product_stock($pdo, (int) $line['product_id'], $qty, (string) $line['product_name']);
+            }
+            foreach (($line['options'] ?? []) as $opt) {
+                if (!empty($opt['option_id'])) {
+                    shop_reserve_option_stock($pdo, (int) $opt['option_id'], $qty,
+                        (string) $line['product_name'] . ' — ' . (string) ($opt['option_label'] ?? ''));
+                }
+            }
             $itemStmt->execute([
                 ':order_id' => $orderId,
                 ':product_id' => (int) $line['product_id'] ?: null,
@@ -1345,6 +1650,14 @@ function shop_order_list(PDO $pdo, array $filters = []): array
         $where[] = '(o.order_ref LIKE :q OR o.customer_name LIKE :q OR o.customer_email LIKE :q)';
         $params[':q'] = '%' . $filters['search'] . '%';
     }
+    if (!empty($filters['date_from'])) {
+        $where[] = 'o.created_at >= :date_from';
+        $params[':date_from'] = (string) $filters['date_from'];
+    }
+    if (!empty($filters['date_to'])) {
+        $where[] = 'o.created_at <= :date_to';
+        $params[':date_to'] = (string) $filters['date_to'];
+    }
     $sql = 'SELECT o.*,
             (SELECT COALESCE(SUM(quantity),0) FROM shop_order_items i WHERE i.order_id = o.id) AS item_count
             FROM shop_orders o';
@@ -1389,21 +1702,10 @@ function shop_mark_order_paid(PDO $pdo, int $orderId, ?string $paymentIntentId =
         stripe_payment_intent_id = COALESCE(:pi, stripe_payment_intent_id) WHERE id = :id AND status <> 'paid'")
         ->execute([':pi' => $paymentIntentId, ':id' => $orderId]);
 
-    // Stock + discount usage.
-    foreach (shop_order_items($pdo, $orderId) as $item) {
-        if ($item['product_id'] !== null) {
-            $pdo->prepare('UPDATE shop_products SET stock_qty = GREATEST(0, stock_qty - :q)
-                WHERE id = :id AND stock_qty IS NOT NULL')
-                ->execute([':q' => (int) $item['quantity'], ':id' => (int) $item['product_id']]);
-        }
-        foreach ((array) json_decode((string) ($item['options_json'] ?? '[]'), true) as $opt) {
-            if (!empty($opt['option_id'])) {
-                $pdo->prepare('UPDATE shop_modifier_options SET stock_qty = GREATEST(0, stock_qty - :q)
-                    WHERE id = :id AND stock_qty IS NOT NULL')
-                    ->execute([':q' => (int) $item['quantity'], ':id' => (int) $opt['option_id']]);
-            }
-        }
-    }
+    // Stock was already reserved when the order was created (see
+    // shop_reserve_product_stock()/shop_reserve_option_stock() in
+    // shop_create_order()) — paying just confirms the reservation, it
+    // doesn't decrement again. Only discount usage is counted here.
     if (!empty($order['discount_code'])) {
         $pdo->prepare('UPDATE shop_discount_codes SET used_count = used_count + 1 WHERE code = :c')
             ->execute([':c' => (string) $order['discount_code']]);
@@ -1420,18 +1722,31 @@ function shop_mark_order_paid(PDO $pdo, int $orderId, ?string $paymentIntentId =
 function shop_cancel_order(PDO $pdo, int $orderId, string $reason = ''): void
 {
     $order = shop_get_order($pdo, $orderId);
-    if (!$order || in_array((string) $order['status'], ['paid', 'collected', 'refunded'], true)) {
+    // Already-cancelled is excluded too — otherwise a second cancel call
+    // (e.g. a retried webhook) would release the reserved stock twice.
+    if (!$order || in_array((string) $order['status'], ['paid', 'collected', 'refunded', 'cancelled'], true)) {
         return;
     }
     $pdo->prepare("UPDATE shop_orders SET status = 'cancelled', cancelled_at = COALESCE(cancelled_at, NOW()),
         customer_note = TRIM(CONCAT(COALESCE(customer_note,''), :note)) WHERE id = :id")
         ->execute([':note' => $reason !== '' ? "\n[cancelled] " . $reason : '', ':id' => $orderId]);
+    shop_release_order_stock($pdo, $orderId);
+    try {
+        shop_send_status_email($pdo, $orderId, 'cancelled', $reason);
+    } catch (Throwable $e) {
+        error_log('[shop] cancellation email failed for order ' . $orderId . ': ' . $e->getMessage());
+    }
 }
 
 function shop_mark_collected(PDO $pdo, int $orderId): void
 {
     $pdo->prepare("UPDATE shop_orders SET status = 'collected', collected_at = COALESCE(collected_at, NOW())
         WHERE id = :id AND status = 'paid'")->execute([':id' => $orderId]);
+    try {
+        shop_send_status_email($pdo, $orderId, 'collected');
+    } catch (Throwable $e) {
+        error_log('[shop] collected email failed for order ' . $orderId . ': ' . $e->getMessage());
+    }
 }
 
 function shop_mark_vsn_ordered(PDO $pdo, int $orderId): void
@@ -1480,6 +1795,12 @@ function shop_refund_order(PDO $pdo, int $orderId, float $amount, string $reason
             ':full' => $fullyRefunded ? 1 : 0,
             ':id' => $orderId,
         ]);
+
+    try {
+        shop_send_status_email($pdo, $orderId, 'refunded', '', $amount);
+    } catch (Throwable $e) {
+        error_log('[shop] refund email failed for order ' . $orderId . ': ' . $e->getMessage());
+    }
 }
 
 /* -------------------------------------------------------------------------
@@ -1699,12 +2020,17 @@ function shop_order_email_content(PDO $pdo, array $order): array
     }
 
     $isDelivery = (string) ($order['fulfilment_method'] ?? 'collection') === 'delivery';
+    $dateLine = '';
+    if (!empty($order['requested_date'])) {
+        $dateLine = '<br>' . ($isDelivery ? 'Requested delivery date: ' : 'Requested collection date: ')
+            . '<strong>' . h((new DateTimeImmutable((string) $order['requested_date']))->format('l j F Y')) . '</strong>';
+    }
     $fulfilmentBlock = $isDelivery
         ? '<div style="margin:18px 0 0;padding:16px 18px;border-radius:12px;background:#f6ecde;color:#3c2f34;font-size:14px;line-height:1.6;">
-            <strong>Delivery</strong><br>' . nl2br(h((string) ($order['delivery_address'] ?? ''))) . '</div>'
+            <strong>Delivery</strong><br>' . nl2br(h((string) ($order['delivery_address'] ?? ''))) . $dateLine . '</div>'
         : '<div style="margin:18px 0 0;padding:16px 18px;border-radius:12px;background:#f6ecde;color:#3c2f34;font-size:14px;line-height:1.6;">
             <strong>Collection</strong><br>' . h($collectionPoint)
-        . ($collectionDetails !== '' ? '<br>' . h($collectionDetails) : '') . '</div>';
+        . ($collectionDetails !== '' ? '<br>' . h($collectionDetails) : '') . $dateLine . '</div>';
 
     $body = '<p style="margin:0 0 16px;font-size:16px;line-height:1.55;">Hi ' . h((string) $order['customer_name']) . ',</p>'
         . '<p style="margin:0 0 20px;font-size:16px;line-height:1.55;color:#4a4046;">' . ($pending ? 'Thanks for your order. Payment is still outstanding. Please pay using the method agreed with the club. Here are the details for' : 'Thanks for your order. We\'ve received your payment in full. Here are the details for') . ' <strong>' . h((string) $order['order_ref']) . '</strong>.</p>'
@@ -1742,6 +2068,80 @@ function shop_send_confirmation_email(PDO $pdo, int $orderId, bool $force = fals
             ->execute([':id' => $orderId]);
     }
     if ($sent) { shop_add_order_event($pdo, $orderId, $order['status'] === 'pending_payment' ? 'Order summary emailed to customer (awaiting payment).' : 'Paid order confirmation emailed to customer.'); }
+    return $sent;
+}
+
+/**
+ * Fires once as stock crosses down through the low-stock threshold (not on
+ * every subsequent sale below it), to the shared payment-notification
+ * recipients list.
+ */
+function shop_maybe_send_low_stock_alert(PDO $pdo, string $itemLabel, int $before, int $after): void
+{
+    if (shop_setting($pdo, 'low_stock_alerts_enabled', '1') !== '1') {
+        return;
+    }
+    $threshold = max(0, (int) shop_setting($pdo, 'low_stock_threshold', '3'));
+    if ($before <= $threshold || $after > $threshold) {
+        return; // was already low, or didn't cross the threshold this time
+    }
+    $recipients = function_exists('stripe_notification_recipients') ? stripe_notification_recipients($pdo) : [];
+    if ($recipients === []) {
+        return;
+    }
+    $subject = '[Club Shop] Low stock — ' . $itemLabel;
+    $body = '<p style="margin:0 0 12px;font-size:15px;">Stock for <strong>' . h($itemLabel) . '</strong> has dropped to '
+        . '<strong>' . $after . ' left</strong> (alert threshold: ' . $threshold . ').</p>'
+        . '<p style="margin:0;font-size:14px;color:#4a4046;">Update stock or restock in the <a href="https://myclubhub.co.uk/admin/shop_products.php">Shop admin</a>.</p>';
+    $html = shop_email_wrapper($subject, 'A shop item is running low on stock.', 'Low stock alert', $itemLabel, $body);
+    foreach ($recipients as $to) {
+        shop_send_mail($to, $subject, $html);
+    }
+}
+
+/**
+ * Customer-facing email for an order status change other than "paid" (which
+ * shop_send_confirmation_email already covers): collected, cancelled, or a
+ * refund. Best-effort — never throws to the caller.
+ */
+function shop_send_status_email(PDO $pdo, int $orderId, string $kind, string $reason = '', float $refundAmount = 0.0): bool
+{
+    $order = shop_get_order($pdo, $orderId);
+    if (!$order) {
+        return false;
+    }
+    $email = trim((string) $order['customer_email']);
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        return false;
+    }
+
+    $ref = (string) $order['order_ref'];
+    if ($kind === 'collected') {
+        $heroTitle = 'Order collected';
+        $subject = 'Your order ' . $ref . ' has been collected';
+        $body = '<p style="margin:0 0 16px;font-size:16px;line-height:1.55;">Hi ' . h((string) $order['customer_name']) . ',</p>'
+            . '<p style="margin:0 0 20px;font-size:16px;line-height:1.55;color:#4a4046;">Thanks — we\'ve marked order <strong>' . h($ref) . '</strong> as collected. If that\'s not right, get in touch and we\'ll sort it out.</p>';
+    } elseif ($kind === 'cancelled') {
+        $heroTitle = 'Order cancelled';
+        $subject = 'Your order ' . $ref . ' has been cancelled';
+        $body = '<p style="margin:0 0 16px;font-size:16px;line-height:1.55;">Hi ' . h((string) $order['customer_name']) . ',</p>'
+            . '<p style="margin:0 0 20px;font-size:16px;line-height:1.55;color:#4a4046;">Your order <strong>' . h($ref) . '</strong> has been cancelled.'
+            . ($reason !== '' ? ' ' . h($reason) : '') . ' If you\'ve already paid, any refund due will follow separately.</p>';
+    } elseif ($kind === 'refunded') {
+        $heroTitle = 'Refund issued';
+        $subject = 'Refund issued for your order ' . $ref;
+        $body = '<p style="margin:0 0 16px;font-size:16px;line-height:1.55;">Hi ' . h((string) $order['customer_name']) . ',</p>'
+            . '<p style="margin:0 0 20px;font-size:16px;line-height:1.55;color:#4a4046;">We\'ve refunded <strong>' . h(gbp($refundAmount)) . '</strong> for order <strong>' . h($ref) . '</strong>. '
+            . 'It can take a few days to appear back on your card.</p>';
+    } else {
+        return false;
+    }
+
+    $html = shop_email_wrapper($subject, $subject, $heroTitle, $ref, $body);
+    $sent = shop_send_mail($email, $subject, $html);
+    if ($sent) {
+        shop_add_order_event($pdo, $orderId, ucfirst($kind) . ' email sent to customer.');
+    }
     return $sent;
 }
 

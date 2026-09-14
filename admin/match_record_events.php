@@ -302,6 +302,9 @@ $scoreRightName = $isHome ? $opponentName : $clubName;
                                         <?php if ((int) $e['own_goal'] === 1): ?><span class="badge bg-warning text-dark ms-1">OG</span><?php endif; ?>
                                         <?php if (trim((string) $e['player_name']) !== ''): ?>
                                             — <?= h((string) $e['player_name']) ?>
+                                            <?php if (($e['participant_type'] ?? 'player') === 'staff' && trim((string) ($e['participant_role'] ?? '')) !== ''): ?>
+                                                <span class="badge bg-secondary ms-1"><?= h((string) $e['participant_role']) ?></span>
+                                            <?php endif; ?>
                                         <?php endif; ?>
                                         <?php if (trim((string) $e['secondary_player_name']) !== ''): ?>
                                             <span class="text-secondary">(<?= h((string) $e['secondary_player_name']) ?>)</span>

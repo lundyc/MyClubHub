@@ -10,7 +10,9 @@ require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/lib/functions.php';
 require_once __DIR__ . '/lib/player_sponsorship_shop.php';
 require_once __DIR__ . '/lib/stripe.php';
+require_once __DIR__ . '/lib/invoices.php';
 ensurePlayerSponsorshipShopSchema($pdo);
+invoices_ensure_schema($pdo);
 
 $pageHero = [
   'eyebrow' => 'Sponsor management',
@@ -33,6 +35,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'resol
     }
     header('Location: playersponsors_orders.php?resolved=1');
     exit;
+  }
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'generate_invoice') {
+  if (!csrf_check()) {
+    $feedback = 'Invalid CSRF token.';
+  } else {
+    $orderId = (int) ($_POST['order_id'] ?? 0);
+    $currentAdmin = hub_auth_current_user();
+    $currentAdminLabel = (string) ($currentAdmin['display_name'] ?? $currentAdmin['username'] ?? $currentAdmin['email'] ?? '');
+    $result = invoices_generate_for_player_sponsorship_order($pdo, $orderId, $currentAdminLabel);
+    if ($result['errors']) {
+      $feedback = implode(' ', $result['errors']);
+    } else {
+      auditLog($pdo, 'invoice_generated', "Generated invoice for player sponsorship order #{$orderId}");
+      header('Location: playersponsors_orders.php?invoice_generated=1');
+      exit;
+    }
   }
 }
 
@@ -120,6 +140,9 @@ function playersponsors_item_status_badge(string $status): string
   <?php if (isset($_GET['resolved'])): ?>
     <div class="alert alert-success">Marked as resolved.</div>
   <?php endif; ?>
+  <?php if (isset($_GET['invoice_generated'])): ?>
+    <div class="alert alert-success">Invoice generated.</div>
+  <?php endif; ?>
   <?php if ($feedback !== ''): ?>
     <div class="alert alert-danger"><?= h($feedback) ?></div>
   <?php endif; ?>
@@ -163,6 +186,7 @@ function playersponsors_item_status_badge(string $status): string
           </span>
         </summary>
         <div class="card-body pt-0">
+          <div class="table-responsive">
           <table class="table table-sm align-middle mb-0">
             <thead><tr><th>Player</th><th>Package</th><th class="text-end">Amount</th><th>Status</th><th></th></tr></thead>
             <tbody>
@@ -191,9 +215,12 @@ function playersponsors_item_status_badge(string $status): string
               <?php endforeach; ?>
             </tbody>
           </table>
+          </div>
           <?php if (!empty($order['buyer_is_business'])): ?>
             <div class="text-muted small mt-2">Business sponsor<?= !empty($order['buyer_address']) ? ' · ' . h((string) $order['buyer_address']) : '' ?><?= !empty($order['buyer_website_url']) ? ' · ' . h((string) $order['buyer_website_url']) : '' ?></div>
           <?php endif; ?>
+          <hr>
+          <?= invoices_render_admin_section(invoices_list_for_source($pdo, 'player_sponsorship_order', (int) $order['id']), '<form method="post">' . csrf_field() . '<input type="hidden" name="order_id" value="' . (int) $order['id'] . '"><input type="hidden" name="action" value="generate_invoice"><button type="submit" class="btn btn-outline-primary btn-sm">Generate invoice</button></form>') ?>
         </div>
       </details>
     <?php endforeach; ?>

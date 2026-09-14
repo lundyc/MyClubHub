@@ -62,6 +62,13 @@ function site_settings_defaults(): array
         'contact_phone'   => '',
         'contact_address' => '',
 
+        // Invoicing — shown on the letterhead of every generated invoice
+        // (admin/invoice_pdf.php). Left blank by default since the club has
+        // no VAT registration or bank details recorded anywhere else in the
+        // system; fill in only what applies.
+        'company_number' => '',
+        'bank_details'   => '',
+
         // Brand tokens (CSS colours) — Saltcoats Victoria 2026/27: maroon + gold
         'brand_primary'     => '#6d2231',  // wine maroon: buttons, links, chips
         'brand_primary_ink' => '#4c1521',  // deep maroon: hover / active

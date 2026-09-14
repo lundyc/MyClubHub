@@ -95,6 +95,17 @@ a:hover {
   text-decoration: underline;
 }
 
+/* Touch devices (phones/tablets) fire :hover on tap, which left a stray
+   underline flash on every link after tapping it. Hover-driven underlines
+   are a pointer-device affordance only, so switch them off wherever
+   pointer input can't hover. */
+@media (hover: none), (pointer: coarse) {
+  a:hover,
+  a:hover * {
+    text-decoration: none !important;
+  }
+}
+
 h1,
 h2,
 h3,
@@ -348,6 +359,7 @@ p {
   align-items: center;
   gap: 1.5rem;
   min-height: var(--header-h);
+  transition: min-height .18s ease;
 }
 
 .brand {
@@ -381,6 +393,10 @@ p {
   font-weight: 600;
   letter-spacing: .14em;
   color: var(--club-accent);
+}
+
+.brand img {
+  transition: height .18s ease;
 }
 
 .is-stuck .brand img {
@@ -811,7 +827,9 @@ body.nav-open {
   .nav-scrim,
   .nav-item::after,
   .nav-item__toggle svg,
-  .subnav__link::before {
+  .subnav__link::before,
+  .masthead .container,
+  .brand img {
     transition: none !important;
   }
 }
@@ -1182,6 +1200,13 @@ body.nav-open {
 .matchcard__row b {
   font-family: var(--font-head);
   font-size: 1.05rem;
+}
+
+.matchcard__pens {
+  text-align: right;
+  font-size: .75rem;
+  color: var(--muted-text);
+  margin-top: -.15rem;
 }
 
 .matchcard__foot {
@@ -2278,8 +2303,235 @@ body.nav-open {
   padding-block: var(--band-y);
 }
 
+.article__layout {
+  display: block;
+}
+
 .article__main {
   margin-inline: auto;
+}
+
+/* Match reports (news_articles.fixture_id set): widen the prose column and
+   shift it left to sit against the match-details sidebar, instead of the
+   normal centered single column. */
+.article__layout--match {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: clamp(1.5rem, 4vw, 3rem);
+  align-items: start;
+}
+
+.article__layout--match .article__main {
+  margin-inline: 0;
+  max-width: none;
+}
+
+.article__layout--match .article__main.prose {
+  max-width: 82ch;
+}
+
+@media (max-width: 860px) {
+  .article__layout--match {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---- Match report sidebar (partials/match_report_sidebar.php) ------------ */
+.mrs {
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+}
+
+.mrs__panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 1.1rem 1.2rem;
+}
+
+.mrs__score {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .5rem;
+}
+
+.mrs__score-team {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: .35rem;
+}
+
+.mrs__score-team img {
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
+}
+
+.mrs__score-name {
+  font-size: .7rem;
+  font-weight: 600;
+  text-align: center;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.mrs__score-value {
+  flex: none;
+  font-family: var(--font-head);
+  font-weight: 800;
+  font-size: 1.4rem;
+}
+
+.mrs__pens {
+  text-align: center;
+  font-size: .78rem;
+  font-weight: 700;
+  color: var(--club-accent-ink);
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  margin-top: .2rem;
+}
+
+.mrs__mclink {
+  display: block;
+  text-align: center;
+  margin-top: .7rem;
+  font-size: .8rem;
+  font-weight: 600;
+}
+
+.mrs__heading {
+  margin: 0 0 .7rem;
+  font-size: .78rem;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--muted-text);
+}
+
+.mrs__heading--sub {
+  margin-top: 1.1rem;
+}
+
+.mrs__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.mrs-row {
+  display: flex;
+  align-items: center;
+  gap: .65rem;
+  padding: .5rem 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.mrs__list li.mrs-row:last-child {
+  border-bottom: none;
+}
+
+.mrs-row__media {
+  position: relative;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: linear-gradient(180deg, var(--club-primary), var(--club-primary-ink));
+  display: grid;
+  place-items: center;
+}
+
+.mrs-row__media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top center;
+}
+
+.mrs-row__initials {
+  font-family: var(--font-head);
+  font-weight: 800;
+  font-size: .8rem;
+  color: rgba(255, 255, 255, .9);
+}
+
+.mrs-row__num {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  background: var(--club-accent);
+  color: var(--club-primary-ink);
+  font-family: var(--font-head);
+  font-weight: 800;
+  font-size: .62rem;
+  line-height: 1;
+  border-radius: 50%;
+  width: 16px;
+  height: 16px;
+  display: grid;
+  place-items: center;
+  border: 1.5px solid var(--surface);
+}
+
+.mrs-row__body {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: .1rem;
+}
+
+.mrs-row__name {
+  font-size: .85rem;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mrs-row__c {
+  display: inline-block;
+  margin-left: .3rem;
+  font-size: .62rem;
+  font-weight: 800;
+  color: var(--club-accent-ink);
+}
+
+.mrs-row__sub {
+  display: flex;
+  align-items: center;
+  gap: .25rem;
+  font-size: .7rem;
+  color: var(--muted-text);
+}
+
+.mrs-row__sub svg {
+  width: 10px;
+  height: 10px;
+}
+
+.mrs-row__events {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: .25rem;
+}
+
+.mrs-row__events .mc-glyph {
+  width: 15px;
+  height: 15px;
 }
 
 .article__herocaption {
@@ -2403,6 +2655,47 @@ body.nav-open {
   min-width: 200px;
 }
 
+.tablebar {
+  align-items: center;
+  justify-content: space-between;
+}
+
+.tablebar__seasonpick {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+}
+
+.tablebar__nav {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  font-size: 1.1rem;
+  line-height: 1;
+  color: var(--ink);
+  text-decoration: none;
+  align-self: flex-end;
+}
+
+.tablebar__nav:hover {
+  border-color: var(--club-primary);
+  color: var(--club-primary);
+}
+
+.tablebar__nav--disabled {
+  opacity: .35;
+  pointer-events: none;
+}
+
+.tablebar__actions {
+  display: flex;
+  gap: .5rem;
+}
+
 .fxmonth {
   font-size: .8rem;
   text-transform: uppercase;
@@ -2518,6 +2811,12 @@ body.nav-open {
 .fxrow__score b span {
   color: var(--muted-text);
   margin: 0 .1em;
+}
+
+.fxrow__pens {
+  display: block;
+  font-size: .68rem;
+  color: var(--muted-text);
 }
 
 .fxrow__v {
@@ -2779,6 +3078,14 @@ body.nav-open {
   letter-spacing: .05em;
 }
 
+.mc-hero__pens {
+  font-size: .82rem;
+  font-weight: 700;
+  color: var(--club-accent);
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+
 .mc-hero__venue {
   margin: 1.2rem 0 0;
   color: #aeb6c0;
@@ -2959,7 +3266,7 @@ body.nav-open {
 /* ---- Match timeline ------------------------------------------------------- */
 .match-timeline {
   position: relative;
-  padding: .4rem 0;
+  padding: .4rem 0 0;
 }
 
 .match-timeline::before {
@@ -2971,6 +3278,13 @@ body.nav-open {
   width: 2px;
   background: var(--line);
   transform: translateX(-50%);
+}
+
+/* The line should stop level with the last item (full-time, or the
+   penalties pill after it when there was a shootout) — not trail on into
+   empty space below it. */
+.match-timeline__break:last-child {
+  margin-bottom: 0;
 }
 
 .match-timeline__break {
@@ -2992,6 +3306,11 @@ body.nav-open {
   text-transform: uppercase;
   letter-spacing: .07em;
   color: var(--muted-text);
+}
+
+.match-timeline__break--pens span {
+  color: var(--club-accent-ink);
+  border-color: var(--club-accent);
 }
 
 .match-timeline__event {
@@ -4369,6 +4688,26 @@ a.pp-sponsor:hover {
   font-style: italic;
 }
 
+/* archived written report shown on a migrated match centre (pages/match.php) */
+.mc-report--archive .mc-report__scorers {
+  margin: 0 0 1rem;
+  padding: .75rem 1rem;
+  background: var(--surface-2, var(--surface));
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.mc-report--archive .mc-report__by {
+  color: var(--muted-text);
+  font-size: .85rem;
+  font-style: italic;
+  margin: 0 0 .75rem;
+}
+.mc-report--archive .mc-report__note {
+  color: var(--muted-text);
+  font-size: .8rem;
+  margin: 1rem 0 0;
+}
+
 .records-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
@@ -5161,6 +5500,15 @@ a.pp-sponsor:hover {
   color: var(--club-on-primary);
 }
 
+.shopbar__cats a.shopbar__subcat {
+  font-size: .72rem;
+  color: var(--muted-text);
+}
+
+.shopbar__cats a.shopbar__subcat::before {
+  content: "› ";
+}
+
 .shopbar__basket {
   margin-left: auto;
   display: inline-flex;
@@ -5198,6 +5546,40 @@ a.pp-sponsor:hover {
 
 .crumbs a {
   color: var(--muted-text);
+}
+
+.shopsearch {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  margin: 0 0 1.6rem;
+  flex-wrap: wrap;
+}
+
+.shopsearch input[type="search"] {
+  flex: 1 1 260px;
+  min-width: 0;
+  padding: .6rem .85rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  font: inherit;
+  color: var(--ink);
+  background: var(--paper);
+}
+
+.shopsearch__clear {
+  font-size: .85rem;
+  color: var(--muted-text);
+}
+
+.pdp__related {
+  margin-top: 3rem;
+  padding-top: 2rem;
+  border-top: 1px solid var(--line);
+}
+
+.pdp__related h2 {
+  margin: 0 0 1.2rem;
 }
 
 /* product grid + card */
@@ -6635,4 +7017,38 @@ a.pp-sponsor:hover {
 .tkt-empty p {
   text-transform: none;
   letter-spacing: .01em;
+}
+
+.cookie-banner {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 999;
+  background: #1a1a1a;
+  color: #fff;
+  padding: 1rem;
+  box-shadow: 0 -2px 12px rgba(0, 0, 0, .25);
+}
+
+.cookie-banner__inner {
+  max-width: 960px;
+  margin: 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.cookie-banner__inner p {
+  margin: 0;
+  font-size: .85rem;
+  flex: 1 1 280px;
+}
+
+.cookie-banner__actions {
+  display: flex;
+  gap: .6rem;
+  flex: 0 0 auto;
 }

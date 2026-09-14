@@ -221,11 +221,23 @@ function comet_report_import_apply(PDO $pdo, array $fixture, array $resolved): v
         $isHome = (int) ($fixture['is_home'] ?? 1) === 1;
         $homeScore = $isHome ? (int) $svfcScore : (int) $oppScore;
         $awayScore = $isHome ? (int) $oppScore : (int) $svfcScore;
+
+        /* ---- Penalty shootout, if the tie needed one (cup only) -------- */
+        $svfcPens = $resolved['penalties']['svfc'] ?? null;
+        $oppPens = $resolved['penalties']['opponent'] ?? null;
+        $homePens = null;
+        $awayPens = null;
+        if ($svfcPens !== null && $oppPens !== null) {
+            $homePens = $isHome ? (int) $svfcPens : (int) $oppPens;
+            $awayPens = $isHome ? (int) $oppPens : (int) $svfcPens;
+        }
+
         $pdo->prepare(
             "UPDATE match_fixtures
-                SET full_time_home_score = :fh, full_time_away_score = :fa, status = 'played'
+                SET full_time_home_score = :fh, full_time_away_score = :fa,
+                    home_penalties = :hp, away_penalties = :ap, status = 'played'
               WHERE id = :id LIMIT 1"
-        )->execute([':fh' => $homeScore, ':fa' => $awayScore, ':id' => $fixtureId]);
+        )->execute([':fh' => $homeScore, ':fa' => $awayScore, ':hp' => $homePens, ':ap' => $awayPens, ':id' => $fixtureId]);
 
         $all = matches_load_all();
         $idx = matches_find_index($all, (string) $fixtureId);

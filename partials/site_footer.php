@@ -94,5 +94,47 @@ $policyLinks = club_menu_pages([
     </div>
   </div>
 </footer>
+
+<?php if (club('ga_measurement_id') !== ''): ?>
+<div id="cookie-banner" class="cookie-banner" hidden>
+  <div class="cookie-banner__inner">
+    <p>We use cookies to understand how visitors use this site. You can accept or reject analytics cookies.</p>
+    <div class="cookie-banner__actions">
+      <button type="button" id="cookie-banner-reject" class="btn btn--ghost">Reject</button>
+      <button type="button" id="cookie-banner-accept" class="btn">Accept</button>
+    </div>
+  </div>
+</div>
+<script>
+(function () {
+  var KEY = 'cookie_consent';
+  var stored = null;
+  try { stored = localStorage.getItem(KEY); } catch (e) {}
+
+  if (stored === 'granted') {
+    gtag('consent', 'update', { analytics_storage: 'granted' });
+    return;
+  }
+  if (stored === 'denied') {
+    return;
+  }
+
+  var banner = document.getElementById('cookie-banner');
+  if (!banner) return;
+  banner.hidden = false;
+
+  function choose(value) {
+    try { localStorage.setItem(KEY, value); } catch (e) {}
+    if (value === 'granted') {
+      gtag('consent', 'update', { analytics_storage: 'granted' });
+    }
+    banner.hidden = true;
+  }
+
+  document.getElementById('cookie-banner-accept').addEventListener('click', function () { choose('granted'); });
+  document.getElementById('cookie-banner-reject').addEventListener('click', function () { choose('denied'); });
+})();
+</script>
+<?php endif; ?>
 </body>
 </html>

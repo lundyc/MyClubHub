@@ -533,6 +533,15 @@ function ensureMatchSchema(PDO $pdo): void
           if (!isset($fixtureColumns['full_time_away_score'])) {
                     $pdo->exec("ALTER TABLE match_fixtures ADD COLUMN full_time_away_score TINYINT UNSIGNED DEFAULT NULL AFTER full_time_home_score");
           }
+          // Cup ties only — a draw after full time that goes to a penalty
+          // shootout. NULL for every league game and any cup tie that didn't
+          // need one; set together, never independently.
+          if (!isset($fixtureColumns['home_penalties'])) {
+                    $pdo->exec("ALTER TABLE match_fixtures ADD COLUMN home_penalties TINYINT UNSIGNED DEFAULT NULL AFTER full_time_away_score");
+          }
+          if (!isset($fixtureColumns['away_penalties'])) {
+                    $pdo->exec("ALTER TABLE match_fixtures ADD COLUMN away_penalties TINYINT UNSIGNED DEFAULT NULL AFTER home_penalties");
+          }
           if (!isset($fixtureColumns['competition_season_id'])) {
                     $pdo->exec("ALTER TABLE match_fixtures ADD COLUMN competition_season_id INT UNSIGNED DEFAULT NULL AFTER competition");
           }
@@ -2386,16 +2395,21 @@ function getMatchFixtures(PDO $pdo, int $seasonId): array
           if (function_exists('ensureCompetitionStructureSchema')) {
                     ensureCompetitionStructureSchema($pdo);
           }
+          // $seasonId <= 0 -> every season (the "All seasons" view in matches.php).
+          $allSeasons = $seasonId <= 0;
           $stmt = $pdo->prepare("
                     SELECT f.*,
                            COALESCE(o.clubname, f.opponent) AS opponent_name,
                            o.logo_path AS opponent_logo,
                            o.ground_location AS opponent_ground_location,
+                           se.name AS season_name,
+                           se.is_locked AS season_is_locked,
                            COALESCE(mc.competition_type, legacy_mc.competition_type, '') AS competition_type,
                            COALESCE(day_counts.match_day_count, 0) AS match_day_count,
                            COALESCE(ball_counts.match_ball_count, 0) AS match_ball_count
                     FROM match_fixtures f
                     LEFT JOIN match_opponents o ON o.id = f.opponent_id
+                    LEFT JOIN seasons se ON se.id = f.season_id
                     LEFT JOIN competition_seasons cs ON cs.id = f.competition_season_id
                     LEFT JOIN match_competitions mc ON mc.id = cs.competition_id
                     LEFT JOIN match_competitions legacy_mc
@@ -2415,10 +2429,10 @@ function getMatchFixtures(PDO $pdo, int $seasonId): array
                                 AND ended_at IS NULL
                               GROUP BY fixture_id
                     ) ball_counts ON ball_counts.fixture_id = f.id
-                    WHERE f.season_id = :season_id
+                    " . ($allSeasons ? "" : "WHERE f.season_id = :season_id") . "
                     ORDER BY f.match_date ASC, f.kickoff_time ASC, f.id ASC
           ");
-          $stmt->execute([':season_id' => $seasonId]);
+          $stmt->execute($allSeasons ? [] : [':season_id' => $seasonId]);
           $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
           foreach ($rows as &$row) {
                     if (!empty($row['opponent_name'])) {

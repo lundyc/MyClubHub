@@ -26,6 +26,7 @@ if ($isAdmin && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
             $data = [
                 'name' => (string) ($_POST['name'] ?? ''),
                 'slug' => (string) ($_POST['slug'] ?? ''),
+                'parent_id' => (int) ($_POST['parent_id'] ?? 0),
                 'description' => (string) ($_POST['description'] ?? ''),
                 'sort_order' => (int) ($_POST['sort_order'] ?? 0),
                 'is_active' => !empty($_POST['is_active']),
@@ -72,6 +73,9 @@ if ((string) ($currentRole ?? 'guest') !== 'admin') {
 
 $categories = shop_get_categories($pdo, true);
 $editing = $editId > 0 ? shop_get_category($pdo, $editId) : null;
+// Only top-level categories can be chosen as a parent, and a category can't
+// be parented under itself.
+$parentOptions = array_filter($categories, static fn($c) => (int) ($c['parent_id'] ?? 0) === 0 && (int) $c['id'] !== $editId);
 ?>
 <div class="shop-admin-page">
     <nav class="hub-breadcrumb" aria-label="Breadcrumb"><a href="/admin/shop_overview.php">Shop</a> <i class="fa-solid fa-chevron-right" aria-hidden="true"></i> <span aria-current="page">Categories</span></nav>
@@ -91,6 +95,13 @@ $editing = $editId > 0 ? shop_get_category($pdo, $editId) : null;
                         <input class="form-control" name="name" required value="<?= h((string) ($editing['name'] ?? '')) ?>"></div>
                     <div class="col-12"><label class="form-label">Slug <span class="text-muted small">(optional — auto from name)</span></label>
                         <input class="form-control" name="slug" value="<?= h((string) ($editing['slug'] ?? '')) ?>" placeholder="matchday-kit-2026-27"></div>
+                    <div class="col-12"><label class="form-label">Parent category <span class="text-muted small">(optional — makes this a subcategory)</span></label>
+                        <select class="form-select" name="parent_id">
+                            <option value="0">None (top-level category)</option>
+                            <?php foreach ($parentOptions as $p): ?>
+                                <option value="<?= (int) $p['id'] ?>" <?= (int) ($editing['parent_id'] ?? 0) === (int) $p['id'] ? 'selected' : '' ?>><?= h((string) $p['name']) ?></option>
+                            <?php endforeach; ?>
+                        </select></div>
                     <div class="col-12"><label class="form-label">Description</label>
                         <textarea class="form-control" name="description" rows="2"><?= h((string) ($editing['description'] ?? '')) ?></textarea></div>
                     <div class="col-6"><label class="form-label">Sort order</label>
@@ -110,22 +121,32 @@ $editing = $editId > 0 ? shop_get_category($pdo, $editId) : null;
             </section>
         </div>
         <div class="col-lg-7">
-            <section class="card hub-panel table-responsive">
-                <table class="table align-middle mb-0">
+            <section class="card hub-panel">
+                <table class="table align-middle mb-0 hub-data-table hub-data-table--responsive">
                     <thead><tr><th>Name</th><th>Slug</th><th class="text-end">Products</th><th>Status</th><th></th></tr></thead>
                     <tbody>
                     <?php if (!$categories): ?><tr><td colspan="5" class="text-muted text-center py-4">No categories yet.</td></tr><?php endif; ?>
+                    <?php
+                    $childCounts = [];
+                    foreach ($categories as $c) {
+                        $pid = (int) ($c['parent_id'] ?? 0);
+                        if ($pid > 0) {
+                            $childCounts[$pid] = ($childCounts[$pid] ?? 0) + 1;
+                        }
+                    }
+                    ?>
                     <?php foreach ($categories as $c): ?>
+                        <?php $isSub = (int) ($c['parent_id'] ?? 0) > 0; $hasChildren = ($childCounts[(int) $c['id']] ?? 0) > 0; ?>
                         <tr>
-                            <td class="fw-bold"><?= h((string) $c['name']) ?></td>
-                            <td class="small text-muted"><?= h((string) $c['slug']) ?></td>
-                            <td class="text-end"><?= (int) $c['product_count'] ?></td>
-                            <td><?= (int) $c['is_active'] === 1 ? '<span class="badge text-bg-success">Visible</span>' : '<span class="badge text-bg-secondary">Hidden</span>' ?></td>
-                            <td class="text-end text-nowrap">
+                            <td data-label="Name" class="fw-bold"><?= $isSub ? '<span class="text-muted">↳</span> ' : '' ?><?= h((string) $c['name']) ?></td>
+                            <td data-label="Slug" class="small text-muted"><?= h((string) $c['slug']) ?></td>
+                            <td data-label="Products" class="text-end"><?= (int) $c['product_count'] ?></td>
+                            <td data-label="Status"><?= (int) $c['is_active'] === 1 ? '<span class="badge text-bg-success">Visible</span>' : '<span class="badge text-bg-secondary">Hidden</span>' ?></td>
+                            <td data-label="Actions" class="text-end text-nowrap">
                                 <a class="btn btn-sm btn-outline-secondary" href="/admin/shop_categories.php?edit=<?= (int) $c['id'] ?>">Edit</a>
                                 <form method="post" class="d-inline" onsubmit="return confirm('Delete this category?');">
                                     <?= csrf_field() ?><input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="<?= (int) $c['id'] ?>">
-                                    <button class="btn btn-sm btn-outline-danger" type="submit" <?= (int) $c['product_count'] > 0 ? 'disabled title="Move its products first"' : '' ?>>Delete</button>
+                                    <button class="btn btn-sm btn-outline-danger" type="submit" <?= ((int) $c['product_count'] > 0 || $hasChildren) ? 'disabled title="Move its products/subcategories first"' : '' ?>>Delete</button>
                                 </form>
                             </td>
                         </tr>

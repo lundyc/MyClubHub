@@ -25,6 +25,7 @@ if (!hub_auth_is_authenticated()) {
 verify_csrf();
 
 $id = (int)($_POST['player_id'] ?? 0);
+$returnPage = ($_POST['return_to'] ?? '') === 'player_photos' ? 'player_photos.php' : 'player_edit.php';
 if ($id <= 0) {
     echo '<div class="alert alert-danger">Invalid player ID.</div>';
     exit;
@@ -127,9 +128,9 @@ if ($savedCount > 0) {
 
 if ($errors) {
     $errorMsg = urlencode(trim(implode(' ', array_map('strip_tags', $errors))));
-    header('Location: player_edit.php?id=' . $id . '&action_shot_error=' . $errorMsg . ($savedCount > 0 ? '&action_shot_success=' . $savedCount : ''));
+    header('Location: ' . $returnPage . '?id=' . $id . '&action_shot_error=' . $errorMsg . ($savedCount > 0 ? '&action_shot_success=' . $savedCount : ''));
     exit;
 }
 
-header('Location: player_edit.php?id=' . $id . '&action_shot_success=' . $savedCount);
+header('Location: ' . $returnPage . '?id=' . $id . '&action_shot_success=' . $savedCount);
 exit;

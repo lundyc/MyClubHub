@@ -176,3 +176,105 @@ function hub_send_mail(string $toEmail, string $subject, string $body, bool $isH
 
     return hub_mail_smtp_send($toEmail, $subject, $body, $isHtml ? 'text/html' : 'text/plain', $replyTo);
 }
+
+/**
+ * Same raw-SMTP transport as hub_send_mail(), extended to a multipart/mixed
+ * message so a generated PDF (invoices, etc.) can travel as an attachment —
+ * hub_mail_smtp_send() itself only ever writes a single-part body, so this
+ * builds the multipart envelope here and reuses its connection/auth/escaping
+ * helpers directly rather than duplicating the SMTP dialogue.
+ *
+ * @param array{filename:string,content:string,mime?:string} $attachment
+ */
+function hub_send_mail_with_attachment(string $toEmail, string $subject, string $htmlBody, array $attachment, ?string $replyTo = null): bool
+{
+    $toEmail = trim($toEmail);
+    if (!filter_var($toEmail, FILTER_VALIDATE_EMAIL)) {
+        return false;
+    }
+
+    $config = hub_mail_smtp_config();
+    if ($config['host'] === '' || $config['username'] === '' || $config['password'] === '') {
+        return false;
+    }
+
+    $boundary = 'hubmail-' . bin2hex(random_bytes(12));
+    $mime = $attachment['mime'] ?? 'application/pdf';
+    $filename = $attachment['filename'];
+    $encodedFile = chunk_split(base64_encode($attachment['content']));
+
+    $body = "--{$boundary}\r\n"
+        . "Content-Type: text/html; charset=UTF-8\r\n"
+        . "Content-Transfer-Encoding: 8bit\r\n\r\n"
+        . $htmlBody . "\r\n"
+        . "--{$boundary}\r\n"
+        . "Content-Type: {$mime}; name=\"{$filename}\"\r\n"
+        . "Content-Transfer-Encoding: base64\r\n"
+        . "Content-Disposition: attachment; filename=\"{$filename}\"\r\n\r\n"
+        . $encodedFile . "\r\n"
+        . "--{$boundary}--";
+
+    $transport = $config['encryption'] === 'ssl' ? 'ssl://' : 'tcp://';
+    $context = stream_context_create([
+        'ssl' => [
+            'verify_peer' => filter_var(hub_mail_config_value('HUB_SMTP_VERIFY_PEER', '0'), FILTER_VALIDATE_BOOL),
+            'verify_peer_name' => filter_var(hub_mail_config_value('HUB_SMTP_VERIFY_PEER', '0'), FILTER_VALIDATE_BOOL),
+            'allow_self_signed' => true,
+        ],
+    ]);
+    $socket = @stream_socket_client($transport . $config['host'] . ':' . $config['port'], $errno, $errstr, 20, STREAM_CLIENT_CONNECT, $context);
+    if (!$socket) {
+        error_log('SMTP connection failed: ' . $errstr . ' (' . $errno . ')');
+        return false;
+    }
+
+    stream_set_timeout($socket, 20);
+
+    try {
+        hub_mail_smtp_command($socket, '', 220);
+        hub_mail_smtp_command($socket, 'EHLO myclubhub.co.uk', 250);
+        if (in_array($config['encryption'], ['tls', 'starttls'], true)) {
+            hub_mail_smtp_command($socket, 'STARTTLS', 220);
+            if (!stream_socket_enable_crypto($socket, true, STREAM_CRYPTO_METHOD_TLS_CLIENT)) {
+                throw new RuntimeException('SMTP STARTTLS negotiation failed.');
+            }
+            hub_mail_smtp_command($socket, 'EHLO myclubhub.co.uk', 250);
+        }
+
+        hub_mail_smtp_command($socket, 'AUTH LOGIN', 334);
+        hub_mail_smtp_command($socket, base64_encode($config['username']), 334);
+        hub_mail_smtp_command($socket, base64_encode($config['password']), 235);
+        hub_mail_smtp_command($socket, 'MAIL FROM:<' . $config['from_email'] . '>', 250);
+        hub_mail_smtp_command($socket, 'RCPT TO:<' . $toEmail . '>', [250, 251]);
+        hub_mail_smtp_command($socket, 'DATA', 354);
+
+        $headers = [
+            'Date: ' . date(DATE_RFC2822),
+            'Message-ID: <' . bin2hex(random_bytes(16)) . '@myclubhub.co.uk>',
+            'From: ' . hub_mail_header_address($config['from_email'], $config['from_name']),
+            'To: ' . $toEmail,
+            'Subject: ' . hub_mail_encode_header($subject),
+            'MIME-Version: 1.0',
+            'Content-Type: multipart/mixed; boundary="' . $boundary . '"',
+        ];
+        if ($replyTo !== null && filter_var($replyTo, FILTER_VALIDATE_EMAIL)) {
+            $headers[] = 'Reply-To: ' . $replyTo;
+        }
+
+        // Only the plain-text envelope headers go through the dot-escaping pass;
+        // the base64 attachment body must not be touched by it (base64 has no
+        // significant leading dots, but escaping is line-oriented and unneeded
+        // work for a chunk this size — headers+HTML part are the only text).
+        fwrite($socket, hub_mail_smtp_escape_body(implode("\r\n", $headers) . "\r\n\r\n") . $body . "\r\n.\r\n");
+        hub_mail_smtp_command($socket, '', 250);
+        hub_mail_smtp_command($socket, 'QUIT', 221);
+        fclose($socket);
+
+        return true;
+    } catch (Throwable $e) {
+        error_log($e->getMessage());
+        @fwrite($socket, "QUIT\r\n");
+        fclose($socket);
+        return false;
+    }
+}

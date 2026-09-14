@@ -1,0 +1,1052 @@
+[
+  {
+    "season": "1911-12",
+    "competition": "Irvine & District Junior Football League",
+    "file": "1911-12__irvine-district-junior-football-league__league_table.json",
+    "saltcoats_row": {
+      "position": 2,
+      "played": 18,
+      "won": 11,
+      "drawn": 1,
+      "lost": 6,
+      "points": 23
+    },
+    "status_note": "TABLE MATHEMATICALLY UNSOUND"
+  },
+  {
+    "season": "1912-13",
+    "competition": "Irvine & District Junior Football League",
+    "file": "1912-13__irvine-district-junior-football-league__league_table.json",
+    "saltcoats_row": {
+      "position": 1,
+      "played": 22,
+      "won": 13,
+      "drawn": 3,
+      "lost": 6,
+      "points": 29
+    },
+    "status_note": "TABLE MATHEMATICALLY UNSOUND"
+  },
+  {
+    "season": "1913-14",
+    "competition": "Irvine & District Junior Football League",
+    "file": "1913-14__irvine-district-junior-football-league__league_table.json",
+    "saltcoats_row": {
+      "position": 9,
+      "played": 18,
+      "won": 4,
+      "drawn": 4,
+      "lost": 10,
+      "points": 12
+    },
+    "status_note": "TABLE MATHEMATICALLY SOUND"
+  },
+  {
+    "season": "1914-15",
+    "competition": "Irvine & District Junior Football League",
+    "file": "1914-15__irvine-district-junior-football-league__league_table.json",
+    "saltcoats_row": {
+      "position": "x",
+      "played": 9,
+      "won": 1,
+      "drawn": 5,
+      "lost": 3,
+      "points": 7
+    },
+    "status_note": "TABLE MATHEMATICALLY UNSOUND"
+  },
+  {
+    "season": "1919-20",
+    "competition": "Western Junior Football League",
+    "file": "1919-20__western-junior-football-league__league_table.json",
+    "saltcoats_row": {
+      "position": "x",
+      "played": 2,
+      "won": 0,
+      "drawn": 1,
+      "lost": 1,
+      "points": 1
+    },
+    "status_note": "TABLE MATHEMATICALLY SOUND AS IT STANDS"
+  },
+  {
+    "season": "1929-30",
+    "competition": "Scottish Junior Football League - West",
+    "file": "1929-30__scottish-junior-football-league-west__league_table.json",
+    "saltcoats_row": {
+      "position": 2,
+      "played": 30,
+      "won": 25,
+      "drawn": 2,
+      "lost": 3,
+      "points": 52
+    },
+    "status_note": "TABLE MATHEMATICALLY SOUND"
+  },
+  {
+    "season": "1929-30",
+    "competition": "Western Intermediate Football League",
+    "file": "1929-30__western-intermediate-football-league__league_table.json",
+    "saltcoats_row": {
+      "position": 12,
+      "played": 26,
+      "won": 7,
+      "drawn": 4,
+      "lost": 15,
+      "points": 18
+    },
+    "status_note": "TABLE MATHEMATICALLY UNSOUND"
+  },
+  {
+    "season": "1930-31",
+    "competition": "Western Intermediate Football League",
+    "file": "1930-31__western-intermediate-football-league__league_table.json",
+    "saltcoats_row": {
+      "position": 5,
+      "played": 20,
+      "won": 8,
+      "drawn": 7,
+      "lost": 5,
+      "points": 23
+    },
+    "status_note": "TABLE MATHEMATICALLY UNSOUND"
+  },
+  {
+    "season": "1945-46",
+    "competition": "Western Junior Football League [north]",
+    "file": "1945-46__western-junior-football-league-north__league_table.json",
+    "saltcoats_row": {
+      "position": 1,
+      "played": 18,
+      "won": 14,
+      "drawn": 3,
+      "lost": 1,
+      "points": 31
+    },
+    "status_note": "TABLE MATHEMATICALLY UNSOUND"
+  },
+  {
+    "season": "1946-47",
+    "competition": "Western Junior Football League [north]",
+    "file": "1946-47__western-junior-football-league-north__league_table.json",
+    "saltcoats_row": {
+      "position": 5,
+      "played": 26,
+      "won": 15,
+      "drawn": 3,
+      "lost": 8,
+      "points": 33
+    },
+    "status_note": "TABLE MATHEMATICALLY UNSOUND"
+  },
+  {
+    "season": "1947-48",
+    "competition": "Western Junior Football League [north]",
+    "file": "1947-48__western-junior-football-league-north__league_table.json",
+    "saltcoats_row": {
+      "position": 9,
+      "played": 26,
+      "won": 12,
+      "drawn": 3,
+      "lost": 11,
+      "points": 27
+    },
+    "status_note": "TABLE MATHEMATICALLY UNSOUND"
+  },
+  {
+    "season": "1948-49",
+    "competition": "Western Junior Football League [north]",
+    "file": "1948-49__western-junior-football-league-north__league_table.json",
+    "saltcoats_row": {
+      "position": "7 =",
+      "played": 26,
+      "won": 10,
+      "drawn": 4,
+      "lost": 12,
+      "points": 24
+    },
+    "status_note": "TABLE MATHEMATICALLY UNSOUND"
+  },
+  {
+    "season": "1949-50",
+    "competition": "Western Junior Football League [north]",
+    "file": "1949-50__western-junior-football-league-north__league_table.json",
+    "saltcoats_row": {
+      "position": "11 =",
+      "played": 30,
+      "won": 9,
+      "drawn": 7,
+      "lost": 14,
+      "points": 25
+    },
+    "status_note": "TABLE MATHEMATICALLY UNSOUND"
+  },
+  {
+    "season": "1950-51",
+    "competition": "Western Junior Football League [north]",
+    "file": "1950-51__western-junior-football-league-north__league_table.json",
+    "saltcoats_row": {
+      "position": 11,
+      "played": 22,
+      "won": 8,
+      "drawn": 4,
+      "lost": 10,
+      "points": 20
+    },
+    "status_note": "TABLE MATHEMATICALLY UNSOUND"
+  },
+  {
+    "season": "1951-52",
+    "competition": "Western Junior Football League [north]",
+    "file": "1951-52__western-junior-football-league-north__league_table.json",
+    "saltcoats_row": {
+      "position": "x",
+      "played": 28,
+      "won": 12,
+      "drawn": 4,
+      "lost": 14,
+      "points": 28
+    },
+    "status_note": "TABLE MATHEMATICALLY SOUND AS IT STANDS"
+  },
+  {
+    "season": "1952-53",
+    "competition": "Western Junior Football League [north]",
+    "file": "1952-53__western-junior-football-league-north__league_table.json",
+    "saltcoats_row": {
+      "position": 15,
+      "played": 30,
+      "won": 9,
+      "drawn": 4,
+      "lost": 17,
+      "points": 22
+    },
+    "status_note": "TABLE MATHEMATICALLY SOUND"
+  },
+  {
+    "season": "1953-54",
+    "competition": "Western Junior Football League [north]",
+    "file": "1953-54__western-junior-football-league-north__league_table.json",
+    "saltcoats_row": {
+      "position": 15,
+      "played": 28,
+      "won": 7,
+      "drawn": 5,
+      "lost": 16,
+      "points": 19
+    },
+    "status_note": "TABLE MATHEMATICALLY SOUND AS IT STANDS"
+  },
+  {
+    "season": "1954-55",
+    "competition": "Western Junior Football League [north]",
+    "file": "1954-55__western-junior-football-league-north__league_table.json",
+    "saltcoats_row": {
+      "position": 13,
+      "played": 30,
+      "won": 7,
+      "drawn": 6,
+      "lost": 17,
+      "points": 20
+    },
+    "status_note": null
+  },
+  {
+    "season": "1955-56",
+    "competition": "Western Junior Football League [north]",
+    "file": "1955-56__western-junior-football-league-north__league_table.json",
+    "saltcoats_row": {
+      "position": 9,
+      "played": 30,
+      "won": 13,
+      "drawn": 3,
+      "lost": 14,
+      "points": 29
+    },
+    "status_note": null
+  },
+  {
+    "season": "1956-57",
+    "competition": "Western Junior Football League [north]",
+    "file": "1956-57__western-junior-football-league-north__league_table.json",
+    "saltcoats_row": {
+      "position": 4,
+      "played": 30,
+      "won": 15,
+      "drawn": 6,
+      "lost": 9,
+      "points": 36
+    },
+    "status_note": "TABLE MATHEMATICALLY UNSOUND"
+  },
+  {
+    "season": "1957-58",
+    "competition": "Western Junior Football League [north]",
+    "file": "1957-58__western-junior-football-league-north__league_table.json",
+    "saltcoats_row": {
+      "position": 6,
+      "played": 30,
+      "won": 13,
+      "drawn": 7,
+      "lost": 10,
+      "points": 33
+    },
+    "status_note": null
+  },
+  {
+    "season": "1958-59",
+    "competition": "Western Junior Football League [north]",
+    "file": "1958-59__western-junior-football-league-north__league_table.json",
+    "saltcoats_row": {
+      "position": 5,
+      "played": 28,
+      "won": 16,
+      "drawn": 1,
+      "lost": 11,
+      "points": 33
+    },
+    "status_note": null
+  },
+  {
+    "season": "1959-60",
+    "competition": "Western Junior Football League [north]",
+    "file": "1959-60__western-junior-football-league-north__league_table.json",
+    "saltcoats_row": {
+      "position": 3,
+      "played": 28,
+      "won": 18,
+      "drawn": 2,
+      "lost": 8,
+      "points": 38
+    },
+    "status_note": null
+  },
+  {
+    "season": "1960-61",
+    "competition": "Western Junior Football League [north]",
+    "file": "1960-61__western-junior-football-league-north__league_table.json",
+    "saltcoats_row": {
+      "position": 3,
+      "played": 28,
+      "won": 16,
+      "drawn": 2,
+      "lost": 10,
+      "points": 34
+    },
+    "status_note": null
+  },
+  {
+    "season": "1961-62",
+    "competition": "Western Junior Football League [north]",
+    "file": "1961-62__western-junior-football-league-north__league_table.json",
+    "saltcoats_row": {
+      "position": 2,
+      "played": 28,
+      "won": 21,
+      "drawn": 3,
+      "lost": 4,
+      "points": 45
+    },
+    "status_note": null
+  },
+  {
+    "season": "1962-63",
+    "competition": "Western Junior Football League [north]",
+    "file": "1962-63__western-junior-football-league-north__league_table.json",
+    "saltcoats_row": {
+      "position": 2,
+      "played": 28,
+      "won": 20,
+      "drawn": 3,
+      "lost": 5,
+      "points": 43
+    },
+    "status_note": null
+  },
+  {
+    "season": "1963-64",
+    "competition": "Western Junior Football League [north]",
+    "file": "1963-64__western-junior-football-league-north__league_table.json",
+    "saltcoats_row": {
+      "position": 4,
+      "played": 28,
+      "won": 15,
+      "drawn": 3,
+      "lost": 10,
+      "points": 33
+    },
+    "status_note": null
+  },
+  {
+    "season": "1964-65",
+    "competition": "Western Junior Football League [north]",
+    "file": "1964-65__western-junior-football-league-north__league_table.json",
+    "saltcoats_row": {
+      "position": 2,
+      "played": 28,
+      "won": 22,
+      "drawn": 3,
+      "lost": 3,
+      "points": 47
+    },
+    "status_note": null
+  },
+  {
+    "season": "1966-67",
+    "competition": "Western Junior Football League [north]",
+    "file": "1966-67__western-junior-football-league-north__league_table.json",
+    "saltcoats_row": {
+      "position": 13,
+      "played": 28,
+      "won": 6,
+      "drawn": 5,
+      "lost": 17,
+      "points": 17
+    },
+    "status_note": null
+  },
+  {
+    "season": "1967-68",
+    "competition": "Western Junior Football League [north]",
+    "file": "1967-68__western-junior-football-league-north__league_table.json",
+    "saltcoats_row": {
+      "position": 7,
+      "played": 26,
+      "won": 12,
+      "drawn": 5,
+      "lost": 9,
+      "points": 29
+    },
+    "status_note": null
+  },
+  {
+    "season": "1968-69",
+    "competition": "Ayrshire Regional Junior Football League - North",
+    "file": "1968-69__ayrshire-regional-junior-football-league-north__league_table.json",
+    "saltcoats_row": {
+      "position": 11,
+      "played": 22,
+      "won": 4,
+      "drawn": 3,
+      "lost": 15,
+      "points": 11
+    },
+    "status_note": "TABLE MATHEMATICALLY UNSOUND"
+  },
+  {
+    "season": "1969-70",
+    "competition": "Ayrshire Regional Junior Football League - North",
+    "file": "1969-70__ayrshire-regional-junior-football-league-north__league_table.json",
+    "saltcoats_row": {
+      "position": 6,
+      "played": 20,
+      "won": 8,
+      "drawn": 4,
+      "lost": 8,
+      "points": 20
+    },
+    "status_note": "TABLE MATHEMATICALLY SOUND"
+  },
+  {
+    "season": "1970-71",
+    "competition": "Ayrshire Regional Junior Football League - North",
+    "file": "1970-71__ayrshire-regional-junior-football-league-north__league_table.json",
+    "saltcoats_row": {
+      "position": 9,
+      "played": 20,
+      "won": 5,
+      "drawn": 6,
+      "lost": 9,
+      "points": 16
+    },
+    "status_note": "TABLE MATHEMATICALLY SOUND"
+  },
+  {
+    "season": "1971-72",
+    "competition": "Ayrshire Regional Junior Football League - North",
+    "file": "1971-72__ayrshire-regional-junior-football-league-north__league_table.json",
+    "saltcoats_row": {
+      "position": 9,
+      "played": 20,
+      "won": 6,
+      "drawn": 4,
+      "lost": 10,
+      "points": 16
+    },
+    "status_note": "TABLE MATHEMATICALLY SOUND"
+  },
+  {
+    "season": "1972-73",
+    "competition": "Ayrshire Regional Junior Football League - North",
+    "file": "1972-73__ayrshire-regional-junior-football-league-north__league_table.json",
+    "saltcoats_row": {
+      "position": 6,
+      "played": 20,
+      "won": 7,
+      "drawn": 4,
+      "lost": 9,
+      "points": 18
+    },
+    "status_note": "TABLE MATHEMATICALLY SOUND"
+  },
+  {
+    "season": "1973-74",
+    "competition": "Ayrshire Regional Junior Football League - North",
+    "file": "1973-74__ayrshire-regional-junior-football-league-north__league_table.json",
+    "saltcoats_row": {
+      "position": 8,
+      "played": 20,
+      "won": 6,
+      "drawn": 7,
+      "lost": 7,
+      "points": 19
+    },
+    "status_note": "TABLE MATHEMATICALLY SOUND"
+  },
+  {
+    "season": "1974-75",
+    "competition": "Ayrshire Regional Junior Football League - North",
+    "file": "1974-75__ayrshire-regional-junior-football-league-north__league_table.json",
+    "saltcoats_row": {
+      "position": 9,
+      "played": 18,
+      "won": 3,
+      "drawn": 2,
+      "lost": 13,
+      "points": 8
+    },
+    "status_note": "TABLE MATHEMATICALLY SOUND"
+  },
+  {
+    "season": "1975-76",
+    "competition": "Ayrshire Regional Junior Football League - North",
+    "file": "1975-76__ayrshire-regional-junior-football-league-north__league_table.json",
+    "saltcoats_row": {
+      "position": 7,
+      "played": 18,
+      "won": 5,
+      "drawn": 4,
+      "lost": 9,
+      "points": 14
+    },
+    "status_note": "TABLE MATHEMATICALLY SOUND"
+  },
+  {
+    "season": "1976-77",
+    "competition": "Ayrshire Regional Junior Football League - 2nd Division",
+    "file": "1976-77__ayrshire-regional-junior-football-league-2nd-division__league_table.json",
+    "saltcoats_row": {
+      "position": 5,
+      "played": 22,
+      "won": 11,
+      "drawn": 2,
+      "lost": 9,
+      "points": 24
+    },
+    "status_note": "TABLE MATHEMATICALLY SOUND"
+  },
+  {
+    "season": "1977-78",
+    "competition": "Ayrshire Regional Junior Football League - 2nd Division",
+    "file": "1977-78__ayrshire-regional-junior-football-league-2nd-division__league_table.json",
+    "saltcoats_row": {
+      "position": 6,
+      "played": 22,
+      "won": 9,
+      "drawn": 4,
+      "lost": 9,
+      "points": 22
+    },
+    "status_note": "TABLE MATHEMATICALLY UNSOUND"
+  },
+  {
+    "season": "1978-79",
+    "competition": "Ayrshire Regional Junior Football League - 2nd Division",
+    "file": "1978-79__ayrshire-regional-junior-football-league-2nd-division__league_table.json",
+    "saltcoats_row": {
+      "position": "x",
+      "played": 22,
+      "won": null,
+      "drawn": null,
+      "lost": null,
+      "points": null
+    },
+    "status_note": "INCOMPLETE DATA"
+  },
+  {
+    "season": "1979-80",
+    "competition": "Ayrshire Regional Junior Football League - 2nd Division",
+    "file": "1979-80__ayrshire-regional-junior-football-league-2nd-division__league_table.json",
+    "saltcoats_row": {
+      "position": 7,
+      "played": 22,
+      "won": 9,
+      "drawn": 3,
+      "lost": 10,
+      "points": 21
+    },
+    "status_note": "TABLE MATHEMATICALLY SOUND"
+  },
+  {
+    "season": "1980-81",
+    "competition": "Ayrshire Regional Junior Football League - 2nd Division",
+    "file": "1980-81__ayrshire-regional-junior-football-league-2nd-division__league_table.json",
+    "saltcoats_row": {
+      "position": 5,
+      "played": 22,
+      "won": 7,
+      "drawn": 9,
+      "lost": 6,
+      "points": 23
+    },
+    "status_note": "TABLE MATHEMATICALLY UNSOUND"
+  },
+  {
+    "season": "1981-82",
+    "competition": "Ayrshire Regional Junior Football League - 2nd Division",
+    "file": "1981-82__ayrshire-regional-junior-football-league-2nd-division__league_table.json",
+    "saltcoats_row": {
+      "position": 5,
+      "played": 22,
+      "won": 10,
+      "drawn": 4,
+      "lost": 8,
+      "points": 24
+    },
+    "status_note": "TABLE MATHEMATICALLY SOUND"
+  },
+  {
+    "season": "1982-83",
+    "competition": "Ayrshire Regional Junior Football League - 2nd Division",
+    "file": "1982-83__ayrshire-regional-junior-football-league-2nd-division__league_table.json",
+    "saltcoats_row": {
+      "position": 6,
+      "played": 22,
+      "won": 8,
+      "drawn": 6,
+      "lost": 8,
+      "points": 22
+    },
+    "status_note": "TABLE MATHEMATICALLY UNSOUND"
+  },
+  {
+    "season": "1983-84",
+    "competition": "Ayrshire Regional Junior Football League - 2nd Division",
+    "file": "1983-84__ayrshire-regional-junior-football-league-2nd-division__league_table.json",
+    "saltcoats_row": {
+      "position": 12,
+      "played": 22,
+      "won": 3,
+      "drawn": 3,
+      "lost": 16,
+      "points": 9
+    },
+    "status_note": "TABLE MATHEMATICALLY UNSOUND"
+  },
+  {
+    "season": "1984-85",
+    "competition": "Ayrshire Regional Junior Football League - 2nd Division",
+    "file": "1984-85__ayrshire-regional-junior-football-league-2nd-division__league_table.json",
+    "saltcoats_row": {
+      "position": 6,
+      "played": 20,
+      "won": 7,
+      "drawn": 6,
+      "lost": 7,
+      "points": 20
+    },
+    "status_note": "TABLE MATHEMATICALLY SOUND"
+  },
+  {
+    "season": "1985-86",
+    "competition": "Ayrshire Regional Junior Football League - 2nd Division",
+    "file": "1985-86__ayrshire-regional-junior-football-league-2nd-division__league_table.json",
+    "saltcoats_row": {
+      "position": 9,
+      "played": 22,
+      "won": 7,
+      "drawn": 4,
+      "lost": 11,
+      "points": 18
+    },
+    "status_note": "TABLE MATHEMATICALLY SOUND"
+  },
+  {
+    "season": "1986-87",
+    "competition": "Ayrshire Regional Junior Football League - 2nd Division",
+    "file": "1986-87__ayrshire-regional-junior-football-league-2nd-division__league_table.json",
+    "saltcoats_row": {
+      "position": 12,
+      "played": 22,
+      "won": 3,
+      "drawn": 3,
+      "lost": 16,
+      "points": 9
+    },
+    "status_note": "TABLE MATHEMATICALLY SOUND"
+  },
+  {
+    "season": "1987-88",
+    "competition": "Ayrshire Regional Junior Football League - 2nd Division",
+    "file": "1987-88__ayrshire-regional-junior-football-league-2nd-division__league_table.json",
+    "saltcoats_row": {
+      "position": 10,
+      "played": 22,
+      "won": 5,
+      "drawn": 5,
+      "lost": 12,
+      "points": 15
+    },
+    "status_note": "TABLE MATHEMATICALLY SOUND"
+  },
+  {
+    "season": "1988-89",
+    "competition": "Ayrshire Regional Junior Football League - 2nd Division",
+    "file": "1988-89__ayrshire-regional-junior-football-league-2nd-division__league_table.json",
+    "saltcoats_row": {
+      "position": 11,
+      "played": 22,
+      "won": 4,
+      "drawn": 2,
+      "lost": 16,
+      "points": 10
+    },
+    "status_note": "TABLE MATHEMATICALLY SOUND"
+  },
+  {
+    "season": "1989-90",
+    "competition": "Ayrshire Regional Junior Football League - 2nd Division",
+    "file": "1989-90__ayrshire-regional-junior-football-league-2nd-division__league_table.json",
+    "saltcoats_row": {
+      "position": 4,
+      "played": 22,
+      "won": 12,
+      "drawn": 5,
+      "lost": 5,
+      "points": 29
+    },
+    "status_note": "TABLE MATHEMATICALLY UNSOUND"
+  },
+  {
+    "season": "1990-91",
+    "competition": "Ayrshire Regional Junior Football League - 2nd Division",
+    "file": "1990-91__ayrshire-regional-junior-football-league-2nd-division__league_table.json",
+    "saltcoats_row": {
+      "position": 10,
+      "played": 22,
+      "won": 4,
+      "drawn": 6,
+      "lost": 12,
+      "points": 14
+    },
+    "status_note": "TABLE MATHEMATICALLY SOUND"
+  },
+  {
+    "season": "1991-92",
+    "competition": "Ayrshire Regional Junior Football League - 2nd Division",
+    "file": "1991-92__ayrshire-regional-junior-football-league-2nd-division__league_table.json",
+    "saltcoats_row": {
+      "position": 4,
+      "played": 22,
+      "won": 9,
+      "drawn": 8,
+      "lost": 5,
+      "points": 26
+    },
+    "status_note": "TABLE MATHEMATICALLY UNSOUND"
+  },
+  {
+    "season": "1992-93",
+    "competition": "Ayrshire Regional Junior Football League - 2nd Division",
+    "file": "1992-93__ayrshire-regional-junior-football-league-2nd-division__league_table.json",
+    "saltcoats_row": {
+      "position": 1,
+      "played": 20,
+      "won": 14,
+      "drawn": 3,
+      "lost": 3,
+      "points": 31
+    },
+    "status_note": "TABLE MATHEMATICALLY SOUND"
+  },
+  {
+    "season": "1993-94",
+    "competition": "Ayrshire Regional Junior Football League - 1st Division",
+    "file": "1993-94__ayrshire-regional-junior-football-league-1st-division__league_table.json",
+    "saltcoats_row": {
+      "position": 10,
+      "played": 20,
+      "won": 3,
+      "drawn": 1,
+      "lost": 16,
+      "points": 7
+    },
+    "status_note": "TABLE MATHEMATICALLY SOUND"
+  },
+  {
+    "season": "1993-94",
+    "competition": "Ayrshire Regional Junior Football League - 2nd Division",
+    "file": "1993-94__ayrshire-regional-junior-football-league-2nd-division__league_table.json",
+    "saltcoats_row": {
+      "position": 9,
+      "played": 22,
+      "won": 6,
+      "drawn": 4,
+      "lost": 12,
+      "points": 22
+    },
+    "status_note": "TABLE MATHEMATICALLY SOUND"
+  },
+  {
+    "season": "1995-96",
+    "competition": "Ayrshire Regional Junior Football League - 2nd Division",
+    "file": "1995-96__ayrshire-regional-junior-football-league-2nd-division__league_table.json",
+    "saltcoats_row": {
+      "position": 8,
+      "played": 22,
+      "won": 8,
+      "drawn": 7,
+      "lost": 7,
+      "points": 31
+    },
+    "status_note": "TABLE MATHEMATICALLY SOUND"
+  },
+  {
+    "season": "1996-97",
+    "competition": "Ayrshire Regional Junior Football League - 2nd Division",
+    "file": "1996-97__ayrshire-regional-junior-football-league-2nd-division__league_table.json",
+    "saltcoats_row": {
+      "position": 10,
+      "played": 22,
+      "won": 7,
+      "drawn": 4,
+      "lost": 11,
+      "points": 25
+    },
+    "status_note": "TABLE MATHEMATICALLY SOUND"
+  },
+  {
+    "season": "1997-98",
+    "competition": "Ayrshire Regional Junior Football League - 2nd Division",
+    "file": "1997-98__ayrshire-regional-junior-football-league-2nd-division__league_table.json",
+    "saltcoats_row": {
+      "position": 10,
+      "played": 22,
+      "won": 7,
+      "drawn": 5,
+      "lost": 10,
+      "points": 26
+    },
+    "status_note": "TABLE MATHEMATICALLY SOUND"
+  },
+  {
+    "season": "1998-99",
+    "competition": "Ayrshire Regional Junior Football League - 2nd Division",
+    "file": "1998-99__ayrshire-regional-junior-football-league-2nd-division__league_table.json",
+    "saltcoats_row": {
+      "position": 8,
+      "played": 22,
+      "won": 8,
+      "drawn": 5,
+      "lost": 8,
+      "points": 29
+    },
+    "status_note": "TABLE MATHEMATICALLY UNSOUND"
+  },
+  {
+    "season": "1999-00",
+    "competition": "Ayrshire Regional Junior Football League - 2nd Division",
+    "file": "1999-00__ayrshire-regional-junior-football-league-2nd-division__league_table.json",
+    "saltcoats_row": {
+      "position": 9,
+      "played": 22,
+      "won": 5,
+      "drawn": 7,
+      "lost": 10,
+      "points": 22
+    },
+    "status_note": "TABLE MATHEMATICALLY SOUND"
+  },
+  {
+    "season": "2000-01",
+    "competition": "Ayrshire Regional Junior Football League - 2nd Division",
+    "file": "2000-01__ayrshire-regional-junior-football-league-2nd-division__league_table.json",
+    "saltcoats_row": {
+      "position": 7,
+      "played": 22,
+      "won": 6,
+      "drawn": 9,
+      "lost": 7,
+      "points": 27
+    },
+    "status_note": "TABLE MATHEMATICALLY SOUND"
+  },
+  {
+    "season": "2001-02",
+    "competition": "Ayrshire Regional Junior Football League - 3rd Division",
+    "file": "2001-02__ayrshire-regional-junior-football-league-3rd-division__league_table.json",
+    "saltcoats_row": {
+      "position": 4,
+      "played": 21,
+      "won": 10,
+      "drawn": 3,
+      "lost": 8,
+      "points": 33
+    },
+    "status_note": "TABLE MATHEMATICALLY UNSOUND"
+  },
+  {
+    "season": "2002-03",
+    "competition": "Ayrshire District League",
+    "file": "2002-03__ayrshire-district-league__league_table.json",
+    "saltcoats_row": {
+      "position": 7,
+      "played": 24,
+      "won": 11,
+      "drawn": 3,
+      "lost": 10,
+      "points": 36
+    },
+    "status_note": "TABLE MATHEMATICALLY SOUND"
+  },
+  {
+    "season": "2003-04",
+    "competition": "Ayrshire District League",
+    "file": "2003-04__ayrshire-district-league__league_table.json",
+    "saltcoats_row": {
+      "position": 2,
+      "played": 24,
+      "won": 17,
+      "drawn": 3,
+      "lost": 4,
+      "points": 54
+    },
+    "status_note": "TABLE MATHEMATICALLY SOUND"
+  },
+  {
+    "season": "2004-05",
+    "competition": "Super League - Division One",
+    "file": "2004-05__super-league-division-one__league_table.json",
+    "saltcoats_row": {
+      "position": 14,
+      "played": 26,
+      "won": 4,
+      "drawn": 2,
+      "lost": 20,
+      "points": 14
+    },
+    "status_note": "TABLE MATHEMATICALLY SOUND"
+  },
+  {
+    "season": "2005-06",
+    "competition": "Ayrshire District League",
+    "file": "2005-06__ayrshire-district-league__league_table.json",
+    "saltcoats_row": {
+      "position": 11,
+      "played": 24,
+      "won": 6,
+      "drawn": 7,
+      "lost": 11,
+      "points": 25
+    },
+    "status_note": "TABLE MATHEMATICALLY SOUND"
+  },
+  {
+    "season": "2006-07",
+    "competition": "Ayrshire District League",
+    "file": "2006-07__ayrshire-district-league__league_table.json",
+    "saltcoats_row": {
+      "position": 10,
+      "played": 22,
+      "won": 4,
+      "drawn": 3,
+      "lost": 15,
+      "points": 15
+    },
+    "status_note": "TABLE MATHEMATICALLY SOUND"
+  },
+  {
+    "season": "2007-08",
+    "competition": "Ayrshire District League",
+    "file": "2007-08__ayrshire-district-league__league_table.json",
+    "saltcoats_row": {
+      "position": 12,
+      "played": 24,
+      "won": 3,
+      "drawn": 3,
+      "lost": 18,
+      "points": 12
+    },
+    "status_note": "TABLE MATHEMATICALLY SOUND"
+  },
+  {
+    "season": "2008-09",
+    "competition": "Ayrshire District League",
+    "file": "2008-09__ayrshire-district-league__league_table.json",
+    "saltcoats_row": {
+      "position": 11,
+      "played": 22,
+      "won": 2,
+      "drawn": 4,
+      "lost": 16,
+      "points": 10
+    },
+    "status_note": "TABLE MATHEMATICALLY SOUND"
+  },
+  {
+    "season": "2009-10",
+    "competition": "Ayrshire District League",
+    "file": "2009-10__ayrshire-district-league__league_table.json",
+    "saltcoats_row": {
+      "position": 10,
+      "played": 22,
+      "won": 4,
+      "drawn": 4,
+      "lost": 14,
+      "points": 16
+    },
+    "status_note": "TABLE MATHEMATICALLY SOUND"
+  },
+  {
+    "season": "2010-11",
+    "competition": "Ayrshire District League",
+    "file": "2010-11__ayrshire-district-league__league_table.json",
+    "saltcoats_row": {
+      "position": 3,
+      "played": 22,
+      "won": 14,
+      "drawn": 2,
+      "lost": 6,
+      "points": 44
+    },
+    "status_note": "TABLE MATHEMATICALLY SOUND"
+  },
+  {
+    "season": "2011-12",
+    "competition": "Ayrshire District League",
+    "file": "2011-12__ayrshire-district-league__league_table.json",
+    "saltcoats_row": {
+      "position": 7,
+      "played": 22,
+      "won": 9,
+      "drawn": 3,
+      "lost": 10,
+      "points": 30
+    },
+    "status_note": "TABLE MATHEMATICALLY SOUND"
+  },
+  {
+    "season": "2012-13",
+    "competition": "Ayrshire District League",
+    "file": "2012-13__ayrshire-district-league__league_table.json",
+    "saltcoats_row": {
+      "position": 6,
+      "played": 22,
+      "won": 9,
+      "drawn": 3,
+      "lost": 10,
+      "points": 30
+    },
+    "status_note": "TABLE MATHEMATICALLY SOUND"
+  }
+]

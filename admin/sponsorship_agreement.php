@@ -4,8 +4,10 @@ $pageHero=['eyebrow'=>'Sponsorship management','title'=>$id?'Manage Agreement':'
 require_once __DIR__.'/header.php';
 require_once __DIR__.'/lib/match_sponsorship.php';
 require_once __DIR__.'/lib/stripe.php';
+require_once __DIR__.'/lib/invoices.php';
 ensureSponsorshipCatalogSchema($pdo);
 ensureStripeSchema($pdo);
+invoices_ensure_schema($pdo);
 $agreement=$id?getSponsorshipAgreement($pdo,$id):null;
 if($id&&!$agreement){echo '<div class="alert alert-danger">Agreement not found.</div>';require __DIR__.'/footer.php';exit;}
 
@@ -76,6 +78,14 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
     }
     $errors[]='That payment could not be found on this agreement.';
    }catch(Throwable $e){$errors[]=$e->getMessage();}
+  }
+ } elseif($formAction==='generate_invoice'){
+  if(!$id||!$agreement){$errors[]='Agreement not found.';}
+  if(!$errors){
+   $currentUserLabel=(string)($currentUser['display_name']??$currentUser['username']??$currentUser['email']??'');
+   $result=invoices_generate_for_sponsorship_agreement($pdo,$id,$currentUserLabel);
+   if($result['errors']){$errors=$result['errors'];}
+   else{auditLog($pdo,'invoice_generated',"Generated invoice for sponsorship agreement #{$id}");header('Location: sponsorship_agreement.php?id='.$id.'&invoice_generated=1');exit;}
   }
  } elseif($formAction==='save_batch'){
   // New match-scope agreement(s) created from the fixture checklist below — one
@@ -164,6 +174,7 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
 $agreementPayments=[];
 $stripeOutstanding=0.0;
 $stripeLinks=[];
+$agreementInvoices=$id>0?invoices_list_for_source($pdo,'sponsorship_agreement',$id):[];
 if($id>0&&$agreement){
  $agreementPayments=getAgreementPayments($pdo,$agreement);
  $stripeOutstanding=stripe_agreement_outstanding_amount($agreement);
@@ -212,6 +223,7 @@ if($id===0&&$scopeForNew==='match'){
 <?php if(isset($_GET['payment_saved'])): ?><div class="alert alert-success">Agreement payment recorded.</div><?php endif; ?>
 <?php if(isset($_GET['payment_deleted'])): ?><div class="alert alert-success">Payment removed. The outstanding balance has been updated.</div><?php endif; ?>
 <?php if(isset($_GET['detached'])): ?><div class="alert alert-success">Agreement removed from its bundle. The agreement and its payment history are unchanged.</div><?php endif; ?>
+<?php if(isset($_GET['invoice_generated'])): ?><div class="alert alert-success">Invoice generated.</div><?php endif; ?>
 <?php if($errors): ?><div class="alert alert-danger"><ul class="mb-0"><?php foreach($errors as $e): ?><li><?= h($e) ?></li><?php endforeach; ?></ul></div><?php endif; ?>
 <?php if($batchResults): ?>
 <div class="alert <?= $batchResults['created']>0?'alert-success':'alert-warning' ?>">
@@ -370,6 +382,9 @@ if($id===0&&$scopeForNew==='match'){
 <?php endif; ?>
 
 <?php if($id>0): ?>
+<section class="card shadow-sm border-0 mt-4 hub-section hub-table-card"><div class="card-header bg-transparent"><h2 class="h5 mb-0">Invoice</h2></div><div class="card-body">
+ <?= invoices_render_admin_section($agreementInvoices,'<form method="post">'.csrf_field().'<input type="hidden" name="form_action" value="generate_invoice"><button type="submit" class="btn btn-outline-primary btn-sm">Generate invoice</button></form>') ?>
+</div></section>
 <section class="card shadow-sm border-0 mt-4 hub-section hub-table-card"><div class="card-header bg-transparent"><h2 class="h5 mb-0">Agreement payments</h2></div><div class="card-body">
  <?php if(!empty($data['is_complimentary'])): ?><div class="alert alert-info mb-0">This is a complimentary agreement. No payment is due or can be recorded.</div><?php else: ?>
  <div class="hub-stripe-card border rounded p-3 mb-4" id="stripePaymentCard" data-agreement-id="<?= $id ?>" data-outstanding="<?= h(number_format($stripeOutstanding,2,'.','')) ?>" data-create-url="stripe_payment_link_create.php" data-send-url="stripe_payment_link_send.php" data-csrf="<?= h((string)($_SESSION['csrf_token'] ?? '')) ?>">

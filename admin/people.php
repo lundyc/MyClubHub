@@ -5,7 +5,9 @@ $pageHero = [
     'eyebrow' => 'Club',
     'title' => 'People',
     'subtitle' => 'Reference people used for photo tagging across players, staff, fans, sponsors and volunteers.',
-    'actions' => [],
+    'actions' => [
+        ['label' => 'Upload reference', 'href' => '/admin/player_photo_review.php', 'class' => 'btn btn-brand'],
+    ],
 ];
 require_once __DIR__ . '/header.php';
 require_once __DIR__ . '/lib/tagged_people.php';
@@ -147,7 +149,7 @@ function people_render_player_card(array $person, array $playerMeta, array $play
                     <span><?= h($statusLabel) ?></span>
                 </div>
                 <?php if ($playerId > 0): ?>
-                    <a class="btn btn-sm btn-outline-secondary" href="/admin/player_edit.php?id=<?= $playerId ?>">Open</a>
+                    <a class="btn btn-sm btn-outline-secondary" href="/admin/player_photos.php?id=<?= $playerId ?>">Open</a>
                 <?php endif; ?>
             </div>
 

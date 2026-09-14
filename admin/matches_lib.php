@@ -22,18 +22,30 @@ function matches_master_pdo(): ?PDO
 
     $initialized = true;
 
-    try {
-        $pdo = new PDO(
-            'mysql:host=' . DB_HOST . ';dbname=' . DB_NAME . ';charset=utf8mb4',
-            DB_USER,
-            DB_PASS,
-            [
-                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-            ]
-        );
-    } catch (Throwable) {
-        $pdo = null;
+    // Same primary-then-fallback database resolution as db.php's hub_connect_pdo() —
+    // this MySQL user only has grants on DB_FALLBACK_NAME, not DB_NAME, so without
+    // the fallback this always failed silently and matches_load_all() fell back to
+    // reading data/matches.json as-is, with no fixture ever merged in from the DB.
+    $databases = array_values(array_unique(array_filter([
+        DB_NAME,
+        defined('DB_FALLBACK_NAME') ? DB_FALLBACK_NAME : null,
+    ])));
+
+    foreach ($databases as $database) {
+        try {
+            $pdo = new PDO(
+                'mysql:host=' . DB_HOST . ';dbname=' . $database . ';charset=utf8mb4',
+                DB_USER,
+                DB_PASS,
+                [
+                    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                ]
+            );
+            return $pdo;
+        } catch (Throwable) {
+            $pdo = null;
+        }
     }
 
     return $pdo;

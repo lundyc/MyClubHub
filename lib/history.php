@@ -58,6 +58,43 @@ function pub_history_match(string $slug): ?array
     }
 }
 
+/**
+ * The archived written report / scorer text for a live fixture, if the results
+ * archive was merged in (history_matches.fixture_id links back). Lets the public
+ * match page show an old match report on a migrated historical fixture.
+ *
+ * @return array{report_html:?string,report_by:string,scorers_text:?string,has_report:bool}|null
+ */
+function pub_fixture_history_report(int $fixtureId): ?array
+{
+    if ($fixtureId <= 0 || !pub_history_has_column('history_matches', 'fixture_id')) {
+        return null;
+    }
+    try {
+        $stmt = db()->prepare(
+            'SELECT report_html, report_by, scorers_text, has_report
+             FROM history_matches WHERE fixture_id = :f LIMIT 1'
+        );
+        $stmt->execute([':f' => $fixtureId]);
+        $row = $stmt->fetch();
+    } catch (Throwable) {
+        return null;
+    }
+    if (!$row) {
+        return null;
+    }
+    $hasContent = trim((string) $row['report_html']) !== '' || trim((string) $row['scorers_text']) !== '';
+    if (!$hasContent) {
+        return null;
+    }
+    return [
+        'report_html' => $row['report_html'],
+        'report_by' => (string) $row['report_by'],
+        'scorers_text' => $row['scorers_text'],
+        'has_report' => (bool) $row['has_report'],
+    ];
+}
+
 /** Overall totals across every played archive match. @return array<string,int> */
 function pub_history_totals(): array
 {

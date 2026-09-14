@@ -28,11 +28,14 @@
   }
 
   .player-profile-actionshot {
+    display: block;
+    position: relative;
     aspect-ratio: 1 / 1;
     overflow: hidden;
     border: 1px solid rgba(75, 8, 24, 0.09);
     border-radius: .75rem;
     background: rgba(246, 236, 222, .45);
+    cursor: zoom-in;
   }
 
   .player-profile-actionshot img {
@@ -40,6 +43,19 @@
     height: 100%;
     object-fit: cover;
     display: block;
+  }
+
+  .player-profile-actionshot-badge {
+    position: absolute;
+    left: .4rem;
+    bottom: .4rem;
+    padding: .18rem .5rem;
+    border-radius: 999px;
+    background: rgba(31, 26, 29, .72);
+    color: #fff;
+    font-size: .65rem;
+    font-weight: 700;
+    letter-spacing: .01em;
   }
 
   .player-profile-page .card-body {
@@ -424,5 +440,153 @@
 
     .player-profile-add-payment .btn {
       min-height: 42px;
+    }
+  }
+
+  /* Action shots lightbox ------------------------------------------------ */
+  .lightbox {
+    position: fixed;
+    inset: 0;
+    z-index: 1080;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: .7rem;
+    padding: 3.4rem 1rem 1rem;
+    background: rgba(20, 5, 9, .92);
+  }
+
+  .lightbox[hidden] {
+    display: none;
+  }
+
+  body.lightbox-open {
+    overflow: hidden;
+  }
+
+  .lightbox__stage {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: .55rem;
+    max-width: 100%;
+  }
+
+  .lightbox__img {
+    max-width: 92vw;
+    max-height: 100%;
+    object-fit: contain;
+    border-radius: 4px;
+  }
+
+  .lightbox__meta {
+    display: flex;
+    gap: .8rem;
+    align-items: baseline;
+    max-width: 92vw;
+    margin: 0;
+    color: #e6dade;
+    font-size: .78rem;
+  }
+
+  .lightbox__count {
+    color: var(--brand-light, #f6ecde);
+    font-weight: 700;
+    letter-spacing: .04em;
+    white-space: nowrap;
+  }
+
+  .lightbox__caption {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .lightbox__thumbs {
+    flex: 0 0 auto;
+    display: flex;
+    gap: .35rem;
+    max-width: 96vw;
+    padding: .3rem .2rem;
+    overflow-x: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, .35) transparent;
+  }
+
+  .lightbox__thumb {
+    flex: 0 0 auto;
+    width: 68px;
+    height: 50px;
+    padding: 0;
+    overflow: hidden;
+    background: none;
+    border: 2px solid transparent;
+    border-radius: 4px;
+    cursor: pointer;
+    opacity: .5;
+    transition: opacity .12s ease, border-color .12s ease;
+  }
+
+  .lightbox__thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  .lightbox__thumb:hover {
+    opacity: .85;
+  }
+
+  .lightbox__thumb.is-active {
+    opacity: 1;
+    border-color: var(--brand-primary);
+  }
+
+  .lightbox--single .lightbox__nav,
+  .lightbox--single .lightbox__thumbs,
+  .lightbox--single .lightbox__count {
+    display: none;
+  }
+
+  .lightbox__close,
+  .lightbox__nav {
+    position: absolute;
+    padding: .4rem .8rem;
+    background: none;
+    border: 0;
+    color: #fff;
+    font-size: 2.6rem;
+    line-height: 1;
+    opacity: .8;
+    cursor: pointer;
+  }
+
+  .lightbox__close:hover,
+  .lightbox__nav:hover {
+    opacity: 1;
+  }
+
+  .lightbox__close {
+    top: .5rem;
+    right: 1rem;
+    font-size: 2.2rem;
+  }
+
+  .lightbox__nav {
+    top: 50%;
+    transform: translateY(-50%);
+  }
+
+  .lightbox__nav--prev { left: .3rem; }
+  .lightbox__nav--next { right: .3rem; }
+
+  @media (max-width: 560px) {
+    .lightbox__nav {
+      font-size: 1.8rem;
     }
   }

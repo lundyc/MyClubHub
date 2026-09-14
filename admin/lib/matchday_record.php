@@ -52,6 +52,7 @@ function matchday_record_ensure_schema(PDO $pdo): void
             position_label VARCHAR(24) NULL,
             is_starting TINYINT(1) NOT NULL DEFAULT 1,
             is_captain TINYINT(1) NOT NULL DEFAULT 0,
+            is_trialist TINYINT(1) NOT NULL DEFAULT 0,
             sort_order SMALLINT UNSIGNED NOT NULL DEFAULT 0,
             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -90,6 +91,8 @@ function matchday_record_ensure_schema(PDO $pdo): void
             secondary_player_name VARCHAR(160) NOT NULL DEFAULT '',
             own_goal TINYINT(1) NOT NULL DEFAULT 0,
             card_type VARCHAR(16) NOT NULL DEFAULT '',
+            participant_type VARCHAR(16) NOT NULL DEFAULT 'player',
+            participant_role VARCHAR(80) NOT NULL DEFAULT '',
             outcome VARCHAR(48) NOT NULL DEFAULT '',
             note VARCHAR(500) NOT NULL DEFAULT '',
             sequence INT UNSIGNED NOT NULL DEFAULT 0,
@@ -161,6 +164,25 @@ function matchday_record_ensure_schema(PDO $pdo): void
                 ':s' => $sort += 10,
             ]);
         }
+    }
+
+    // Columns added after the tables shipped — self-heal existing installs.
+    try {
+        if (!(int) $pdo->query("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'matchday_lineups' AND COLUMN_NAME = 'is_trialist'")->fetchColumn()) {
+            $pdo->exec("ALTER TABLE matchday_lineups ADD COLUMN is_trialist TINYINT(1) NOT NULL DEFAULT 0 AFTER is_captain");
+        }
+    } catch (Throwable $e) {
+        // non-fatal: a read on a fresh DB where the CREATE above already added the column
+    }
+    try {
+        if (!(int) $pdo->query("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'matchday_events' AND COLUMN_NAME = 'participant_type'")->fetchColumn()) {
+            $pdo->exec("ALTER TABLE matchday_events ADD COLUMN participant_type VARCHAR(16) NOT NULL DEFAULT 'player' AFTER card_type");
+        }
+        if (!(int) $pdo->query("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'matchday_events' AND COLUMN_NAME = 'participant_role'")->fetchColumn()) {
+            $pdo->exec("ALTER TABLE matchday_events ADD COLUMN participant_role VARCHAR(80) NOT NULL DEFAULT '' AFTER participant_type");
+        }
+    } catch (Throwable $e) {
+        // non-fatal: existing installations can retry the self-healing columns
     }
 
     $ensured = true;

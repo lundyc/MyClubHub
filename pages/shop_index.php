@@ -11,11 +11,15 @@ $settings = shop_get_settings(db());
 $shopEnabled = ($settings['shop_enabled'] ?? '1') === '1';
 
 $activeCategoryId = (int) ($_GET['category'] ?? 0);
-$categories = shop_get_categories(db(), false);
+$searchQuery = trim((string) ($_GET['q'] ?? ''));
+$categories = shop_category_tree(db(), false);
 
 $filters = ['active_only' => true];
 if ($activeCategoryId > 0) {
     $filters['category_id'] = $activeCategoryId;
+}
+if ($searchQuery !== '') {
+    $filters['search'] = $searchQuery;
 }
 $products = $shopEnabled ? shop_get_products(db(), $filters) : [];
 $basketCount = shop_basket_count();
@@ -43,10 +47,19 @@ set_meta([
       </div>
     <?php endif; ?>
 
+    <?php if ($shopEnabled): ?>
+      <form class="shopsearch" method="get" action="<?= e(url('shop')) ?>" role="search">
+        <?php if ($activeCategoryId > 0): ?><input type="hidden" name="category" value="<?= (int) $activeCategoryId ?>"><?php endif; ?>
+        <input type="search" name="q" value="<?= e($searchQuery) ?>" placeholder="Search products&hellip;" aria-label="Search products">
+        <button type="submit" class="btn btn--sm">Search</button>
+        <?php if ($searchQuery !== ''): ?><a class="shopsearch__clear" href="<?= e(url('shop') . ($activeCategoryId > 0 ? '?category=' . (int) $activeCategoryId : '')) ?>">Clear</a><?php endif; ?>
+      </form>
+    <?php endif; ?>
+
     <?php if (!$shopEnabled): ?>
       <div class="notice notice--warn"><p>The club shop is temporarily closed. Please check back soon.</p></div>
     <?php elseif (!$products): ?>
-      <div class="emptystate"><p>There are no products on sale right now.</p></div>
+      <div class="emptystate"><p><?= $searchQuery !== '' ? 'No products match your search.' : 'There are no products on sale right now.' ?></p></div>
     <?php else: ?>
       <div class="prodgrid">
         <?php foreach ($products as $product): ?>

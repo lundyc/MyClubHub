@@ -151,7 +151,7 @@ if ($product && !empty($product['preorder_close_at'])) {
                         <div class="col-md-4"><label class="form-label">Category</label>
                             <select class="form-select" name="category_id" required>
                                 <?php foreach ($categories as $c): ?>
-                                    <option value="<?= (int) $c['id'] ?>" <?= (int) ($product['category_id'] ?? 0) === (int) $c['id'] ? 'selected' : '' ?>><?= h((string) $c['name']) ?></option>
+                                    <option value="<?= (int) $c['id'] ?>" <?= (int) ($product['category_id'] ?? 0) === (int) $c['id'] ? 'selected' : '' ?>><?= (int) ($c['parent_id'] ?? 0) > 0 ? '— ' : '' ?><?= h((string) $c['name']) ?></option>
                                 <?php endforeach; ?>
                             </select></div>
                         <div class="col-md-8"><label class="form-label">Slug <span class="text-muted small">(optional)</span></label>
@@ -184,7 +184,7 @@ if ($product && !empty($product['preorder_close_at'])) {
                 <section class="card hub-panel p-3 mb-3">
                     <h2 class="h6 fw-bold text-uppercase text-muted">Pre-order</h2>
                     <div class="form-check mb-2">
-                        <input class="form-check-input" type="checkbox" id="p_preorder" name="is_preorder" value="1" <?= (int) ($product['is_preorder'] ?? 1) === 1 ? 'checked' : '' ?>>
+                        <input class="form-check-input" type="checkbox" id="p_preorder" name="is_preorder" value="1" <?= (int) ($product['is_preorder'] ?? 0) === 1 ? 'checked' : '' ?>>
                         <label class="form-check-label" for="p_preorder">This is a pre-order item (pay now, made by VSN, collected later)</label>
                     </div>
                     <div class="row g-2">

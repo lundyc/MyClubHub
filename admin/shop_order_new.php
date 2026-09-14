@@ -69,7 +69,8 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
             $order = shop_create_order($pdo, ['name' => $value('name'), 'email' => $value('email'), 'phone' => $value('phone'),
                 'note' => 'Manual order. Payment method: ' . str_replace('_', ' ', $payment) . ".\n" . $value('note'), 'marketing_opt_in' => false], $lines,
                 ['discount_code' => $value('discount_code'), 'manual_credit' => $value('manual_credit', '0'), 'credit_reason' => $value('credit_reason'),
-                 'fulfilment_method' => $delivery ? 'delivery' : 'collection', 'delivery_address' => $value('delivery_address')]);
+                 'fulfilment_method' => $delivery ? 'delivery' : 'collection', 'delivery_address' => $value('delivery_address'),
+                 'requested_date' => $value('requested_date')]);
             $_SESSION['shop_manual_saved'][$nonce] = (int) $order['id'];
             $_SESSION['shop_manual_saved'] = array_slice($_SESSION['shop_manual_saved'], -20, null, true);
             $_SESSION['shop_manual_nonce'] = bin2hex(random_bytes(24));
@@ -96,14 +97,17 @@ require __DIR__ . '/header.php';
 <button class="btn btn-outline-secondary align-self-start" type="button" id="add-item">Add another item</button>
 <div class="row g-3 mt-2">
 <label class="col-md-4">Payment method<select class="form-select" name="payment_method"><?php foreach (['bank_transfer' => 'Bank transfer', 'cash' => 'Cash', 'other' => 'Other'] as $key => $label): ?><option value="<?= $key ?>" <?= $value('payment_method', 'bank_transfer') === $key ? 'selected' : '' ?>><?= $label ?></option><?php endforeach; ?></select></label>
-<label class="col-md-4">Discount code (optional)<input class="form-control" name="discount_code" maxlength="40" value="<?= h($value('discount_code')) ?>"><a href="/admin/shop_settings.php#discount-codes" target="_blank" rel="noopener">Manage discount codes</a></label>
+<label class="col-md-4">Discount code (optional)<input class="form-control" name="discount_code" maxlength="40" value="<?= h($value('discount_code')) ?>"><a href="/admin/shop_discount_codes.php" target="_blank" rel="noopener">Manage discount codes</a></label>
 <label class="col-md-4">Credit / adjustment (£)<input class="form-control" type="number" min="0" step="0.01" name="manual_credit" value="<?= h($value('manual_credit', '0')) ?>" required></label>
 <label class="col-12">Credit reason<input class="form-control" name="credit_reason" value="<?= h($value('credit_reason')) ?>" placeholder="e.g. £10 owed from a previous sale"><span class="form-text">Deducted after any discount code. This records the credit on this order; it does not change the previous sale.</span></label>
 <label class="col-md-4">Fulfilment<select class="form-select" name="fulfilment_method"><option value="collection">Collection</option><?php if (shop_delivery_enabled($pdo)): ?><option value="delivery" <?= $value('fulfilment_method') === 'delivery' ? 'selected' : '' ?>>Delivery (<?= gbp(shop_delivery_fee($pdo)) ?>)</option><?php endif; ?></select></label>
 <label class="col-md-8">Delivery address (if delivering)<textarea class="form-control" name="delivery_address"><?= h($value('delivery_address')) ?></textarea></label>
+<?php if (shop_scheduling_enabled($pdo)): ?>
+<label class="col-md-4">Requested date <span class="text-muted small">(optional)</span><input class="form-control" type="date" name="requested_date" value="<?= h($value('requested_date')) ?>"><span class="form-text">Not restricted to the storefront's available dates — set whatever was agreed with the customer.</span></label>
+<?php endif; ?>
 <label class="col-12">Order note<textarea class="form-control" name="note"><?= h($value('note')) ?></textarea></label>
 </div>
-<p class="text-muted mt-3">Orders are saved as pending payment. Open the order and mark it paid once the bank transfer or cash is received. Stock is deducted when marked paid.</p>
+<p class="text-muted mt-3">Orders are saved as pending payment, with stock reserved immediately. Open the order and mark it paid once the bank transfer or cash is received.</p>
 <?php if ($preview && !$error): ?>
 <section class="alert alert-info mt-3" id="order-preview"><h2 class="h5">Review order</h2>
 <?php foreach ($preview['lines'] as $line): ?><div><?= h($line['product_name'] . ' — ' . $line['options_label']) ?> × <?= (int) $line['quantity'] ?>: <?= gbp($line['unit_price'] * $line['quantity']) ?></div><?php endforeach; ?>

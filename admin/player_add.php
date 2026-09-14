@@ -11,6 +11,10 @@ $playerEditCssVersion = (string) filemtime(__DIR__ . '/assets/css/player_edit.cs
 $playerStatusCardsJsVersion = (string) filemtime(__DIR__ . '/assets/js/player_status_cards.js');
 echo '<link rel="stylesheet" href="/admin/assets/css/player_edit.css?v=' . h($playerEditCssVersion) . '">';
 echo '<script src="/admin/assets/js/player_status_cards.js?v=' . h($playerStatusCardsJsVersion) . '" defer></script>';
+$prefillName = trim((string) ($_GET['name'] ?? ''));
+$prefillStatus = in_array((string) ($_GET['status'] ?? ''), ['trialist', 'current', 'left', 'retired', 'loan', 'injured'], true)
+          ? (string) $_GET['status']
+          : 'current';
 
 // Sponsors active in the selected season
 $seasonId = getSelectedSeasonId($pdo);
@@ -36,7 +40,7 @@ unset($_SESSION['flash_toast']);
                                         <?= csrf_field() ?>
                                         <div class="mb-3">
                                                   <label class="form-label" for="playerNameAdd">Name</label>
-                                                  <input type="text" class="form-control" id="playerNameAdd" name="name" value="" autocomplete="name" required>
+                                                  <input type="text" class="form-control" id="playerNameAdd" name="name" value="<?= htmlspecialchars($prefillName) ?>" autocomplete="name" required>
                                         </div>
                                         <div class="mb-3">
                                                   <label class="form-label" for="playerDobAdd">Date of birth</label>
@@ -55,7 +59,7 @@ unset($_SESSION['flash_toast']);
                                                                       'injured' => 'Injured'
                                                             ];
                                                             foreach ($statuses as $val => $label): ?>
-                                                                      <button type="button" class="player-status-card <?= $val === 'current' ? 'active' : '' ?>" data-status="<?= $val ?>">
+                                                                      <button type="button" class="player-status-card <?= $val === $prefillStatus ? 'active' : '' ?>" data-status="<?= $val ?>">
                                                                                 <span class="player-status-card-label"><?= htmlspecialchars($label) ?></span>
                                                                                 <span class="player-status-card-meta"><?php if ($val === 'trialist'): ?>Trial start<?php elseif ($val === 'current'): ?>Signed in<?php elseif ($val === 'left'): ?>Left date<?php elseif ($val === 'retired'): ?>Retired on<?php elseif ($val === 'loan'): ?>On loan<?php else: ?>Injured<?php endif; ?></span>
                                                                       </button>
@@ -67,7 +71,7 @@ unset($_SESSION['flash_toast']);
                                                             <div class="player-status-summary-row"><span>Left</span><strong id="playerStatusSummaryLeft">—</strong></div>
                                                             <div class="player-status-summary-row"><span>Active squad</span><strong id="playerStatusSummaryActive">Yes</strong></div>
                                                   </div>
-                                                  <input type="hidden" name="status" id="playerStatusAdd" value="current">
+                                                  <input type="hidden" name="status" id="playerStatusAdd" value="<?= htmlspecialchars($prefillStatus) ?>">
                                                   <input type="hidden" name="joined_at" id="playerJoinedAdd" value="">
                                                   <input type="hidden" name="left_at" id="playerLeftAdd" value="">
                                                   <div id="playerActiveAddHidden">

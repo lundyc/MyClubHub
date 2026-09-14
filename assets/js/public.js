@@ -7,10 +7,32 @@
 
   /* Sticky header condense ---------------------------------------------------*/
   if (doc.querySelector(".site-header")) {
-    var onScroll = function () {
-      doc.body.classList.toggle("is-stuck", window.scrollY > 10);
+    /* Hysteresis (different on/off thresholds) stops the class flapping when
+       scrollY hovers near a single value — e.g. while momentum-scrolling on
+       mobile, or when the browser's address bar hide/show nudges the
+       viewport, which otherwise made the header repeatedly grow/shrink
+       ("shake") right at the boundary. rAF-throttled so we test at most
+       once per frame instead of on every scroll event. */
+    var stuck = false;
+    var ticking = false;
+    var applyScroll = function () {
+      ticking = false;
+      var y = window.scrollY;
+      if (!stuck && y > 40) {
+        stuck = true;
+        doc.body.classList.add("is-stuck");
+      } else if (stuck && y < 10) {
+        stuck = false;
+        doc.body.classList.remove("is-stuck");
+      }
     };
-    onScroll();
+    var onScroll = function () {
+      if (!ticking) {
+        ticking = true;
+        window.requestAnimationFrame(applyScroll);
+      }
+    };
+    applyScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
   }
 

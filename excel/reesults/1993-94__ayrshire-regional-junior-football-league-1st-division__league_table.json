@@ -1,0 +1,142 @@
+{
+  "season": "1993-94",
+  "season_full": "1993-1994",
+  "competition": "Ayrshire Regional Junior Football League - 1st Division",
+  "source": "tables 1891 to 2014.xlsx",
+  "source_sheet": "1991-2002",
+  "source_status_note": "TABLE MATHEMATICALLY SOUND",
+  "league_table": [
+    {
+      "position": 1,
+      "team": "Irvine Meadow XI",
+      "played": 20,
+      "won": 14,
+      "drawn": 3,
+      "lost": 3,
+      "goals_for": 63,
+      "goals_against": 28,
+      "goal_difference": 35,
+      "points": 31
+    },
+    {
+      "position": 2,
+      "team": "Auchinleck Talbot",
+      "played": 20,
+      "won": 14,
+      "drawn": 2,
+      "lost": 4,
+      "goals_for": 59,
+      "goals_against": 24,
+      "goal_difference": 35,
+      "points": 30
+    },
+    {
+      "position": 3,
+      "team": "Beith",
+      "played": 20,
+      "won": 12,
+      "drawn": 2,
+      "lost": 6,
+      "goals_for": 61,
+      "goals_against": 28,
+      "goal_difference": 33,
+      "points": 26
+    },
+    {
+      "position": 4,
+      "team": "Kilwinning Rangers",
+      "played": 20,
+      "won": 10,
+      "drawn": 6,
+      "lost": 4,
+      "goals_for": 51,
+      "goals_against": 29,
+      "goal_difference": 22,
+      "points": 26
+    },
+    {
+      "position": 5,
+      "team": "Ardrossan Winton Rovers",
+      "played": 20,
+      "won": 10,
+      "drawn": 4,
+      "lost": 6,
+      "goals_for": 39,
+      "goals_against": 33,
+      "goal_difference": 6,
+      "points": 24
+    },
+    {
+      "position": 6,
+      "team": "Glenafton Athletic",
+      "played": 20,
+      "won": 10,
+      "drawn": 3,
+      "lost": 7,
+      "goals_for": 52,
+      "goals_against": 31,
+      "goal_difference": 21,
+      "points": 23
+    },
+    {
+      "position": 7,
+      "team": "Maybole",
+      "played": 20,
+      "won": 8,
+      "drawn": 3,
+      "lost": 9,
+      "goals_for": 37,
+      "goals_against": 48,
+      "goal_difference": -11,
+      "points": 19
+    },
+    {
+      "position": 8,
+      "team": "Kilbirnie Ladeside",
+      "played": 20,
+      "won": 5,
+      "drawn": 8,
+      "lost": 7,
+      "goals_for": 27,
+      "goals_against": 26,
+      "goal_difference": 1,
+      "points": 18
+    },
+    {
+      "position": 9,
+      "team": "Cumnock",
+      "played": 20,
+      "won": 5,
+      "drawn": 2,
+      "lost": 13,
+      "goals_for": 29,
+      "goals_against": 47,
+      "goal_difference": -18,
+      "points": 12
+    },
+    {
+      "position": 10,
+      "team": "Saltcoats Victoria",
+      "played": 20,
+      "won": 3,
+      "drawn": 1,
+      "lost": 16,
+      "goals_for": 23,
+      "goals_against": 88,
+      "goal_difference": -65,
+      "points": 7
+    },
+    {
+      "position": 11,
+      "team": "Kello Rovers",
+      "played": 20,
+      "won": 1,
+      "drawn": 2,
+      "lost": 17,
+      "goals_for": 26,
+      "goals_against": 85,
+      "goal_difference": -59,
+      "points": 4
+    }
+  ]
+}

@@ -88,8 +88,15 @@ set_meta(['title' => 'Order ' . (string) $order['order_ref']]);
             <?php else: ?>
               <li>Collect from <strong><?= e($collectionPoint) ?></strong>. There is no delivery option.</li>
             <?php endif; ?>
+            <?php if (!empty($order['requested_date'])): ?>
+              <li><?= (string) ($order['fulfilment_method'] ?? 'collection') === 'delivery' ? 'Requested delivery date' : 'Requested collection date' ?>: <strong><?= e((new DateTimeImmutable((string) $order['requested_date']))->format('l j F Y')) ?></strong></li>
+            <?php endif; ?>
           </ul>
-          <?php if ((string) ($order['fulfilment_method'] ?? 'collection') !== 'delivery' && ($settings['collection_details'] ?? '') !== ''): ?><p class="pdp__note"><?= e((string) $settings['collection_details']) ?></p><?php endif; ?>
+          <?php if ((string) ($order['fulfilment_method'] ?? 'collection') !== 'delivery'): ?>
+            <?php if (($settings['collection_address'] ?? '') !== ''): ?><p class="pdp__note"><span style="white-space:pre-line"><?= e((string) $settings['collection_address']) ?></span></p><?php endif; ?>
+            <?php if (($settings['collection_details'] ?? '') !== ''): ?><p class="pdp__note"><?= e((string) $settings['collection_details']) ?></p><?php endif; ?>
+            <?php if (($settings['collection_map_url'] ?? '') !== ''): ?><p class="pdp__note"><a class="btn btn--ghost btn--sm" href="<?= e((string) $settings['collection_map_url']) ?>" target="_blank" rel="noopener">Get directions</a></p><?php endif; ?>
+          <?php endif; ?>
         <?php endif; ?>
 
         <p style="margin-top:1.4rem"><a class="btn btn--ghost btn--sm" href="<?= e(url('shop')) ?>">Back to the shop</a></p>

@@ -327,6 +327,22 @@ function comet_report_parse(string $text): array
         }
     }
 
+    // --- Penalty shootout ---------------------------------------------------
+    // COMET prints "Home 3:3 (PEN 4:2) Away" — the shootout score sits right
+    // after the full-time score, in the same home:away order. It's extracted
+    // independently of the score regexes above (rather than folded into
+    // them) so a drawn-then-decided-on-penalties match can't have its PEN
+    // score mistaken for the match score by the generic N:N scanner: the
+    // full-time score always appears first in reading order, so that scanner
+    // already lands on the right pair on its own, and this just captures the
+    // shootout score separately.
+    $homePenalties = null;
+    $awayPenalties = null;
+    if (preg_match('/\(\s*PEN\s+(\d{1,2})\s*:\s*(\d{1,2})\s*\)/i', $scoreHaystack, $pm)) {
+        $homePenalties = (int) $pm[1];
+        $awayPenalties = (int) $pm[2];
+    }
+
     // --- Meta (competition / round / date / kickoff) -------------------------
     $competition = '';
     if (preg_match('/Match report\s*\n\s*(.+)/i', $text, $m)) {
@@ -362,7 +378,7 @@ function comet_report_parse(string $text): array
     $goalsBlock = comet_report_section(
         $text,
         ['GOALS'],
-        ['DISCIPLINARY', 'SUBSTITUTIONS', 'YELLOW CARDS', 'RED CARDS', 'My Scottish Football', 'COMET -', 'Match report:', 'PLAYED', 'Printed by']
+        ['PENALTY SHOOTOUT', 'DISCIPLINARY', 'SUBSTITUTIONS', 'YELLOW CARDS', 'RED CARDS', 'My Scottish Football', 'COMET -', 'Match report:', 'PLAYED', 'Printed by']
     );
     $goals = [];
     foreach (comet_report_split_on_minute($goalsBlock) as $chunk) {
@@ -424,6 +440,7 @@ function comet_report_parse(string $text): array
         'home_team' => $homeTeam,
         'away_team' => $awayTeam,
         'score' => [$homeGoals, $awayGoals],
+        'penalties' => ($homePenalties !== null && $awayPenalties !== null) ? [$homePenalties, $awayPenalties] : null,
         'competition' => $competition,
         'stage' => $stage,
         'match_date' => $matchDate,
@@ -605,6 +622,7 @@ function comet_report_resolve(array $parsed, PDO $pdo, array $fixture, array $ma
         'stage' => (string) $parsed['stage'],
         'match_date' => (string) $parsed['match_date'],
         'score' => ['svfc' => null, 'opponent' => null],
+        'penalties' => ['svfc' => null, 'opponent' => null],
         'starters' => [],
         'captain' => null,
         'captain_raw' => '',
@@ -779,6 +797,11 @@ function comet_report_resolve(array $parsed, PDO $pdo, array $fixture, array $ma
         $result['score']['opponent'] = $homeIsUs ? (int) $awayScore : (int) $homeScore;
     } else {
         $result['warnings'][] = 'No full-time score could be read from the report.';
+    }
+    if ($parsed['penalties'] !== null) {
+        [$homePens, $awayPens] = $parsed['penalties'];
+        $result['penalties']['svfc'] = $homeIsUs ? (int) $homePens : (int) $awayPens;
+        $result['penalties']['opponent'] = $homeIsUs ? (int) $awayPens : (int) $homePens;
     }
 
     // --- Starting XI -----------------------------------------------------------

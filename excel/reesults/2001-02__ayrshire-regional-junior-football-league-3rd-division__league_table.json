@@ -1,0 +1,106 @@
+{
+  "season": "2001-02",
+  "season_full": "2001-2002",
+  "competition": "Ayrshire Regional Junior Football League - 3rd Division",
+  "source": "tables 1891 to 2014.xlsx",
+  "source_sheet": "1991-2002",
+  "source_status_note": "TABLE MATHEMATICALLY UNSOUND",
+  "league_table": [
+    {
+      "position": 1,
+      "team": "Dalry Thistle",
+      "played": 21,
+      "won": 15,
+      "drawn": 2,
+      "lost": 4,
+      "goals_for": 49,
+      "goals_against": 25,
+      "goal_difference": 24,
+      "points": 47
+    },
+    {
+      "position": 2,
+      "team": "Maybole",
+      "played": 21,
+      "won": 13,
+      "drawn": 5,
+      "lost": 3,
+      "goals_for": 56,
+      "goals_against": 26,
+      "goal_difference": 30,
+      "points": 44
+    },
+    {
+      "position": 3,
+      "team": "Ardrossan Winton Rovers",
+      "played": 21,
+      "won": 10,
+      "drawn": 4,
+      "lost": 7,
+      "goals_for": 43,
+      "goals_against": 41,
+      "goal_difference": 2,
+      "points": 34
+    },
+    {
+      "position": 4,
+      "team": "Saltcoats Victoria",
+      "played": 21,
+      "won": 10,
+      "drawn": 3,
+      "lost": 8,
+      "goals_for": 50,
+      "goals_against": 38,
+      "goal_difference": 12,
+      "points": 33
+    },
+    {
+      "position": 5,
+      "team": "Whitletts Victoria",
+      "played": 21,
+      "won": 10,
+      "drawn": 2,
+      "lost": 9,
+      "goals_for": 50,
+      "goals_against": 54,
+      "goal_difference": -4,
+      "points": 32
+    },
+    {
+      "position": 6,
+      "team": "Ardeer Thistle",
+      "played": 21,
+      "won": 6,
+      "drawn": 4,
+      "lost": 11,
+      "goals_for": 35,
+      "goals_against": 56,
+      "goal_difference": -21,
+      "points": 22
+    },
+    {
+      "position": 7,
+      "team": "Annbank United",
+      "played": 21,
+      "won": 4,
+      "drawn": 4,
+      "lost": 13,
+      "goals_for": 36,
+      "goals_against": 54,
+      "goal_difference": -18,
+      "points": 16
+    },
+    {
+      "position": 8,
+      "team": "Darvel",
+      "played": 21,
+      "won": 2,
+      "drawn": 4,
+      "lost": 15,
+      "goals_for": 25,
+      "goals_against": 61,
+      "goal_difference": -36,
+      "points": 10
+    }
+  ]
+}

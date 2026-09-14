@@ -1,28 +1,85 @@
 <?php
-/** Route: /table — full league standings (read from the Hub's WOSFL cache). */
+/**
+ * Route: /table — league standings, with a season picker.
+ * The current season reads the Hub's live WOSFL cache; any other season
+ * reads whatever standings an admin pasted into league_table_history.
+ */
 declare(strict_types=1);
 
-$table = pub_league_table();
-$config = pub_league_config();
+$seasons = pub_league_table_seasons();
+$currentSeasonId = pub_current_season_id();
+$seasonId = (int) ($_GET['season'] ?? 0);
+$validSeasonIds = array_map(static fn (array $s): int => (int) $s['id'], $seasons);
+if ($seasonId <= 0 || !in_array($seasonId, $validSeasonIds, true)) {
+    $seasonId = $currentSeasonId;
+}
+$isCurrent = $seasonId === $currentSeasonId;
+$recentSeasonIds = array_slice($validSeasonIds, 0, 2); // $seasons is ordered newest-first
+$showBadges = in_array($seasonId, $recentSeasonIds, true);
+
+// $validSeasonIds is newest-first, so the next index back is an older season
+// and the previous index is a newer one.
+$seasonIndex = array_search($seasonId, $validSeasonIds, true);
+$olderSeasonId = $seasonIndex !== false ? ($validSeasonIds[$seasonIndex + 1] ?? null) : null;
+$newerSeasonId = $seasonIndex !== false && $seasonIndex > 0 ? ($validSeasonIds[$seasonIndex - 1] ?? null) : null;
+
+$table = pub_league_table_for_season($seasonId);
 $rowCount = count($table['rows']);
 
 set_meta([
     'title' => 'League table',
-    'description' => $config['title'] . ' standings.',
+    'description' => $table['title'] . ' standings.',
 ]);
 ?>
 <?php partial('page_hero', [
     'eyebrow' => 'First team',
-    'title'   => $config['title'],
+    'title'   => $table['title'],
     'sub'     => $table['updated'] ? 'Updated ' . format_date(date('Y-m-d', $table['updated']), 'j M Y') : '',
 ]); ?>
 
 <div class="page">
   <div class="container">
+    <?php if (count($seasons) > 1): ?>
+      <div class="fxfilters tablebar no-print">
+        <form method="get" action="<?= e(url('table')) ?>" class="tablebar__seasonpick">
+          <?php if ($newerSeasonId): ?>
+            <a class="tablebar__nav" href="<?= e(url('table') . '?season=' . $newerSeasonId) ?>" aria-label="Newer season">&#8249;</a>
+          <?php else: ?>
+            <span class="tablebar__nav tablebar__nav--disabled" aria-hidden="true">&#8249;</span>
+          <?php endif; ?>
+          <label>
+            <span>Season</span>
+            <select name="season" onchange="this.form.submit()">
+              <?php foreach ($seasons as $s): ?>
+                <option value="<?= (int) $s['id'] ?>" <?= (int) $s['id'] === $seasonId ? 'selected' : '' ?>><?= e($s['name']) ?><?= (int) $s['id'] === $currentSeasonId ? ' (current)' : '' ?></option>
+              <?php endforeach; ?>
+            </select>
+          </label>
+          <?php if ($olderSeasonId): ?>
+            <a class="tablebar__nav" href="<?= e(url('table') . '?season=' . $olderSeasonId) ?>" aria-label="Older season">&#8250;</a>
+          <?php else: ?>
+            <span class="tablebar__nav tablebar__nav--disabled" aria-hidden="true">&#8250;</span>
+          <?php endif; ?>
+          <noscript><button type="submit">Go</button></noscript>
+        </form>
+        <div class="tablebar__actions">
+          <a class="btn btn--sm btn--ghost" href="<?= e(url('table/pdf') . '?season=' . $seasonId) ?>" target="_blank" rel="noopener" aria-label="Download as PDF" title="Download as PDF">PDF</a>
+          <button type="button" class="btn btn--sm btn--ghost" onclick="window.print()" aria-label="Print table" title="Print table">Print</button>
+        </div>
+      </div>
+      <style media="print">
+        .site-header, .primary-nav, .site-footer, .no-print { display: none !important; }
+      </style>
+    <?php endif; ?>
+
     <?php if (!$table['ok']): ?>
       <div class="emptystate">
-        <p>The league table isn't available right now.</p>
-        <p><a class="btn btn--sm" href="<?= e($table['url']) ?>" target="_blank" rel="noopener">View on WOSFL</a></p>
+        <?php if ($isCurrent): ?>
+          <p>The league table isn't available right now.</p>
+          <p><a class="btn btn--sm" href="<?= e($table['url']) ?>" target="_blank" rel="noopener">View on WOSFL</a></p>
+        <?php else: ?>
+          <p>No table has been recorded for this season yet.</p>
+        <?php endif; ?>
       </div>
     <?php else: ?>
       <div class="tablewrap">
@@ -42,9 +99,9 @@ set_meta([
               $pos = (int) ($row['pos'] ?: $i + 1);
               $isUs = pub_league_is_us($row);
               $zone = '';
-              if ($config['promotion'] > 0 && $pos <= $config['promotion']) {
+              if ($table['promotion'] > 0 && $pos <= $table['promotion']) {
                   $zone = 'promo';
-              } elseif ($config['relegation'] > 0 && $pos > $rowCount - $config['relegation']) {
+              } elseif ($table['relegation'] > 0 && $pos > $rowCount - $table['relegation']) {
                   $zone = 'releg';
               }
               $logo = trim((string) ($row['logo'] ?? ''));
@@ -52,7 +109,7 @@ set_meta([
               <tr class="<?= $isUs ? 'is-us' : '' ?> <?= $zone ? 'zone-' . $zone : '' ?>">
                 <td class="c"><?= $pos ?></td>
                 <td class="club">
-                  <?php if ($logo !== ''): ?><img src="/<?= e(ltrim($logo, '/')) ?>" alt="" loading="lazy"><?php endif; ?>
+                  <?php if ($logo !== '' && $showBadges): ?><img src="/<?= e(ltrim($logo, '/')) ?>" alt="" loading="lazy"><?php endif; ?>
                   <span><?= e($row['club'] ?? '') ?></span>
                 </td>
                 <td class="c"><?= e($row['p'] ?? '') ?></td>
@@ -75,9 +132,9 @@ set_meta([
       </div>
 
       <div class="tablekey">
-        <?php if ($config['promotion'] > 0): ?><span><i class="sw sw--promo"></i> Promotion</span><?php endif; ?>
-        <?php if ($config['relegation'] > 0): ?><span><i class="sw sw--releg"></i> Relegation</span><?php endif; ?>
-        <a href="<?= e($table['url']) ?>" target="_blank" rel="noopener">Full standings on WOSFL →</a>
+        <?php if ($table['promotion'] > 0): ?><span><i class="sw sw--promo"></i> Promotion</span><?php endif; ?>
+        <?php if ($table['relegation'] > 0): ?><span><i class="sw sw--releg"></i> Relegation</span><?php endif; ?>
+        <?php if ($isCurrent): ?><a href="<?= e($table['url']) ?>" target="_blank" rel="noopener">Full standings on WOSFL →</a><?php endif; ?>
       </div>
     <?php endif; ?>
   </div>

@@ -51,8 +51,14 @@ foreach ($tokenMap as $name => $value) {
 <?php if (meta('jsonld') !== ''): ?><script type="application/ld+json"><?= meta('jsonld') /* json_encode output, slashes escaped */ ?></script><?php endif; ?>
 <script src="<?= e(asset('js/public.js')) ?>" defer></script>
 <?php if (club('ga_measurement_id') !== ''): ?>
+<script>
+window.dataLayer=window.dataLayer||[];
+function gtag(){dataLayer.push(arguments);}
+/* Analytics storage stays denied until the visitor accepts the cookie banner (see site_footer.php). */
+gtag('consent','default',{'analytics_storage':'denied'});
+</script>
 <script async src="https://www.googletagmanager.com/gtag/js?id=<?= e(club('ga_measurement_id')) ?>"></script>
-<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','<?= e(club('ga_measurement_id')) ?>');</script>
+<script>gtag('js',new Date());gtag('config','<?= e(club('ga_measurement_id')) ?>');</script>
 <?php endif; ?>
 </head>
 <body>

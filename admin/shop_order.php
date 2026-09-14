@@ -9,8 +9,10 @@ require_once __DIR__ . '/lib/functions.php';
 require_once __DIR__ . '/lib/shop.php';
 require_once __DIR__ . '/account_auth.php';
 require_once __DIR__ . '/lib/audit.php';
+require_once __DIR__ . '/lib/invoices.php';
 
 shop_ensure_schema($pdo);
+invoices_ensure_schema($pdo);
 $isAdmin = hub_auth_is_admin();
 $id = (int) ($_GET['id'] ?? $_POST['id'] ?? 0);
 
@@ -56,6 +58,13 @@ if ($isAdmin && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
             shop_refund_order($pdo, $id, $amount, (string) ($_POST['reason'] ?? ''));
             auditLog($pdo, 'shop_order_refunded', 'Shop order #' . $id . ' refunded ' . gbp($amount));
             $m = 'Refund of ' . gbp($amount) . ' processed.';
+        } elseif ($action === 'generate_invoice') {
+            $currentAdmin = hub_auth_current_user();
+            $currentAdminLabel = (string) ($currentAdmin['display_name'] ?? $currentAdmin['username'] ?? $currentAdmin['email'] ?? '');
+            $result = invoices_generate_for_shop_order($pdo, $id, $currentAdminLabel);
+            if ($result['errors']) { throw new RuntimeException(implode(' ', $result['errors'])); }
+            auditLog($pdo, 'invoice_generated', 'Generated invoice for shop order #' . $id);
+            $m = 'Invoice generated.';
         } else {
             $m = '';
         }
@@ -126,6 +135,7 @@ function shop_status_badge(string $status): string
         <div class="col-lg-7">
             <section class="card hub-panel p-3 mb-3">
                 <h2 class="h6 fw-bold text-uppercase text-muted">Items</h2>
+                <div class="table-responsive">
                 <table class="table align-middle mb-0">
                     <tbody>
                     <?php foreach ($items as $it): ?>
@@ -150,6 +160,7 @@ function shop_status_badge(string $status): string
                         <?php endif; ?>
                     </tfoot>
                 </table>
+                </div>
             </section>
 
             <section class="card hub-panel p-3">
@@ -213,6 +224,9 @@ function shop_status_badge(string $status): string
                     <p class="mb-1 small"><strong>Fulfilment:</strong> Collection only</p>
                     <p class="mb-0 small"><strong>Collection point:</strong> <?= h((string) $order['collection_point']) ?></p>
                 <?php endif; ?>
+                <?php if (!empty($order['requested_date'])): ?>
+                    <p class="mb-0 small mt-1"><strong><?= (string) ($order['fulfilment_method'] ?? 'collection') === 'delivery' ? 'Requested delivery date' : 'Requested collection date' ?>:</strong> <?= h((new DateTimeImmutable((string) $order['requested_date']))->format('l j F Y')) ?></p>
+                <?php endif; ?>
                 <?php if (($order['batch_note'] ?? '') !== ''): ?><p class="mb-0 small text-muted mt-1"><?= h((string) $order['batch_note']) ?></p><?php endif; ?>
                 <p class="mt-2 mb-0 small"><a href="/shop/order/<?= h((string) $order['access_token']) ?>" target="_blank" rel="noopener">Customer confirmation page ↗</a></p>
             </section>
@@ -251,6 +265,10 @@ function shop_status_badge(string $status): string
                         </form>
                     <?php endif; ?>
                 </div>
+            </section>
+
+            <section class="card hub-panel p-3 mb-3">
+                <?= invoices_render_admin_section(invoices_list_for_source($pdo, 'shop_order', $id), '<form method="post">' . csrf_field() . '<input type="hidden" name="action" value="generate_invoice"><input type="hidden" name="id" value="' . $id . '"><button type="submit" class="btn btn-outline-primary btn-sm">Generate invoice</button></form>') ?>
             </section>
 
             <?php if (in_array((string) $order['status'], ['paid', 'collected'], true) && !empty($order['stripe_payment_intent_id']) && $remainingRefund > 0): ?>

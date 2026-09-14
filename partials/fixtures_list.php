@@ -8,16 +8,20 @@ declare(strict_types=1);
 $mode = ($mode ?? 'upcoming') === 'results' ? 'results' : 'upcoming';
 
 $seasons = pub_seasons();
-$seasonId = (int) ($_GET['season'] ?? 0) ?: pub_current_season_id();
-$validSeason = false;
-foreach ($seasons as $s) {
-    if ((int) $s['id'] === $seasonId) {
-        $validSeason = true;
-        break;
+$seasonParam = trim((string) ($_GET['season'] ?? ''));
+$seasonAll = strtolower($seasonParam) === 'all';
+$seasonId = $seasonAll ? 0 : ((int) $seasonParam ?: pub_current_season_id());
+if (!$seasonAll) {
+    $validSeason = false;
+    foreach ($seasons as $s) {
+        if ((int) $s['id'] === $seasonId) {
+            $validSeason = true;
+            break;
+        }
     }
-}
-if (!$validSeason) {
-    $seasonId = pub_current_season_id();
+    if (!$validSeason) {
+        $seasonId = pub_current_season_id();
+    }
 }
 
 $competitions = pub_competitions_in_season($seasonId);
@@ -34,9 +38,9 @@ $rows = pub_fixtures([
 $byMonth = pub_fixtures_by_month($rows);
 
 $base = url($mode === 'results' ? 'results' : 'fixtures');
-$qs = static function (array $overrides) use ($seasonId, $competition): string {
+$qs = static function (array $overrides) use ($seasonId, $seasonAll, $competition): string {
     $params = array_filter([
-        'season' => $seasonId,
+        'season' => $seasonAll ? 'all' : $seasonId,
         'competition' => $competition,
     ] + $overrides, static fn ($v) => $v !== '' && $v !== null);
     return $params ? '?' . http_build_query($params) : '';
@@ -52,8 +56,9 @@ $qs = static function (array $overrides) use ($seasonId, $competition): string {
       <label>
         <span>Season</span>
         <select name="season" onchange="this.form.submit()">
+          <option value="all" <?= $seasonAll ? 'selected' : '' ?>>All seasons</option>
           <?php foreach ($seasons as $s): ?>
-            <option value="<?= (int) $s['id'] ?>" <?= (int) $s['id'] === $seasonId ? 'selected' : '' ?>><?= e($s['name']) ?></option>
+            <option value="<?= (int) $s['id'] ?>" <?= !$seasonAll && (int) $s['id'] === $seasonId ? 'selected' : '' ?>><?= e($s['name']) ?></option>
           <?php endforeach; ?>
         </select>
       </label>

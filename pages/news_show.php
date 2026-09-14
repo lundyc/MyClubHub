@@ -57,33 +57,39 @@ pub_jsonld([
   </header>
 
   <div class="container article__body">
-    <div class="article__main prose">
-      <?php if ($heroUrl !== '' && trim((string) $article['hero_caption']) !== ''): ?>
-        <p class="article__herocaption"><?= e($article['hero_caption']) ?></p>
-      <?php endif; ?>
+    <div class="article__layout<?= !empty($article['fixture_id']) ? ' article__layout--match' : '' ?>">
+      <div class="article__main prose">
+        <?php if ($heroUrl !== '' && trim((string) $article['hero_caption']) !== ''): ?>
+          <p class="article__herocaption"><?= e($article['hero_caption']) ?></p>
+        <?php endif; ?>
 
-      <?= $bodyHtml /* sanitised by news_purify() */ ?>
+        <?= $bodyHtml /* sanitised by news_purify() */ ?>
 
-      <?php if ($gallery): ?>
-        <div class="article__gallery" data-lightbox>
-          <?php foreach ($gallery as $img): ?>
-            <?php $gu = news_image_url((string) $img['file_path']); $gc = trim((string) $img['caption']); ?>
-            <figure>
-              <a class="article__gallery__item" href="<?= e($gu) ?>" data-full="<?= e($gu) ?>" data-caption="<?= e($gc) ?>">
-                <img src="<?= e($gu) ?>" alt="<?= e($gc) ?>" loading="lazy">
-              </a>
-              <?php if ($gc !== ''): ?><figcaption><?= e($gc) ?></figcaption><?php endif; ?>
-            </figure>
-          <?php endforeach; ?>
-        </div>
-        <?php partial('lightbox'); ?>
-      <?php endif; ?>
+        <?php if ($gallery): ?>
+          <div class="article__gallery" data-lightbox>
+            <?php foreach ($gallery as $img): ?>
+              <?php $gu = news_image_url((string) $img['file_path']); $gc = trim((string) $img['caption']); ?>
+              <figure>
+                <a class="article__gallery__item" href="<?= e($gu) ?>" data-full="<?= e($gu) ?>" data-caption="<?= e($gc) ?>">
+                  <img src="<?= e($gu) ?>" alt="<?= e($gc) ?>" loading="lazy">
+                </a>
+                <?php if ($gc !== ''): ?><figcaption><?= e($gc) ?></figcaption><?php endif; ?>
+              </figure>
+            <?php endforeach; ?>
+          </div>
+          <?php partial('lightbox'); ?>
+        <?php endif; ?>
+
+        <?php if (!empty($article['fixture_id'])): ?>
+          <p><a class="linkarrow" href="<?= e(url('match/' . (int) $article['fixture_id'])) ?>">Match centre</a></p>
+        <?php endif; ?>
+
+        <p class="article__back"><a class="linkarrow" href="<?= e(url('news')) ?>">All news</a></p>
+      </div>
 
       <?php if (!empty($article['fixture_id'])): ?>
-        <p><a class="linkarrow" href="<?= e(url('match/' . (int) $article['fixture_id'])) ?>">Match centre</a></p>
+        <?php partial('match_report_sidebar', ['fixture_id' => (int) $article['fixture_id']]); ?>
       <?php endif; ?>
-
-      <p class="article__back"><a class="linkarrow" href="<?= e(url('news')) ?>">All news</a></p>
     </div>
   </div>
 </article>

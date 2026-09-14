@@ -4,626 +4,668 @@ require_once __DIR__ . '/lib/functions.php';
 require_once __DIR__ . '/lib/match_sponsorship.php';
 require_once __DIR__ . '/lib/season.php';
 
-$seasonId = getSelectedSeasonId($pdo);
-$season = getSeasonById($pdo, $seasonId);
+/* --------------------------------------------------------------------------
+ * Season scope. The Hub header has its own season switcher (numeric ids); this
+ * page adds an "All seasons" mode via ?season_id=all so the whole match history
+ * (live + the merged results archive) can be browsed in one place.
+ * ---------------------------------------------------------------------- */
+$allSeasons = (($_GET['season_id'] ?? null) === 'all');
+$seasonId   = $allSeasons ? 0 : getSelectedSeasonId($pdo);
+$season     = $allSeasons ? null : getSeasonById($pdo, $seasonId);
+$seasons    = getSeasons($pdo);                       // start_date ASC
+$seasonsDesc = array_reverse($seasons);
+
+$isOpenSeason = !$allSeasons && $season !== null && (int) ($season['is_locked'] ?? 0) !== 1;
+$showSponsor  = $isOpenSeason;                        // sponsorship only tracked for the working season
 
 $pageHero = [
-          'eyebrow' => 'Fixture management',
-          'title' => 'Match Fixtures',
-          'subtitle' => 'Season: ' . ($season['name'] ?? 'Unknown'),
-          'actions' => [],
+    'eyebrow'  => 'Fixture management',
+    'title'    => 'Matches',
+    'subtitle' => $allSeasons ? 'All seasons' : ('Season: ' . ($season['name'] ?? 'Unknown')),
+    'actions'  => [],
 ];
 
 require_once __DIR__ . '/header.php';
 
 $fixtures = getMatchFixtures($pdo, $seasonId);
 
-$fixtureCount = count($fixtures);
-$activeMatchDay = 0;
-$activeMatchBall = 0;
-$activeMotm = 0;
-$totalDue = 0.0;
-$totalPaid = 0.0;
-$fixtureCards = [];
-foreach ($fixtures as $fixture) {
-          $rows = getMatchSponsorshipRows($pdo, (int)$fixture['id']);
-          $dayRow = null;
-          $ballRow = null;
-          $motmRow = null;
-          foreach ($rows as $row) {
-                    if ((int)($row['is_complimentary'] ?? 0) !== 1) {
-                              $totalDue += (float)$row['amount'];
-                              $totalPaid += (float)$row['paid_total'];
-                    }
-                    if ($row['sponsorship_role'] === 'match_day') {
-                              $activeMatchDay++;
-                              $dayRow = $row;
-                    }
-                    if ($row['sponsorship_role'] === 'match_ball') {
-                              $activeMatchBall++;
-                              $ballRow = $row;
-                    }
-                    if ($row['sponsorship_role'] === 'motm') {
-                              $activeMotm++;
-                              $motmRow = $row;
-                    }
-          }
-          $fixtureCards[] = [
-                    'fixture' => $fixture,
-                    'dayRow' => $dayRow,
-                    'ballRow' => $ballRow,
-                    'motmRow' => $motmRow,
-                    'hasSponsor' => $dayRow !== null || $ballRow !== null || $motmRow !== null,
-          ];
-}
-$outstanding = max(0, $totalDue - $totalPaid);
-
-$upcomingFixtureCards = [];
-$playedFixtureCards = [];
-foreach ($fixtureCards as $item) {
-          $fixtureStatusValue = strtolower(trim((string)($item['fixture']['status'] ?? '')));
-          if ($fixtureStatusValue === 'played') {
-                    $playedFixtureCards[] = $item;
-          } else {
-                    $upcomingFixtureCards[] = $item;
-          }
-}
-$playedFixtureCards = array_reverse($playedFixtureCards);
-
-$matchSponsorshipStateClass = static function (?array $row): string {
-          if ($row === null) {
-                    return 'is-available';
-          }
-          if ((int)($row['is_complimentary'] ?? 0) === 1) {
-                    return 'is-complimentary';
-          }
-
-          $amount = (float) ($row['amount'] ?? 0);
-          $paidTotal = (float) ($row['paid_total'] ?? 0);
-          if ($paidTotal <= 0.0001) {
-                    return 'is-unpaid';
-          }
-
-          return ($paidTotal + 0.0001) >= $amount ? 'is-paid' : 'is-partial';
-};
-
-$matchSponsorshipStateIcon = static function (?array $row): string {
-          if ($row === null) {
-                    return '<i class="fa-solid fa-minus" aria-hidden="true"></i>';
-          }
-          if ((int)($row['is_complimentary'] ?? 0) === 1) {
-                    return '<i class="fa-solid fa-gift" aria-hidden="true"></i>';
-          }
-
-          $amount = (float) ($row['amount'] ?? 0);
-          $paidTotal = (float) ($row['paid_total'] ?? 0);
-
-          if ($paidTotal <= 0.0001) {
-                    return '<i class="fa-solid fa-sterling-sign" aria-hidden="true"></i>';
-          }
-
-          return ($paidTotal + 0.0001) >= $amount
-                    ? '<i class="fa-solid fa-check" aria-hidden="true"></i>'
-                    : '<i class="fa-solid fa-circle-half-stroke" aria-hidden="true"></i>';
-};
-
-$matchSponsorshipStateLabel = static function (?array $row): string {
-          if ($row === null) {
-                    return 'Not assigned';
-          }
-          if ((int)($row['is_complimentary'] ?? 0) === 1) {
-                    return 'Complimentary / Free promotion';
-          }
-          $amount = (float)($row['amount'] ?? 0);
-          $paidTotal = (float)($row['paid_total'] ?? 0);
-          if ($paidTotal <= 0.0001) {
-                    return 'Assigned, not paid';
-          }
-          return ($paidTotal + 0.0001) >= $amount ? 'Paid' : 'Part paid';
+/* --------------------------------------------------------------------------
+ * Per-fixture view model (result from the club's perspective, sponsorship
+ * rollup only where it is meaningful).
+ * ---------------------------------------------------------------------- */
+$clubOutcome = static function (array $f): array {
+    $h = $f['full_time_home_score'];
+    $a = $f['full_time_away_score'];
+    $played = strtolower(trim((string) ($f['status'] ?? ''))) === 'played' || ($h !== null && $a !== null);
+    if (!$played || $h === null || $a === null) {
+        return ['played' => $played, 'outcome' => '', 'us' => null, 'them' => null];
+    }
+    $us   = $f['is_home'] ? (int) $h : (int) $a;
+    $them = $f['is_home'] ? (int) $a : (int) $h;
+    return [
+        'played'  => true,
+        'outcome' => $us > $them ? 'W' : ($us < $them ? 'L' : 'D'),
+        'us'      => $us,
+        'them'    => $them,
+    ];
 };
 
 $fixtureStatusClass = static function (string $status): string {
-          return match (strtolower(trim($status))) {
-                    'played', 'finished', 'complete', 'completed' => 'text-bg-success',
-                    'live', 'in_progress', 'in progress' => 'text-bg-danger',
-                    'postponed', 'delayed' => 'text-bg-warning',
-                    'cancelled', 'canceled', 'abandoned' => 'text-bg-dark',
-                    'scheduled', 'upcoming' => 'text-bg-primary',
-                    default => 'text-bg-secondary',
-          };
+    return match (strtolower(trim($status))) {
+        'played', 'finished', 'complete', 'completed' => 'text-bg-success',
+        'live', 'in_progress', 'in progress'          => 'text-bg-danger',
+        'postponed', 'delayed'                        => 'text-bg-warning',
+        'cancelled', 'canceled', 'abandoned'          => 'text-bg-dark',
+        'scheduled', 'upcoming'                       => 'text-bg-primary',
+        default                                       => 'text-bg-secondary',
+    };
 };
+
+$outcomeChipClass = static fn (string $o): string => match ($o) {
+    'W' => 'match-outcome match-outcome--w',
+    'D' => 'match-outcome match-outcome--d',
+    'L' => 'match-outcome match-outcome--l',
+    default => 'match-outcome',
+};
+
+// Sponsorship state helpers (only used when $showSponsor).
+$matchSponsorshipStateClass = static function (?array $row): string {
+    if ($row === null) {
+        return 'is-available';
+    }
+    if ((int) ($row['is_complimentary'] ?? 0) === 1) {
+        return 'is-complimentary';
+    }
+    $amount = (float) ($row['amount'] ?? 0);
+    $paid   = (float) ($row['paid_total'] ?? 0);
+    if ($paid <= 0.0001) {
+        return 'is-unpaid';
+    }
+    return ($paid + 0.0001) >= $amount ? 'is-paid' : 'is-partial';
+};
+$matchSponsorshipStateIcon = static function (?array $row): string {
+    if ($row === null) {
+        return '<i class="fa-solid fa-minus" aria-hidden="true"></i>';
+    }
+    if ((int) ($row['is_complimentary'] ?? 0) === 1) {
+        return '<i class="fa-solid fa-gift" aria-hidden="true"></i>';
+    }
+    $amount = (float) ($row['amount'] ?? 0);
+    $paid   = (float) ($row['paid_total'] ?? 0);
+    if ($paid <= 0.0001) {
+        return '<i class="fa-solid fa-sterling-sign" aria-hidden="true"></i>';
+    }
+    return ($paid + 0.0001) >= $amount
+        ? '<i class="fa-solid fa-check" aria-hidden="true"></i>'
+        : '<i class="fa-solid fa-circle-half-stroke" aria-hidden="true"></i>';
+};
+$matchSponsorshipStateLabel = static function (?array $row): string {
+    if ($row === null) {
+        return 'Not assigned';
+    }
+    if ((int) ($row['is_complimentary'] ?? 0) === 1) {
+        return 'Complimentary / free promotion';
+    }
+    $amount = (float) ($row['amount'] ?? 0);
+    $paid   = (float) ($row['paid_total'] ?? 0);
+    if ($paid <= 0.0001) {
+        return 'Assigned, not paid';
+    }
+    return ($paid + 0.0001) >= $amount ? 'Paid' : 'Part paid';
+};
+
+$rowsVm = [];
+$played = $upcoming = $won = $drawn = $lost = $gf = $ga = 0;
+$activeMatchDay = $activeMatchBall = $activeMotm = 0;
+$totalDue = $totalPaid = 0.0;
+
+foreach ($fixtures as $fixture) {
+    $o = $clubOutcome($fixture);
+    if ($o['played']) {
+        $played++;
+        if ($o['outcome'] === 'W') { $won++; }
+        elseif ($o['outcome'] === 'D') { $drawn++; }
+        elseif ($o['outcome'] === 'L') { $lost++; }
+        if ($o['us'] !== null) { $gf += $o['us']; $ga += $o['them']; }
+    } else {
+        $upcoming++;
+    }
+
+    $dayRow = $ballRow = $motmRow = null;
+    if ($showSponsor) {
+        foreach (getMatchSponsorshipRows($pdo, (int) $fixture['id']) as $sr) {
+            if ((int) ($sr['is_complimentary'] ?? 0) !== 1) {
+                $totalDue  += (float) $sr['amount'];
+                $totalPaid += (float) $sr['paid_total'];
+            }
+            if ($sr['sponsorship_role'] === 'match_day')  { $activeMatchDay++;  $dayRow  = $sr; }
+            if ($sr['sponsorship_role'] === 'match_ball') { $activeMatchBall++; $ballRow = $sr; }
+            if ($sr['sponsorship_role'] === 'motm')       { $activeMotm++;      $motmRow = $sr; }
+        }
+    }
+
+    $rowsVm[] = [
+        'f'       => $fixture,
+        'o'       => $o,
+        'dayRow'  => $dayRow,
+        'ballRow' => $ballRow,
+        'motmRow' => $motmRow,
+    ];
+}
+// Keep the next fixture at the top, then show completed matches newest first.
+usort($rowsVm, static function (array $a, array $b): int {
+    $aPlayed = $a['o']['played'];
+    $bPlayed = $b['o']['played'];
+    if ($aPlayed !== $bPlayed) {
+        return $aPlayed ? 1 : -1;
+    }
+    $aDate = (string) ($a['f']['match_date'] ?? '');
+    $bDate = (string) ($b['f']['match_date'] ?? '');
+    $dateOrder = $aPlayed ? strcmp($bDate, $aDate) : strcmp($aDate, $bDate);
+    return $dateOrder !== 0 ? $dateOrder : ($aPlayed
+        ? ((int) $b['f']['id'] <=> (int) $a['f']['id'])
+        : ((int) $a['f']['id'] <=> (int) $b['f']['id']));
+});
+$outstanding = max(0, $totalDue - $totalPaid);
+$fixtureCount = count($rowsVm);
+$competitionOptions = [];
+foreach ($rowsVm as $vm) {
+    $competition = trim((string) ($vm['f']['competition'] ?? ''));
+    if ($competition !== '') {
+        $competitionOptions[$competition] = $competition;
+    }
+}
+natcasesort($competitionOptions);
+
+/* --------------------------------------------------------------------------
+ * Metric grid — contextual.
+ * ---------------------------------------------------------------------- */
+$metrics = [
+    ['label' => 'Matches',  'value' => $fixtureCount, 'meta' => $allSeasons ? 'All seasons' : (string) ($season['name'] ?? ''), 'icon' => 'fa-calendar-days', 'tone' => 'primary'],
+    ['label' => 'Played',   'value' => $played,   'meta' => $played ? sprintf('%d W · %d D · %d L', $won, $drawn, $lost) : 'None yet', 'icon' => 'fa-flag-checkered', 'tone' => 'success'],
+    ['label' => 'Upcoming', 'value' => $upcoming, 'meta' => 'Not yet played', 'icon' => 'fa-clock', 'tone' => 'info'],
+];
+if ($showSponsor) {
+    $metrics[] = ['label' => 'Sponsor slots', 'value' => ($activeMatchDay + $activeMatchBall + $activeMotm), 'meta' => sprintf('%d day · %d ball · %d MOTM', $activeMatchDay, $activeMatchBall, $activeMotm), 'icon' => 'fa-handshake', 'tone' => 'info'];
+    $metrics[] = ['label' => 'Total due', 'value' => gbp($totalDue), 'meta' => 'Booked sponsorship value', 'icon' => 'fa-sterling-sign', 'tone' => 'primary'];
+    $metrics[] = ['label' => 'Outstanding', 'value' => gbp($outstanding), 'meta' => 'Still to collect', 'icon' => 'fa-hourglass-half', 'tone' => 'danger'];
+} else {
+    $metrics[] = ['label' => 'Goals', 'value' => $played ? ($gf . '–' . $ga) : '—', 'meta' => $played ? 'For – against' : '', 'icon' => 'fa-futbol', 'tone' => 'neutral'];
+}
+hub_render_metric_grid($metrics, 'Match summary');
+
+$colspan = 5 + ($allSeasons ? 1 : 0) + ($showSponsor ? 3 : 0);
 ?>
 
 <?php if (isset($_GET['imported'])): ?>
-          <div class="alert alert-success">
-                    Fixtures imported successfully.
-                    <?php if (isset($_GET['created']) || isset($_GET['updated'])): ?>
-                              Created <?= (int)($_GET['created'] ?? 0) ?>, updated <?= (int)($_GET['updated'] ?? 0) ?>.
-                    <?php endif; ?>
-          </div>
+    <div class="alert alert-success">
+        Fixtures imported successfully.
+        <?php if (isset($_GET['created']) || isset($_GET['updated'])): ?>
+            Created <?= (int) ($_GET['created'] ?? 0) ?>, updated <?= (int) ($_GET['updated'] ?? 0) ?>.
+        <?php endif; ?>
+    </div>
 <?php endif; ?>
 
-<?php hub_render_metric_grid([
-          ['label' => 'Fixtures', 'value' => (int)$fixtureCount, 'meta' => (string)($selectedSeason['name'] ?? 'Selected season'), 'icon' => 'fa-calendar-days', 'tone' => 'primary'],
-          ['label' => 'Match day', 'value' => (int)$activeMatchDay, 'meta' => 'Sponsor slots assigned', 'icon' => 'fa-handshake', 'tone' => 'info'],
-          ['label' => 'Match ball', 'value' => (int)$activeMatchBall, 'meta' => 'Sponsor slots assigned', 'icon' => 'fa-futbol', 'tone' => 'info'],
-          ['label' => 'Player of the match', 'value' => (int)$activeMotm, 'meta' => 'Sponsor slots assigned', 'icon' => 'fa-star', 'tone' => 'warning'],
-          ['label' => 'Total due', 'value' => gbp($totalDue), 'meta' => 'Booked sponsorship value', 'icon' => 'fa-sterling-sign', 'tone' => 'primary'],
-          ['label' => 'Outstanding', 'value' => gbp($outstanding), 'meta' => 'Still to collect', 'icon' => 'fa-clock', 'tone' => 'danger'],
-], 'Fixture summary'); ?>
+<div class="hub-toolbar matches-toolbar" aria-label="Filter matches">
+    <div class="matches-toolbar__heading">
+        <span class="matches-toolbar__eyebrow">Match list</span>
+        <strong>Upcoming first</strong>
+        <span class="matches-toolbar__hint">Finished matches follow, newest first</span>
+    </div>
+    <form class="matches-toolbar__season" method="get" action="matches.php">
+        <label for="matchSeason">Season scope</label>
+        <select id="matchSeason" name="season_id" class="form-select form-select-sm" onchange="this.form.submit()">
+            <option value="all" <?= $allSeasons ? 'selected' : '' ?>>All seasons</option>
+            <?php foreach ($seasonsDesc as $s): ?>
+                <option value="<?= (int) $s['id'] ?>" <?= (!$allSeasons && (int) $s['id'] === (int) $seasonId) ? 'selected' : '' ?>>
+                    <?= h((string) $s['name']) ?><?= !empty($s['is_current']) ? ' · Current' : '' ?><?= !empty($s['is_locked']) ? ' · Locked' : '' ?>
+                </option>
+            <?php endforeach; ?>
+        </select>
+        <noscript><button type="submit" class="btn btn-sm btn-outline-secondary">Go</button></noscript>
+    </form>
 
-<div class="fixtures-toolbar hub-toolbar" aria-label="Search and filter fixtures">
-          <div class="fixtures-search">
-                    <label class="visually-hidden" for="fixtureSearch">Search fixtures</label>
-                    <i class="fa-solid fa-magnifying-glass fixtures-search__icon" aria-hidden="true"></i>
-                    <input id="fixtureSearch" type="search" class="form-control" placeholder="Search opponent, date or status" autocomplete="off">
-                    <button type="button" class="fixtures-search__clear" id="clearFixtureSearch" aria-label="Clear fixture search" title="Clear search" hidden>
-                              <i class="fa-solid fa-xmark" aria-hidden="true"></i>
-                    </button>
-          </div>
+    <div class="matches-toolbar__filters">
+        <div class="matches-toolbar__field">
+            <label for="matchStatusFilter">View</label>
+            <select id="matchStatusFilter" class="form-select form-select-sm" aria-label="Match status">
+                <option value="all">All matches</option>
+                <option value="upcoming">Upcoming</option>
+                <option value="played">Finished</option>
+            </select>
+        </div>
+        <div class="matches-toolbar__field">
+            <label for="matchVenueFilter">Venue</label>
+            <select id="matchVenueFilter" class="form-select form-select-sm" aria-label="Home or away">
+                <option value="all">Home &amp; away</option>
+                <option value="home">Home</option>
+                <option value="away">Away</option>
+            </select>
+        </div>
+        <div class="matches-toolbar__field">
+            <label for="matchOutcomeFilter">Outcome</label>
+            <select id="matchOutcomeFilter" class="form-select form-select-sm" aria-label="Match outcome">
+                <option value="all">Any outcome</option>
+                <option value="W">Wins</option>
+                <option value="D">Draws</option>
+                <option value="L">Losses</option>
+            </select>
+        </div>
+        <div class="matches-toolbar__field matches-toolbar__field--competition">
+            <label for="matchCompetitionFilter">Competition</label>
+            <select id="matchCompetitionFilter" class="form-select form-select-sm" aria-label="Competition">
+                <option value="all">All competitions</option>
+                <?php foreach ($competitionOptions as $competition): ?>
+                    <option value="<?= h($competition) ?>"><?= h($competition) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <div class="matches-search">
+            <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+            <label class="visually-hidden" for="matchSearch">Search matches</label>
+            <input type="search" id="matchSearch" class="form-control form-control-sm" placeholder="Search opponent, date…" autocomplete="off">
+        </div>
+        <button type="button" class="btn btn-outline-secondary btn-sm" id="matchFilterReset" hidden>
+            <i class="fa-solid fa-rotate-left" aria-hidden="true"></i> Reset
+        </button>
+    </div>
 
-          <div class="fixtures-filter-field">
-                    <label for="fixtureVenueFilter">Match type</label>
-                    <select id="fixtureVenueFilter" class="form-select form-select-sm">
-                              <option value="all">All matches</option>
-                              <option value="home">Home</option>
-                              <option value="away">Away</option>
-                    </select>
-          </div>
+    <div class="hub-toolbar__count" aria-live="polite">
+        <strong id="matchVisibleCount"><?= $fixtureCount ?></strong>
+        <span id="matchCountLabel"><?= $fixtureCount === 1 ? 'match' : 'matches' ?></span>
+    </div>
 
-          <div class="fixtures-filter-field">
-                    <label for="fixtureSponsorFilter">Sponsorship</label>
-                    <select id="fixtureSponsorFilter" class="form-select form-select-sm">
-                              <option value="all">All fixtures</option>
-                              <option value="sponsored">Sponsored</option>
-                              <option value="unsponsored">Not sponsored</option>
-                    </select>
-          </div>
-
-          <button type="button" class="btn btn-outline-secondary btn-sm fixtures-reset" id="resetFixtureFilters" hidden>
-                    <i class="fa-solid fa-rotate-left" aria-hidden="true"></i> Reset
-          </button>
-
-          <div class="hub-toolbar__count fixtures-toolbar__count" aria-live="polite">
-                    <strong id="visibleFixtureCount"><?= (int)$fixtureCount ?></strong>
-                    <span id="fixtureCountLabel"><?= $fixtureCount === 1 ? 'fixture' : 'fixtures' ?></span>
-          </div>
-          <div class="hub-local-actions">
-                    <a href="match.php?action=new&amp;season_id=<?= (int)$seasonId ?>" class="btn btn-brand btn-sm"><i class="fa-solid fa-plus me-1" aria-hidden="true"></i>Add fixture</a>
-                    <div class="dropdown">
-                              <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">More</button>
-                              <div class="dropdown-menu dropdown-menu-end">
-                                        <button class="dropdown-item" type="button" data-bs-toggle="modal" data-bs-target="#importFixturesModal"><i class="fa-solid fa-upload" aria-hidden="true"></i>Import fixtures</button>
-                                        <a class="dropdown-item" href="monthly_fixtures.php?season_id=<?= (int)$seasonId ?>"><i class="fa-solid fa-calendar-days" aria-hidden="true"></i>Monthly fixtures</a>
-                                        <a class="dropdown-item" href="match_fixtures_poster.php?season_id=<?= (int)$seasonId ?>"><i class="fa-solid fa-image" aria-hidden="true"></i>Fixture poster</a>
-                                        <a class="dropdown-item" href="seasons.php"><i class="fa-solid fa-coins" aria-hidden="true"></i>Season pricing</a>
-                              </div>
-                    </div>
-          </div>
+    <div class="hub-local-actions">
+        <?php if (!$allSeasons): ?>
+            <a href="match.php?action=new&amp;season_id=<?= (int) $seasonId ?>" class="btn btn-brand btn-sm"><i class="fa-solid fa-plus me-1" aria-hidden="true"></i>Add match</a>
+        <?php endif; ?>
+        <div class="dropdown">
+            <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">More</button>
+            <div class="dropdown-menu dropdown-menu-end">
+                <?php if (!$allSeasons): ?>
+                    <button class="dropdown-item" type="button" data-bs-toggle="modal" data-bs-target="#importFixturesModal"><i class="fa-solid fa-upload" aria-hidden="true"></i>Import fixtures</button>
+                    <a class="dropdown-item" href="monthly_fixtures.php?season_id=<?= (int) $seasonId ?>"><i class="fa-solid fa-calendar-days" aria-hidden="true"></i>Monthly fixtures</a>
+                    <a class="dropdown-item" href="match_fixtures_poster.php?season_id=<?= (int) $seasonId ?>"><i class="fa-solid fa-image" aria-hidden="true"></i>Fixture poster</a>
+                <?php endif; ?>
+                <a class="dropdown-item" href="seasons.php"><i class="fa-solid fa-calendar-days" aria-hidden="true"></i>Seasons</a>
+            </div>
+        </div>
+    </div>
 </div>
 
+<?php if (!$allSeasons): ?>
 <div class="modal fade" id="importFixturesModal" tabindex="-1" aria-labelledby="importFixturesModalLabel" aria-hidden="true">
-          <div class="modal-dialog modal-lg modal-dialog-centered">
-                    <div class="modal-content">
-                              <div class="modal-header">
-                                        <div>
-                                                  <h5 class="modal-title mb-1" id="importFixturesModalLabel">Import Fixtures</h5>
-                                                  <div class="text-muted small">Upload a CSV or Excel file to create or update fixtures in this season.</div>
-                                        </div>
-                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                              </div>
-                              <div class="modal-body">
-                                        <div class="d-flex justify-content-end mb-3">
-                                                  <a href="templates/match_fixtures_import_template.csv" class="btn btn-outline-secondary btn-sm" download>
-                                                            <i class="fa-solid fa-file-csv me-1"></i>Download Template
-                                                  </a>
-                                        </div>
-
-                                        <form method="post" action="matches_import.php" enctype="multipart/form-data">
-                                                  <?= csrf_field() ?>
-                                                  <input type="hidden" name="season_id" value="<?= (int)$seasonId ?>">
-                                                  <div class="row g-3 align-items-end">
-                                                            <div class="col-lg-8">
-                                                                      <label class="form-label">Import file</label>
-                                                                      <input type="file" name="import_file" class="form-control" accept=".csv,.xlsx,.xlsm,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required>
-                                                                      <div class="form-text">Headers must match the template. Existing fixtures are matched by `fixture_id` or `match_date + opponent`.</div>
-                                                            </div>
-                                                            <div class="col-lg-4 text-lg-end">
-                                                                      <button type="submit" class="btn btn-brand w-100">Import Fixtures</button>
-                                                            </div>
-                                                            <?php if ((int)($season['is_locked'] ?? 0) === 1): ?>
-                                                                      <div class="col-12">
-                                                                                <div class="alert alert-warning mb-0">
-                                                                                          <div class="form-check">
-                                                                                                    <input class="form-check-input" type="checkbox" value="1" name="historical_import" id="historicalImportConfirm" required>
-                                                                                                    <label class="form-check-label fw-semibold" for="historicalImportConfirm">I understand this import will add or update historical fixtures in a locked season.</label>
-                                                                                          </div>
-                                                                                          <div class="small mt-1">The season remains locked for normal editing. Review the spreadsheet carefully before importing.</div>
-                                                                                </div>
-                                                                      </div>
-                                                            <?php endif; ?>
-                                                  </div>
-                                        </form>
-                              </div>
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <h5 class="modal-title mb-1" id="importFixturesModalLabel">Import fixtures</h5>
+                    <div class="text-muted small">Upload a CSV or Excel file to create or update fixtures in <?= h((string) ($season['name'] ?? 'this season')) ?>.</div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="d-flex justify-content-end mb-3">
+                    <a href="templates/match_fixtures_import_template.csv" class="btn btn-outline-secondary btn-sm" download>
+                        <i class="fa-solid fa-file-csv me-1"></i>Download template
+                    </a>
+                </div>
+                <form method="post" action="matches_import.php" enctype="multipart/form-data">
+                    <?= csrf_field() ?>
+                    <input type="hidden" name="season_id" value="<?= (int) $seasonId ?>">
+                    <div class="row g-3 align-items-end">
+                        <div class="col-lg-8">
+                            <label class="form-label">Import file</label>
+                            <input type="file" name="import_file" class="form-control" accept=".csv,.xlsx,.xlsm,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required>
+                            <div class="form-text">Headers must match the template. Existing fixtures are matched by <code>fixture_id</code> or <code>match_date + opponent</code>.</div>
+                        </div>
+                        <div class="col-lg-4 text-lg-end">
+                            <button type="submit" class="btn btn-brand w-100">Import fixtures</button>
+                        </div>
+                        <?php if ((int) ($season['is_locked'] ?? 0) === 1): ?>
+                            <div class="col-12">
+                                <div class="alert alert-warning mb-0">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" value="1" name="historical_import" id="historicalImportConfirm" required>
+                                        <label class="form-check-label fw-semibold" for="historicalImportConfirm">I understand this import will add or update fixtures in a locked season.</label>
+                                    </div>
+                                    <div class="small mt-1">The season stays locked for normal editing. Review the spreadsheet carefully first.</div>
+                                </div>
+                            </div>
+                        <?php endif; ?>
                     </div>
-          </div>
+                </form>
+            </div>
+        </div>
+    </div>
 </div>
+<?php endif; ?>
 
-<?php if (!$fixtureCards): ?>
-          <div class="card shadow-sm hub-section hub-table-card">
-                    <div class="card-body">
-                              <div class="alert alert-info mb-0 hub-empty-state">No fixtures recorded for this season.</div>
-                    </div>
-          </div>
-<?php else: ?>
-          <?php
-          $renderFixtureItems = function (array $cards, string $groupKey, string $mode) use (
-                    $seasonId,
-                    $matchSponsorshipStateClass,
-                    $matchSponsorshipStateIcon,
-                    $matchSponsorshipStateLabel,
-                    $fixtureStatusClass
-          ): void {
-                    foreach ($cards as $item) {
-                              $fixture = $item['fixture'];
-                              $dayRow = $item['dayRow'];
-                              $ballRow = $item['ballRow'];
-                              $motmRow = $item['motmRow'];
-                              $hasSponsor = $item['hasSponsor'];
-                              $opponentIsDeleted = isDeletedOpponentLabel((string)($fixture['opponent'] ?? ''));
-                              $fixtureSearchText = implode(' ', [
-                                        (string)($fixture['opponent'] ?? ''),
-                                        (string)($fixture['status'] ?? ''),
-                                        (string)($fixture['match_date'] ?? ''),
-                                        date('d/m/Y', strtotime((string)$fixture['match_date'])),
-                                        !empty($fixture['is_home']) ? 'home' : 'away',
-                              ]);
-                              if ($mode === 'mobile'):
-                              ?>
-                                        <a class="fixtures-mobile-card fixtures-mobile-card--link hub-record-card js-fixture-item"
-                                                  href="match.php?id=<?= (int)$fixture['id'] ?>&season_id=<?= (int)$seasonId ?>"
-                                                  aria-label="Open fixture against <?= h((string)$fixture['opponent']) ?>"
-                                                  data-fixture-id="<?= (int)$fixture['id'] ?>"
-                                                  data-group="<?= h($groupKey) ?>"
-                                                  data-search="<?= h($fixtureSearchText) ?>"
-                                                  data-venue="<?= !empty($fixture['is_home']) ? 'home' : 'away' ?>"
-                                                  data-sponsored="<?= $hasSponsor ? '1' : '0' ?>">
-                                                  <div class="fixtures-mobile-head">
-                                                            <div>
-                                                                      <div class="fixtures-mobile-venue">
-                                                                                <span class="fixtures-venue-icon <?= $fixture['is_home'] ? 'fixtures-venue-icon--home' : 'fixtures-venue-icon--away' ?>">
-                                                                                          <i class="fa-solid <?= $fixture['is_home'] ? 'fa-house' : 'fa-bus' ?>"></i>
-                                                                                </span>
-                                                                                <span class="fixtures-venue-text"><?= h($fixture['is_home'] ? 'Home fixture' : 'Away fixture') ?></span>
-                                                                      </div>
-                                                                      <div class="fixtures-mobile-opponent<?= $opponentIsDeleted ? ' is-deleted' : '' ?>">
-                                                                                <?php if ($opponentIsDeleted): ?>
-                                                                                          <span class="fixtures-opponent-deleted">Team Deleted</span>
-                                                                                <?php else: ?>
-                                                                                          <?= h($fixture['opponent']) ?>
-                                                                                <?php endif; ?>
-                                                                      </div>
-                                                                      <div class="fixtures-mobile-meta">
-                                                                                <span class="badge <?= h($fixtureStatusClass((string)$fixture['status'])) ?>"><?= h(ucfirst((string)$fixture['status'])) ?></span>
-                                                                                <span class="badge bg-light text-dark"><?= h(date('d/m/Y', strtotime((string)$fixture['match_date']))) ?></span>
-                                                                                <?php if (!empty($fixture['kickoff_time'])): ?>
-                                                                                          <span class="badge bg-light text-dark"><?= h(substr((string)$fixture['kickoff_time'], 0, 5)) ?></span>
-                                                                                <?php endif; ?>
-                                                                      </div>
-                                                            </div>
-                                                            <div class="badge bg-brand-primary align-self-start"><?= h($fixture['is_home'] ? 'Home' : 'Away') ?></div>
-                                                  </div>
-
-                                                  <div class="fixtures-mobile-summary">
-                                                            <div class="fixtures-mobile-panel">
-                                                                      <span class="label">Match Day</span>
-                                                                      <span class="value">
-                                                                                <span class="fixtures-sponsorship-status is-compact <?= h($matchSponsorshipStateClass($dayRow)) ?>" title="<?= h($matchSponsorshipStateLabel($dayRow)) ?>" aria-label="<?= h($matchSponsorshipStateLabel($dayRow)) ?>">
-                                                                                          <?= $matchSponsorshipStateIcon($dayRow) ?>
-                                                                                </span>
-                                                                      </span>
-                                                            </div>
-                                                            <div class="fixtures-mobile-panel">
-                                                                      <span class="label">Match Ball</span>
-                                                                      <span class="value">
-                                                                                <span class="fixtures-sponsorship-status is-compact <?= h($matchSponsorshipStateClass($ballRow)) ?>" title="<?= h($matchSponsorshipStateLabel($ballRow)) ?>" aria-label="<?= h($matchSponsorshipStateLabel($ballRow)) ?>">
-                                                                                          <?= $matchSponsorshipStateIcon($ballRow) ?>
-                                                                                </span>
-                                                                      </span>
-                                                            </div>
-                                                            <div class="fixtures-mobile-panel">
-                                                                      <span class="label">MOTM</span>
-                                                                      <span class="value">
-                                                                                <span class="fixtures-sponsorship-status is-compact <?= h($matchSponsorshipStateClass($motmRow)) ?>" title="<?= h($matchSponsorshipStateLabel($motmRow)) ?>" aria-label="<?= h($matchSponsorshipStateLabel($motmRow)) ?>">
-                                                                                          <?= $matchSponsorshipStateIcon($motmRow) ?>
-                                                                                </span>
-                                                                      </span>
-                                                            </div>
-                                                  </div>
-                                        </a>
-                              <?php else: ?>
-                                        <tr class="fixture-row js-fixture-item"
-                                                  role="link"
-                                                  tabindex="0"
-                                                  aria-label="Open fixture against <?= h((string)$fixture['opponent']) ?>"
-                                                  data-href="match.php?id=<?= (int)$fixture['id'] ?>&amp;season_id=<?= (int)$seasonId ?>"
-                                                  data-fixture-id="<?= (int)$fixture['id'] ?>"
-                                                  data-group="<?= h($groupKey) ?>"
-                                                  data-search="<?= h($fixtureSearchText) ?>"
-                                                  data-venue="<?= !empty($fixture['is_home']) ? 'home' : 'away' ?>"
-                                                  data-sponsored="<?= $hasSponsor ? '1' : '0' ?>">
-                                                  <td class="text-center">
-                                                            <span class="fixtures-venue-icon <?= $fixture['is_home'] ? 'fixtures-venue-icon--home' : 'fixtures-venue-icon--away' ?>" title="<?= h($fixture['is_home'] ? 'Home fixture' : 'Away fixture') ?>" aria-label="<?= h($fixture['is_home'] ? 'Home fixture' : 'Away fixture') ?>">
-                                                                      <i class="fa-solid <?= $fixture['is_home'] ? 'fa-house' : 'fa-bus' ?>"></i>
-                                                            </span>
-                                                  </td>
-                                                  <td><?= h(date('d/m/Y', strtotime((string)$fixture['match_date']))) ?><?php if (!empty($fixture['kickoff_time'])): ?><div class="small text-muted"><?= h(substr((string)$fixture['kickoff_time'], 0, 5)) ?></div><?php endif; ?></td>
-                                                  <td>
-                                                            <?php if ($opponentIsDeleted): ?>
-                                                                      <span class="fixtures-opponent-deleted">Team Deleted</span>
-                                                            <?php else: ?>
-                                                                      <span class="fw-semibold"><?= h($fixture['opponent']) ?></span>
-                                                            <?php endif; ?>
-                                                  </td>
-                                                  <td><span class="badge <?= h($fixtureStatusClass((string)$fixture['status'])) ?>"><?= h(ucfirst((string)$fixture['status'])) ?></span></td>
-                                                  <td class="text-center fixtures-sponsor-col">
-                                                            <span class="fixtures-sponsorship-status is-compact <?= h($matchSponsorshipStateClass($dayRow)) ?>" title="<?= h($matchSponsorshipStateLabel($dayRow)) ?>" aria-label="<?= h($matchSponsorshipStateLabel($dayRow)) ?>">
-                                                                      <?= $matchSponsorshipStateIcon($dayRow) ?>
-                                                            </span>
-                                                  </td>
-                                                  <td class="text-center fixtures-sponsor-col">
-                                                            <span class="fixtures-sponsorship-status is-compact <?= h($matchSponsorshipStateClass($ballRow)) ?>" title="<?= h($matchSponsorshipStateLabel($ballRow)) ?>" aria-label="<?= h($matchSponsorshipStateLabel($ballRow)) ?>">
-                                                                      <?= $matchSponsorshipStateIcon($ballRow) ?>
-                                                            </span>
-                                                  </td>
-                                                  <td class="text-center fixtures-sponsor-col">
-                                                            <span class="fixtures-sponsorship-status is-compact <?= h($matchSponsorshipStateClass($motmRow)) ?>" title="<?= h($matchSponsorshipStateLabel($motmRow)) ?>" aria-label="<?= h($matchSponsorshipStateLabel($motmRow)) ?>">
-                                                                      <?= $matchSponsorshipStateIcon($motmRow) ?>
-                                                            </span>
-                                                  </td>
-                                        </tr>
-                              <?php endif;
-                    }
-          };
-
-          $fixtureGroups = [
-                    ['key' => 'upcoming', 'label' => 'Upcoming Fixtures', 'cards' => $upcomingFixtureCards, 'emptyAll' => 'No upcoming fixtures scheduled for this season.', 'badgeTone' => 'primary'],
-                    ['key' => 'played', 'label' => 'Played Fixtures', 'cards' => $playedFixtureCards, 'emptyAll' => 'No fixtures have been played yet this season.', 'badgeTone' => 'secondary'],
-          ];
-          ?>
-
-          <div class="fixtures-status-legend" aria-label="Sponsorship payment status key">
+<div class="card shadow-sm hub-section hub-table-card">
+    <div class="card-body">
+        <?php if (!$rowsVm): ?>
+            <div class="alert alert-info mb-0 hub-empty-state">No matches recorded for this selection.</div>
+        <?php else: ?>
+            <?php if ($showSponsor): ?>
+                <div class="matches-legend" aria-label="Sponsorship payment key">
                     <span><span class="fixtures-sponsorship-status is-available is-compact"><i class="fa-solid fa-minus" aria-hidden="true"></i></span>Available</span>
                     <span><span class="fixtures-sponsorship-status is-unpaid is-compact"><i class="fa-solid fa-sterling-sign" aria-hidden="true"></i></span>Unpaid</span>
                     <span><span class="fixtures-sponsorship-status is-partial is-compact"><i class="fa-solid fa-circle-half-stroke" aria-hidden="true"></i></span>Part paid</span>
                     <span><span class="fixtures-sponsorship-status is-paid is-compact"><i class="fa-solid fa-check" aria-hidden="true"></i></span>Paid</span>
                     <span><span class="fixtures-sponsorship-status is-complimentary is-compact"><i class="fa-solid fa-gift" aria-hidden="true"></i></span>Complimentary</span>
-          </div>
+                </div>
+            <?php endif; ?>
 
-          <?php foreach ($fixtureGroups as $group): ?>
-                    <div class="card shadow-sm hub-section hub-table-card mb-4">
-                              <div class="card-header d-flex align-items-center justify-content-between gap-2">
-                                        <h2 class="h5 mb-0"><?= h($group['label']) ?></h2>
-                                        <span class="badge text-bg-<?= h($group['badgeTone']) ?>"><?= count($group['cards']) ?></span>
-                              </div>
-                              <div class="card-body">
-                                        <?php if (!$group['cards']): ?>
-                                                  <div class="alert alert-info mb-0 hub-empty-state"><?= h($group['emptyAll']) ?></div>
-                                        <?php else: ?>
-                                                  <div class="d-xl-none d-flex flex-column gap-3 mb-3" id="fixturesMobileList-<?= h($group['key']) ?>">
-                                                            <?php $renderFixtureItems($group['cards'], $group['key'], 'mobile'); ?>
-                                                  </div>
+            <?php
+            /** One row/card, shared desktop + mobile. */
+            $renderMatch = function (array $vm, string $mode) use (
+                $seasonId, $allSeasons, $showSponsor, $fixtureStatusClass, $outcomeChipClass,
+                $matchSponsorshipStateClass, $matchSponsorshipStateIcon, $matchSponsorshipStateLabel
+            ): void {
+                $f = $vm['f'];
+                $o = $vm['o'];
+                $id = (int) $f['id'];
+                $isHome = !empty($f['is_home']);
+                $deleted = isDeletedOpponentLabel((string) ($f['opponent'] ?? ''));
+                $dateStr = date('d/m/Y', strtotime((string) $f['match_date']));
+                $ko = !empty($f['kickoff_time']) ? substr((string) $f['kickoff_time'], 0, 5) : '';
+                $comp = trim((string) ($f['competition'] ?? ''));
+                $stage = trim((string) ($f['competition_stage'] ?? ''));
+                $seasonName = (string) ($f['season_name'] ?? '');
+                $statusRaw = (string) ($f['status'] ?? '');
+                $search = strtolower(implode(' ', array_filter([
+                    (string) ($f['opponent'] ?? ''), $comp, $stage, $seasonName, $statusRaw,
+                    (string) $f['match_date'], $dateStr, $isHome ? 'home' : 'away',
+                ])));
+                $href = 'match.php?id=' . $id . '&season_id=' . ($allSeasons ? (int) $f['season_id'] : (int) $seasonId);
 
-                                                  <div class="d-none d-xl-block">
-                                                  <div class="table-responsive">
-                                                            <table class="table table-striped hub-data-table align-middle">
-                                                                      <thead>
-                                                                                <tr>
-                                                                                          <th>Venue</th>
-                                                                                          <th>Date</th>
-                                                                                          <th>Opponent</th>
-                                                                                          <th>Status</th>
-                                                                                          <th class="fixtures-sponsor-col">Match Day</th>
-                                                                                          <th class="fixtures-sponsor-col">Match Ball</th>
-                                                                                          <th class="fixtures-sponsor-col">MOTM</th>
-                                                                                </tr>
-                                                                      </thead>
-                                                                      <tbody id="fixturesDesktopBody-<?= h($group['key']) ?>">
-                                                                                <?php $renderFixtureItems($group['cards'], $group['key'], 'desktop'); ?>
-                                                                      </tbody>
-                                                            </table>
-                                                  </div>
-                                                  </div>
+                $scoreCell = $o['played'] && $o['us'] !== null
+                    ? '<span class="match-score">' . ($isHome ? (int) $o['us'] : (int) $o['them']) . '&ndash;' . ($isHome ? (int) $o['them'] : (int) $o['us']) . '</span>'
+                      . ' <span class="' . $outcomeChipClass($o['outcome']) . '">' . $o['outcome'] . '</span>'
+                    : '<span class="badge ' . h($fixtureStatusClass($statusRaw)) . '">' . h(ucfirst($statusRaw ?: 'scheduled')) . '</span>';
 
-                                                  <div class="fixtures-filter-empty hub-empty-state" id="fixtureFilterEmpty-<?= h($group['key']) ?>" hidden>
-                                                            <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
-                                                            <strong>No fixtures match your filters</strong>
-                                                            <span>Try changing your search or filter selection.</span>
-                                                  </div>
+                if ($mode === 'mobile'):
+                    ?>
+                    <a class="matches-card js-match-item" href="<?= h($href) ?>"
+                       data-match-id="<?= $id ?>" data-status="<?= $o['played'] ? 'played' : 'upcoming' ?>"
+                       data-venue="<?= $isHome ? 'home' : 'away' ?>" data-outcome="<?= h($o['outcome']) ?>"
+                       data-competition="<?= h($comp) ?>" data-search="<?= h($search) ?>">
+                        <div class="matches-card__top">
+                            <span class="matches-venue-icon <?= $isHome ? 'is-home' : 'is-away' ?>"><i class="fa-solid <?= $isHome ? 'fa-house' : 'fa-bus' ?>" aria-hidden="true"></i></span>
+                            <span class="matches-card__opp"><?= $deleted ? '<em class="text-muted">Team deleted</em>' : h((string) $f['opponent']) ?></span>
+                            <span class="matches-card__score"><?= $scoreCell ?></span>
+                        </div>
+                        <div class="matches-card__meta">
+                            <span><?= h($dateStr) ?><?= $ko ? ' · ' . h($ko) : '' ?></span>
+                            <?php if ($comp !== ''): ?><span><?= h($comp) ?><?= $stage ? ' · ' . h($stage) : '' ?></span><?php endif; ?>
+                            <?php if ($allSeasons && $seasonName !== ''): ?><span class="badge bg-light text-dark"><?= h($seasonName) ?></span><?php endif; ?>
+                        </div>
+                        <?php if ($showSponsor): ?>
+                            <div class="matches-card__sponsors">
+                                <?php foreach ([['Day', $vm['dayRow']], ['Ball', $vm['ballRow']], ['MOTM', $vm['motmRow']]] as [$lbl, $r]): ?>
+                                    <span><?= h($lbl) ?>
+                                        <span class="fixtures-sponsorship-status is-compact <?= h($matchSponsorshipStateClass($r)) ?>" title="<?= h($matchSponsorshipStateLabel($r)) ?>"><?= $matchSponsorshipStateIcon($r) ?></span>
+                                    </span>
+                                <?php endforeach; ?>
+                            </div>
+                        <?php endif; ?>
+                    </a>
+                    <?php
+                else:
+                    ?>
+                    <tr class="match-row js-match-item" role="link" tabindex="0"
+                        data-href="<?= h($href) ?>" data-match-id="<?= $id ?>"
+                        data-status="<?= $o['played'] ? 'played' : 'upcoming' ?>"
+                        data-venue="<?= $isHome ? 'home' : 'away' ?>" data-outcome="<?= h($o['outcome']) ?>"
+                        data-competition="<?= h($comp) ?>" data-search="<?= h($search) ?>">
+                        <td class="text-center">
+                            <span class="matches-venue-icon <?= $isHome ? 'is-home' : 'is-away' ?>" title="<?= $isHome ? 'Home' : 'Away' ?>"><i class="fa-solid <?= $isHome ? 'fa-house' : 'fa-bus' ?>" aria-hidden="true"></i></span>
+                        </td>
+                        <td class="nowrap"><?= h($dateStr) ?><?php if ($ko): ?><div class="small text-muted"><?= h($ko) ?></div><?php endif; ?></td>
+                        <td>
+                            <?php if ($deleted): ?><em class="text-muted">Team deleted</em>
+                            <?php else: ?><span class="fw-semibold"><?= h((string) $f['opponent']) ?></span><?php endif; ?>
+                        </td>
+                        <td class="match-comp">
+                            <?= $comp !== '' ? h($comp) : '<span class="text-muted">—</span>' ?>
+                            <?php if ($stage !== ''): ?><div class="small text-muted"><?= h($stage) ?></div><?php endif; ?>
+                        </td>
+                        <?php if ($allSeasons): ?><td class="nowrap small text-muted"><?= h($seasonName) ?></td><?php endif; ?>
+                        <td class="nowrap"><?= $scoreCell ?></td>
+                        <?php if ($showSponsor): ?>
+                            <?php foreach ([$vm['dayRow'], $vm['ballRow'], $vm['motmRow']] as $r): ?>
+                                <td class="text-center">
+                                    <span class="fixtures-sponsorship-status is-compact <?= h($matchSponsorshipStateClass($r)) ?>" title="<?= h($matchSponsorshipStateLabel($r)) ?>" aria-label="<?= h($matchSponsorshipStateLabel($r)) ?>"><?= $matchSponsorshipStateIcon($r) ?></span>
+                                </td>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                    </tr>
+                    <?php
+                endif;
+            };
+            ?>
 
-                                                  <nav class="fixtures-pagination mt-3" aria-label="<?= h($group['label']) ?> pages" id="fixturesPagination-<?= h($group['key']) ?>" hidden>
-                                                            <ul class="pagination pagination-sm justify-content-center mb-0"></ul>
-                                                  </nav>
-                                        <?php endif; ?>
-                              </div>
-                    </div>
-          <?php endforeach; ?>
-<?php endif; ?>
+            <div class="d-lg-none d-flex flex-column gap-2" id="matchesMobileList">
+                <?php foreach ($rowsVm as $vm) { $renderMatch($vm, 'mobile'); } ?>
+            </div>
+
+            <div class="d-none d-lg-block table-responsive">
+                <table class="table hub-data-table align-middle matches-table">
+                    <thead>
+                        <tr>
+                            <th class="text-center"><span class="visually-hidden">Venue</span></th>
+                            <th>Date</th>
+                            <th>Opponent</th>
+                            <th>Competition</th>
+                            <?php if ($allSeasons): ?><th>Season</th><?php endif; ?>
+                            <th>Result</th>
+                            <?php if ($showSponsor): ?>
+                                <th class="text-center">Match Day</th>
+                                <th class="text-center">Match Ball</th>
+                                <th class="text-center">MOTM</th>
+                            <?php endif; ?>
+                        </tr>
+                    </thead>
+                    <tbody id="matchesTableBody">
+                        <?php foreach ($rowsVm as $vm) { $renderMatch($vm, 'desktop'); } ?>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="hub-empty-state matches-filter-empty" id="matchesFilterEmpty" hidden>
+                <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+                <strong>No matches for these filters</strong>
+                <span>Try a different search or filter.</span>
+            </div>
+
+            <nav class="matches-pagination mt-3" id="matchesPagination" aria-label="Match pages" hidden>
+                <ul class="pagination pagination-sm justify-content-center mb-0"></ul>
+            </nav>
+        <?php endif; ?>
+    </div>
+</div>
+
+<style>
+.matches-toolbar { display:flex; flex-wrap:wrap; align-items:flex-end; gap:.75rem 1rem; }
+.matches-toolbar__heading { display:flex; flex-direction:column; gap:.08rem; margin-right:auto; min-width:13rem; }
+.matches-toolbar__eyebrow, .matches-toolbar__field label { font-size:.68rem; font-weight:800; letter-spacing:.07em; text-transform:uppercase; color:var(--bs-secondary-color,#6c757d); }
+.matches-toolbar__heading strong { font-size:.96rem; color:#1f1a1d; }
+.matches-toolbar__hint { font-size:.75rem; color:var(--bs-secondary-color,#6c757d); }
+.matches-toolbar__season { display:flex; flex-direction:column; gap:.2rem; }
+.matches-toolbar__season label { font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--bs-secondary-color,#6c757d); }
+.matches-toolbar__season select { min-width:14rem; }
+.matches-toolbar__filters { display:flex; flex-wrap:wrap; align-items:center; gap:.5rem; }
+.matches-toolbar__field { display:flex; flex-direction:column; gap:.2rem; }
+.matches-toolbar__field select { min-width:8.5rem; }
+.matches-toolbar__field--competition select { min-width:12rem; max-width:15rem; }
+.matches-search { position:relative; }
+.matches-search i { position:absolute; left:.6rem; top:50%; transform:translateY(-50%); color:var(--bs-secondary-color,#6c757d); font-size:.8rem; }
+.matches-search input { padding-left:1.9rem; min-width:15rem; }
+.matches-legend { display:flex; flex-wrap:wrap; gap:1rem; font-size:.8rem; color:var(--bs-secondary-color,#6c757d); margin-bottom:.9rem; }
+.matches-legend > span { display:inline-flex; align-items:center; gap:.35rem; }
+.matches-venue-icon { display:inline-grid; place-items:center; width:1.9rem; height:1.9rem; border-radius:50%; font-size:.78rem; }
+.matches-venue-icon.is-home { background:rgba(106,32,54,.10); color:#6a2036; }
+.matches-venue-icon.is-away { background:rgba(0,0,0,.06); color:#555; }
+.matches-table td { vertical-align:middle; }
+.match-row { cursor:pointer; }
+.match-row:hover td { background:rgba(106,32,54,.045); }
+.match-row:focus-visible { outline:2px solid #6a2036; outline-offset:-2px; }
+.match-comp { max-width:22rem; }
+.match-score { font-weight:700; font-variant-numeric:tabular-nums; }
+.match-outcome { display:inline-grid; place-items:center; min-width:1.4rem; height:1.4rem; padding:0 .3rem; border-radius:.35rem; font-size:.72rem; font-weight:800; color:#fff; }
+.match-outcome--w { background:#2f7d55; }
+.match-outcome--d { background:#8a8a8a; }
+.match-outcome--l { background:#b23b3b; }
+.matches-card { display:block; padding:.8rem .9rem; border:1px solid var(--bs-border-color,#dee2e6); border-radius:.7rem; text-decoration:none; color:inherit; background:#fff; }
+.matches-card:hover { border-color:#6a2036; }
+.matches-card__top { display:flex; align-items:center; gap:.6rem; }
+.matches-card__opp { font-weight:600; flex:1; min-width:0; }
+.matches-card__score { white-space:nowrap; }
+.matches-card__meta { display:flex; flex-wrap:wrap; gap:.4rem .8rem; margin-top:.4rem; font-size:.82rem; color:var(--bs-secondary-color,#6c757d); }
+.matches-card__sponsors { display:flex; gap:1rem; margin-top:.5rem; font-size:.78rem; color:var(--bs-secondary-color,#6c757d); }
+.matches-card__sponsors span { display:inline-flex; align-items:center; gap:.3rem; }
+.matches-filter-empty { text-align:center; padding:2rem 1rem; }
+@media (max-width: 900px) {
+    .matches-toolbar__heading { flex-basis:100%; }
+    .matches-toolbar__field--competition { flex:1 1 12rem; }
+}
+@media (max-width: 560px) {
+    .matches-toolbar__season, .matches-toolbar__filters, .matches-toolbar__field,
+    .matches-toolbar__field select, .matches-search, .matches-search input { width:100%; max-width:none; }
+}
+</style>
 
 <script>
 (function () {
-          var PAGE_SIZE = 5;
-          var GROUPS = ['upcoming', 'played'];
-          var pageState = { upcoming: 1, played: 1 };
+    var PAGE_SIZE = 25;
+    var page = 1;
 
-          var searchInput = document.getElementById('fixtureSearch');
-          var clearSearch = document.getElementById('clearFixtureSearch');
-          var venueFilter = document.getElementById('fixtureVenueFilter');
-          var sponsorFilter = document.getElementById('fixtureSponsorFilter');
-          var resetButton = document.getElementById('resetFixtureFilters');
-          var visibleCount = document.getElementById('visibleFixtureCount');
-          var countLabel = document.getElementById('fixtureCountLabel');
+    var body = document.getElementById('matchesTableBody');
+    var mobile = document.getElementById('matchesMobileList');
+    if (!body && !mobile) { return; }
 
-          if (!searchInput || !venueFilter || !sponsorFilter) {
-                    return;
-          }
+    var search = document.getElementById('matchSearch');
+    var venueSel = document.getElementById('matchVenueFilter');
+    var statusSel = document.getElementById('matchStatusFilter');
+    var outcomeSel = document.getElementById('matchOutcomeFilter');
+    var competitionSel = document.getElementById('matchCompetitionFilter');
+    var resetBtn = document.getElementById('matchFilterReset');
+    var countEl = document.getElementById('matchVisibleCount');
+    var countLabel = document.getElementById('matchCountLabel');
+    var emptyEl = document.getElementById('matchesFilterEmpty');
+    var pager = document.getElementById('matchesPagination');
 
-          function normalize(value) {
-                    return String(value || '').toLocaleLowerCase().trim();
-          }
+    var status = 'all';
+    var items = Array.prototype.slice.call(document.querySelectorAll('.js-match-item'));
+    // De-dupe by id so desktop + mobile copies count once for totals.
+    var ids = [];
+    items.forEach(function (el) { if (ids.indexOf(el.dataset.matchId) === -1) { ids.push(el.dataset.matchId); } });
 
-          var fixtureMeta = {};
-          document.querySelectorAll('.js-fixture-item').forEach(function (item) {
-                    var id = item.dataset.fixtureId;
-                    if (!fixtureMeta[id]) {
-                              fixtureMeta[id] = {
-                                        search: normalize(item.dataset.search),
-                                        venue: item.dataset.venue,
-                                        sponsored: item.dataset.sponsored
-                              };
-                    }
-          });
+    function norm(v) { return String(v || '').toLowerCase().trim(); }
 
-          var groupOrder = {};
-          GROUPS.forEach(function (group) {
-                    var body = document.getElementById('fixturesDesktopBody-' + group);
-                    groupOrder[group] = body
-                              ? Array.prototype.map.call(body.querySelectorAll('.js-fixture-item'), function (el) { return el.dataset.fixtureId; })
-                              : [];
-          });
+    function matches(el) {
+        var q = norm(search && search.value);
+        var venue = venueSel ? venueSel.value : 'all';
+        var outcome = outcomeSel ? outcomeSel.value : 'all';
+        var competition = competitionSel ? competitionSel.value : 'all';
+        if (status !== 'all' && el.dataset.status !== status) { return false; }
+        if (venue !== 'all' && el.dataset.venue !== venue) { return false; }
+        if (outcome !== 'all' && el.dataset.outcome !== outcome) { return false; }
+        if (competition !== 'all' && el.dataset.competition !== competition) { return false; }
+        if (q && el.dataset.search.indexOf(q) === -1) { return false; }
+        return true;
+    }
 
-          function matchingIds(group) {
-                    var query = normalize(searchInput.value);
-                    var venue = venueFilter.value;
-                    var sponsorship = sponsorFilter.value;
+    function render() {
+        // Desktop pagination works on rows; mobile just shows everything that matches.
+        var visibleIds = [];
+        (body ? Array.prototype.slice.call(body.querySelectorAll('.js-match-item')) : []).forEach(function (el) {
+            if (visibleIds.indexOf(el.dataset.matchId) === -1 && matches(el)) { visibleIds.push(el.dataset.matchId); }
+        });
+        var total = visibleIds.length;
+        var pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+        if (page > pages) { page = pages; }
+        var start = (page - 1) * PAGE_SIZE;
+        var onPage = {};
+        visibleIds.slice(start, start + PAGE_SIZE).forEach(function (id) { onPage[id] = true; });
 
-                    return groupOrder[group].filter(function (id) {
-                              var meta = fixtureMeta[id];
-                              if (!meta) return false;
-                              var matchesSearch = !query || meta.search.includes(query);
-                              var matchesVenue = venue === 'all' || meta.venue === venue;
-                              var matchesSponsorship = sponsorship === 'all'
-                                        || (sponsorship === 'sponsored' && meta.sponsored === '1')
-                                        || (sponsorship === 'unsponsored' && meta.sponsored === '0');
-                              return matchesSearch && matchesVenue && matchesSponsorship;
-                    });
-          }
+        if (body) {
+            body.querySelectorAll('.js-match-item').forEach(function (el) {
+                el.hidden = !(matches(el) && onPage[el.dataset.matchId]);
+            });
+        }
+        if (mobile) {
+            mobile.querySelectorAll('.js-match-item').forEach(function (el) { el.hidden = !matches(el); });
+        }
 
-          function renderPagination(group, totalPages) {
-                    var nav = document.getElementById('fixturesPagination-' + group);
-                    if (!nav) return;
-                    var list = nav.querySelector('ul');
-                    list.innerHTML = '';
+        if (countEl) { countEl.textContent = String(total); }
+        if (countLabel) { countLabel.textContent = total === 1 ? 'match' : 'matches'; }
+        if (emptyEl) { emptyEl.hidden = total !== 0; }
 
-                    if (totalPages <= 1) {
-                              nav.hidden = true;
-                              return;
-                    }
-                    nav.hidden = false;
+        var active = (search && search.value) || (venueSel && venueSel.value !== 'all')
+            || (outcomeSel && outcomeSel.value !== 'all') || (competitionSel && competitionSel.value !== 'all') || status !== 'all';
+        if (resetBtn) { resetBtn.hidden = !active; }
 
-                    var current = pageState[group];
+        renderPager(pages);
+    }
 
-                    function addItem(label, page, disabled, active) {
-                              var li = document.createElement('li');
-                              li.className = 'page-item' + (active ? ' active' : '') + (disabled ? ' disabled' : '');
-                              var btn = document.createElement('button');
-                              btn.type = 'button';
-                              btn.className = 'page-link';
-                              btn.textContent = label;
-                              if (active) btn.setAttribute('aria-current', 'page');
-                              if (!disabled && !active) {
-                                        btn.addEventListener('click', function () {
-                                                  pageState[group] = page;
-                                                  renderGroup(group);
-                                        });
-                              } else if (disabled) {
-                                        btn.disabled = true;
-                              }
-                              li.appendChild(btn);
-                              list.appendChild(li);
-                    }
+    function renderPager(pages) {
+        if (!pager) { return; }
+        var ul = pager.querySelector('ul');
+        ul.innerHTML = '';
+        if (pages <= 1) { pager.hidden = true; return; }
+        pager.hidden = false;
+        function add(label, target, disabled, current) {
+            var li = document.createElement('li');
+            li.className = 'page-item' + (disabled ? ' disabled' : '') + (current ? ' active' : '');
+            var b = document.createElement('button');
+            b.type = 'button'; b.className = 'page-link'; b.textContent = label;
+            if (!disabled && !current) { b.addEventListener('click', function () { page = target; render(); window.scrollTo({ top: 0, behavior: 'smooth' }); }); }
+            li.appendChild(b); ul.appendChild(li);
+        }
+        add('Prev', page - 1, page === 1, false);
+        for (var i = 1; i <= pages; i++) {
+            if (pages > 9 && Math.abs(i - page) > 2 && i !== 1 && i !== pages) {
+                if (i === 2 || i === pages - 1) { add('…', page, true, false); }
+                continue;
+            }
+            add(String(i), i, false, i === page);
+        }
+        add('Next', page + 1, page === pages, false);
+    }
 
-                    addItem('Prev', current - 1, current === 1, false);
-                    for (var i = 1; i <= totalPages; i++) {
-                              addItem(String(i), i, false, i === current);
-                    }
-                    addItem('Next', current + 1, current === totalPages, false);
-          }
+    function onChange() { page = 1; render(); }
 
-          function renderGroup(group) {
-                    var ids = matchingIds(group);
-                    var totalPages = Math.max(1, Math.ceil(ids.length / PAGE_SIZE));
-                    if (pageState[group] > totalPages) pageState[group] = totalPages;
-                    if (pageState[group] < 1) pageState[group] = 1;
+    if (search) { search.addEventListener('input', onChange); }
+    if (venueSel) { venueSel.addEventListener('change', onChange); }
+    if (statusSel) { statusSel.addEventListener('change', function () { status = statusSel.value; onChange(); }); }
+    if (outcomeSel) { outcomeSel.addEventListener('change', onChange); }
+    if (competitionSel) { competitionSel.addEventListener('change', onChange); }
+    if (resetBtn) {
+        resetBtn.addEventListener('click', function () {
+            if (search) { search.value = ''; }
+            if (venueSel) { venueSel.value = 'all'; }
+            if (statusSel) { statusSel.value = 'all'; }
+            if (outcomeSel) { outcomeSel.value = 'all'; }
+            if (competitionSel) { competitionSel.value = 'all'; }
+            status = 'all';
+            onChange();
+        });
+    }
 
-                    var start = (pageState[group] - 1) * PAGE_SIZE;
-                    var pageIds = {};
-                    ids.slice(start, start + PAGE_SIZE).forEach(function (id) { pageIds[id] = true; });
+    document.querySelectorAll('.match-row[data-href]').forEach(function (row) {
+        row.addEventListener('click', function (e) {
+            if (e.target.closest('a,button,input,select,label')) { return; }
+            window.location.assign(row.dataset.href);
+        });
+        row.addEventListener('keydown', function (e) {
+            if (e.key !== 'Enter' && e.key !== ' ') { return; }
+            e.preventDefault();
+            window.location.assign(row.dataset.href);
+        });
+    });
 
-                    document.querySelectorAll('.js-fixture-item[data-group="' + group + '"]').forEach(function (item) {
-                              item.hidden = !pageIds[item.dataset.fixtureId];
-                    });
-
-                    var emptyState = document.getElementById('fixtureFilterEmpty-' + group);
-                    if (emptyState) emptyState.hidden = ids.length > 0 || groupOrder[group].length === 0;
-
-                    renderPagination(group, totalPages);
-
-                    return ids.length;
-          }
-
-          function applyFixtureFilters() {
-                    var total = 0;
-                    GROUPS.forEach(function (group) { total += renderGroup(group); });
-
-                    var query = searchInput.value;
-                    var filtersActive = query !== '' || venueFilter.value !== 'all' || sponsorFilter.value !== 'all';
-
-                    if (visibleCount) visibleCount.textContent = String(total);
-                    if (countLabel) countLabel.textContent = total === 1 ? 'fixture' : 'fixtures';
-                    if (clearSearch) clearSearch.hidden = query === '';
-                    if (resetButton) resetButton.hidden = !filtersActive;
-          }
-
-          function onFilterChange() {
-                    pageState.upcoming = 1;
-                    pageState.played = 1;
-                    applyFixtureFilters();
-          }
-
-          searchInput.addEventListener('input', onFilterChange);
-          venueFilter.addEventListener('change', onFilterChange);
-          sponsorFilter.addEventListener('change', onFilterChange);
-          clearSearch.addEventListener('click', function () {
-                    searchInput.value = '';
-                    searchInput.focus();
-                    onFilterChange();
-          });
-          resetButton.addEventListener('click', function () {
-                    searchInput.value = '';
-                    venueFilter.value = 'all';
-                    sponsorFilter.value = 'all';
-                    onFilterChange();
-                    searchInput.focus();
-          });
-
-          document.querySelectorAll('.fixture-row[data-href]').forEach(function (row) {
-                    function openFixture() {
-                              window.location.assign(row.dataset.href);
-                    }
-
-                    row.addEventListener('click', function (event) {
-                              if (event.target.closest('a, button, input, select, textarea, label')) return;
-                              openFixture();
-                    });
-                    row.addEventListener('keydown', function (event) {
-                              if (event.key !== 'Enter' && event.key !== ' ') return;
-                              event.preventDefault();
-                              openFixture();
-                    });
-          });
-
-          applyFixtureFilters();
+    render();
 }());
 </script>
 

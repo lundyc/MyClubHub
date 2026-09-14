@@ -208,9 +208,37 @@ $notes = $stmt->fetchAll(PDO::FETCH_ASSOC);
 $actionShotsStmt = $pdo->prepare('SELECT id, filename FROM player_action_shots WHERE player_id = :pid ORDER BY sort_order ASC, id ASC');
 $actionShotsStmt->execute([':pid' => $id]);
 $actionShots = array_values(array_filter(
-    $actionShotsStmt->fetchAll(PDO::FETCH_ASSOC),
-    static fn(array $shot): bool => is_file(__DIR__ . '/uploads/players/action_shots/' . basename((string)$shot['filename']))
+    array_map(static fn(array $shot): array => [
+        'url' => '/uploads/players/action_shots/' . rawurlencode(basename((string) $shot['filename'])),
+        'label' => 'Action shot',
+    ], $actionShotsStmt->fetchAll(PDO::FETCH_ASSOC)),
+    static fn(array $shot): bool => is_file(__DIR__ . rawurldecode(parse_url($shot['url'], PHP_URL_PATH)))
 ));
+
+// Photos where this player has been tagged in a match gallery — shown alongside
+// the dedicated action-shots gallery so tagging work shows up on the profile too.
+$taggedShotsStmt = $pdo->prepare("
+    SELECT mp.id AS photo_id, mp.match_fixture_id, mp.filename
+    FROM match_photo_tags mpt
+    JOIN tagged_people tp ON tp.id = mpt.tagged_person_id
+    JOIN match_photos mp ON mp.id = mpt.match_photo_id
+    WHERE tp.player_id = :pid
+    ORDER BY mp.uploaded_at DESC, mp.id DESC
+");
+$taggedShotsStmt->execute([':pid' => $id]);
+$taggedShots = [];
+foreach ($taggedShotsStmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+    $fixtureId = (int) $row['match_fixture_id'];
+    $filename = basename((string) $row['filename']);
+    if ($fixtureId <= 0 || $filename === '') {
+        continue;
+    }
+    $relative = 'matches/gallery/' . $fixtureId . '/' . rawurlencode($filename);
+    if (is_file(__DIR__ . '/uploads/' . $relative)) {
+        $taggedShots[] = ['url' => '/uploads/' . $relative, 'label' => 'Tagged match photo'];
+    }
+}
+$actionAndTaggedShots = array_merge($actionShots, $taggedShots);
 
 $playerName = trim((string)($player['name'] ?? 'Player'));
 $nameParts = preg_split('/\s+/', $playerName) ?: [];
@@ -334,16 +362,30 @@ $paymentProgress = $totalRequired > 0
         </div>
         <a href="/admin/player_edit.php?id=<?= $id ?>" class="btn btn-outline-primary btn-sm"><i class="fa-solid fa-cloud-arrow-up me-1" aria-hidden="true"></i>Manage photos</a>
       </div>
-      <?php if ($actionShots): ?>
-        <div class="player-profile-actionshots-grid">
-          <?php foreach ($actionShots as $shot): ?>
-            <div class="player-profile-actionshot">
-              <img src="/uploads/players/action_shots/<?= rawurlencode((string) $shot['filename']) ?>" alt="<?= htmlspecialchars($playerName, ENT_QUOTES, 'UTF-8') ?> action shot" loading="lazy">
-            </div>
+      <?php if ($actionAndTaggedShots): ?>
+        <p class="text-muted small mb-3">Includes photos tagged of this player in match galleries. Only dedicated action shots (not tagged photos) can be used in Man of the Match, Goal and Player Sponsor graphics.</p>
+        <div class="player-profile-actionshots-grid" data-lightbox>
+          <?php foreach ($actionAndTaggedShots as $shot): ?>
+            <a href="<?= h((string) $shot['url']) ?>" class="player-profile-actionshot" data-full="<?= h((string) $shot['url']) ?>" data-caption="<?= h((string) $shot['label']) ?>">
+              <img src="<?= h((string) $shot['url']) ?>" alt="<?= htmlspecialchars($playerName, ENT_QUOTES, 'UTF-8') ?> — <?= h((string) $shot['label']) ?>" loading="lazy">
+              <?php if ($shot['label'] === 'Tagged match photo'): ?>
+                <span class="player-profile-actionshot-badge">Tagged</span>
+              <?php endif; ?>
+            </a>
           <?php endforeach; ?>
         </div>
+        <div class="lightbox" id="actionShotsLightbox" hidden role="dialog" aria-modal="true" aria-label="Photo viewer">
+          <button class="lightbox__close" type="button" aria-label="Close">&times;</button>
+          <button class="lightbox__nav lightbox__nav--prev" type="button" aria-label="Previous image">&#8249;</button>
+          <div class="lightbox__stage">
+            <img class="lightbox__img" src="" alt="">
+            <p class="lightbox__meta"><span class="lightbox__count"></span><span class="lightbox__caption" hidden></span></p>
+          </div>
+          <button class="lightbox__nav lightbox__nav--next" type="button" aria-label="Next image">&#8250;</button>
+          <div class="lightbox__thumbs"></div>
+        </div>
       <?php else: ?>
-        <p class="text-muted mb-0">No action shots uploaded yet. Add some from the edit page to use in Man of the Match, Goal and Player Sponsor graphics.</p>
+        <p class="text-muted mb-0">No action shots or tagged match photos yet. Add some from the edit page to use in Man of the Match, Goal and Player Sponsor graphics.</p>
       <?php endif; ?>
     </div>
   </section>

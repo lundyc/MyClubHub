@@ -448,7 +448,7 @@ $statusMeta = [
           <span class="players-section__count"><?= $statusCount ?> <?= $statusCount === 1 ? 'player' : 'players' ?></span>
         </header>
         <div class="players-section__table">
-          <table class="table table-modern players-table hub-data-table align-middle mb-0">
+          <table class="table table-modern players-table hub-data-table hub-data-table--responsive align-middle mb-0">
             <thead>
               <tr>
                 <th scope="col">Player</th>
@@ -466,7 +466,7 @@ $statusMeta = [
                     : (isset($atRiskPlayers[$pl['id']]) ? 'players-table-row--warning' : '');
                 ?>
                 <tr class="players-table-row <?= $rowStateClass ?>">
-                  <td class="players-table__player-cell">
+                  <td class="players-table__player-cell" data-label="Player">
                     <div class="players-player">
                       <div class="players-avatar players-avatar--table">
                         <?php if (!empty($pl['avatar'])): ?>
@@ -483,16 +483,16 @@ $statusMeta = [
                       </div>
                     </div>
                   </td>
-                  <td class="players-table__sponsors-cell">
+                  <td class="players-table__sponsors-cell" data-label="Sponsors">
                     <?php if (!empty($slotsByPlayer[$pl['id']])): ?>
                       <?= renderPlayerSponsorSlots($slotsByPlayer[$pl['id']]) ?>
                     <?php else: ?>
                       <span class="players-empty-sponsor"><i class="fa-regular fa-circle" aria-hidden="true"></i>No sponsors assigned</span>
                     <?php endif; ?>
                   </td>
-                  <td class="text-center"><?= renderDoneIcon((bool) $pl['profile_picture_done']) ?></td>
-                  <td class="text-center"><?= renderDoneIcon((bool) $pl['website_done']) ?></td>
-                  <td class="text-center players-table__actions-col">
+                  <td class="text-center" data-label="Profile Picture"><?= renderDoneIcon((bool) $pl['profile_picture_done']) ?></td>
+                  <td class="text-center" data-label="Website"><?= renderDoneIcon((bool) $pl['website_done']) ?></td>
+                  <td class="text-center players-table__actions-col" data-label="Actions">
                     <div class="btn-group players-row-actions hub-actions" role="group" aria-label="Player actions">
                       <a href="player_view.php?id=<?= $pl['id'] ?>"
                         class="btn btn-sm btn-action btn-view"

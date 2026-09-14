@@ -44,6 +44,23 @@ function history_ensure_schema(PDO $pdo): void
         KEY idx_history_matches_season (season)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 
+    // Additive: link an archived result to its live match_fixtures row once the
+    // history merge (tools/merge_history_into_fixtures.php) has run, so the
+    // public match page can pull the old written report / scorers through it.
+    $matchColumns = [];
+    foreach ($pdo->query('SHOW COLUMNS FROM history_matches') as $column) {
+        $matchColumns[(string) $column['Field']] = true;
+    }
+    if (!isset($matchColumns['fixture_id'])) {
+        try {
+            $pdo->exec("ALTER TABLE history_matches
+                ADD COLUMN fixture_id INT UNSIGNED NULL AFTER id,
+                ADD KEY idx_history_matches_fixture (fixture_id)");
+        } catch (Throwable) {
+            // another request beat us to it, or the grant is read-only — harmless
+        }
+    }
+
     $pdo->exec("CREATE TABLE IF NOT EXISTS history_player_stats (
         id INT UNSIGNED NOT NULL AUTO_INCREMENT,
         legacy_id INT UNSIGNED NULL,

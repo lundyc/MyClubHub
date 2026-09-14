@@ -1,0 +1,142 @@
+{
+  "season": "1973-74",
+  "season_full": "1973-1974",
+  "competition": "Ayrshire Regional Junior Football League - North",
+  "source": "tables 1891 to 2014.xlsx",
+  "source_sheet": "1968-80",
+  "source_status_note": "TABLE MATHEMATICALLY SOUND",
+  "league_table": [
+    {
+      "position": 1,
+      "team": "Irvine Victoria",
+      "played": 20,
+      "won": 15,
+      "drawn": 4,
+      "lost": 1,
+      "goals_for": 66,
+      "goals_against": 29,
+      "goal_difference": 37,
+      "points": 34
+    },
+    {
+      "position": 2,
+      "team": "Kilbirnie Ladeside",
+      "played": 20,
+      "won": 15,
+      "drawn": 2,
+      "lost": 3,
+      "goals_for": 75,
+      "goals_against": 33,
+      "goal_difference": 42,
+      "points": 32
+    },
+    {
+      "position": 3,
+      "team": "Beith",
+      "played": 20,
+      "won": 11,
+      "drawn": 5,
+      "lost": 4,
+      "goals_for": 67,
+      "goals_against": 29,
+      "goal_difference": 38,
+      "points": 27
+    },
+    {
+      "position": 4,
+      "team": "Irvine Meadow XI",
+      "played": 20,
+      "won": 10,
+      "drawn": 6,
+      "lost": 4,
+      "goals_for": 63,
+      "goals_against": 35,
+      "goal_difference": 28,
+      "points": 26
+    },
+    {
+      "position": 5,
+      "team": "Largs Thistle",
+      "played": 20,
+      "won": 9,
+      "drawn": 3,
+      "lost": 8,
+      "goals_for": 39,
+      "goals_against": 40,
+      "goal_difference": -1,
+      "points": 21
+    },
+    {
+      "position": 6,
+      "team": "Dalry Thistle",
+      "played": 20,
+      "won": 8,
+      "drawn": 4,
+      "lost": 8,
+      "goals_for": 43,
+      "goals_against": 49,
+      "goal_difference": -6,
+      "points": 20
+    },
+    {
+      "position": 7,
+      "team": "Ardrossan Winton Rovers",
+      "played": 20,
+      "won": 7,
+      "drawn": 6,
+      "lost": 7,
+      "goals_for": 37,
+      "goals_against": 40,
+      "goal_difference": -3,
+      "points": 20
+    },
+    {
+      "position": 8,
+      "team": "Saltcoats Victoria",
+      "played": 20,
+      "won": 6,
+      "drawn": 7,
+      "lost": 7,
+      "goals_for": 41,
+      "goals_against": 44,
+      "goal_difference": -3,
+      "points": 19
+    },
+    {
+      "position": 9,
+      "team": "Troon",
+      "played": 20,
+      "won": 3,
+      "drawn": 2,
+      "lost": 15,
+      "goals_for": 26,
+      "goals_against": 69,
+      "goal_difference": -43,
+      "points": 8
+    },
+    {
+      "position": 10,
+      "team": "Kilwinning Rangers",
+      "played": 20,
+      "won": 2,
+      "drawn": 3,
+      "lost": 15,
+      "goals_for": 26,
+      "goals_against": 66,
+      "goal_difference": -40,
+      "points": 7
+    },
+    {
+      "position": 11,
+      "team": "Ardeer Thistle",
+      "played": 20,
+      "won": 2,
+      "drawn": 2,
+      "lost": 16,
+      "goals_for": 33,
+      "goals_against": 82,
+      "goal_difference": -49,
+      "points": 6
+    }
+  ]
+}

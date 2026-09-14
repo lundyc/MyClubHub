@@ -113,3 +113,83 @@ $(function () {
     });
   });
 });
+
+// Action-shots lightbox — click a thumbnail to open, arrows/keys/thumbnail
+// strip to browse. Ported from the public site's [data-lightbox] pattern.
+(function () {
+  const grid = document.querySelector("[data-lightbox]");
+  const lightbox = document.getElementById("actionShotsLightbox");
+  if (!grid || !lightbox) return;
+
+  const img = lightbox.querySelector(".lightbox__img");
+  const countEl = lightbox.querySelector(".lightbox__count");
+  const captionEl = lightbox.querySelector(".lightbox__caption");
+  const thumbsWrap = lightbox.querySelector(".lightbox__thumbs");
+  const stage = lightbox.querySelector(".lightbox__stage");
+  const items = Array.from(grid.querySelectorAll("[data-full]"));
+  const thumbEls = [];
+  let current = 0;
+
+  if (items.length < 2) lightbox.classList.add("lightbox--single");
+
+  items.forEach((item, index) => {
+    const innerImg = item.querySelector("img");
+    const thumb = document.createElement("button");
+    thumb.type = "button";
+    thumb.className = "lightbox__thumb";
+    thumb.setAttribute("aria-label", "Show image " + (index + 1));
+    const thumbImg = document.createElement("img");
+    thumbImg.src = innerImg ? innerImg.getAttribute("src") : item.getAttribute("data-full");
+    thumbImg.alt = "";
+    thumb.appendChild(thumbImg);
+    thumb.addEventListener("click", () => show(index));
+    if (thumbsWrap) thumbsWrap.appendChild(thumb);
+    thumbEls.push(thumb);
+  });
+
+  function show(index) {
+    current = (index + items.length) % items.length;
+    img.src = items[current].getAttribute("data-full");
+    const caption = items[current].getAttribute("data-caption") || "";
+    if (captionEl) { captionEl.textContent = caption; captionEl.hidden = caption === ""; }
+    if (countEl) countEl.textContent = (current + 1) + " / " + items.length;
+    thumbEls.forEach((thumb, i) => thumb.classList.toggle("is-active", i === current));
+    const active = thumbEls[current];
+    if (active && active.scrollIntoView) active.scrollIntoView({ inline: "center", block: "nearest" });
+  }
+
+  function open(index) {
+    show(index);
+    lightbox.hidden = false;
+    document.body.classList.add("lightbox-open");
+    const closeButton = lightbox.querySelector(".lightbox__close");
+    if (closeButton) closeButton.focus();
+  }
+
+  function close() {
+    lightbox.hidden = true;
+    img.src = "";
+    document.body.classList.remove("lightbox-open");
+  }
+
+  grid.addEventListener("click", (event) => {
+    const item = event.target.closest("[data-full]");
+    if (!item) return;
+    event.preventDefault();
+    open(items.indexOf(item));
+  });
+
+  lightbox.addEventListener("click", (event) => {
+    if (event.target.closest(".lightbox__nav--next")) show(current + 1);
+    else if (event.target.closest(".lightbox__nav--prev")) show(current - 1);
+    else if (event.target.closest(".lightbox__thumb")) { /* handled per-thumb */ }
+    else if (event.target === lightbox || event.target === stage || event.target.closest(".lightbox__close")) close();
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (lightbox.hidden) return;
+    if (event.key === "Escape") close();
+    else if (event.key === "ArrowRight") show(current + 1);
+    else if (event.key === "ArrowLeft") show(current - 1);
+  });
+})();

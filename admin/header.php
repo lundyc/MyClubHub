@@ -499,10 +499,6 @@ $documentTitle = $documentTitle !== '' ? $documentTitle . ' – ' . APP_NAME : A
                             <?php endif; ?>
                             <li class="nav-item"><a class="nav-link <?= activePage('index.php') ?>"<?= hub_nav_current(['index.php']) ?> href="/admin/index.php"><i class="fa-solid fa-house me-1" aria-hidden="true"></i>Club overview</a></li>
                             <li class="nav-item"><a class="nav-link <?= activePage('club_reminders.php') ?>"<?= hub_nav_current(['club_reminders.php']) ?> href="/admin/club_reminders.php"><i class="fa-solid fa-bell me-1" aria-hidden="true"></i>Reminders</a></li>
-                            <?php if (hub_auth_has_capability('football_ops')): ?>
-                                <!-- Temporary historical PDF importer entry. -->
-                                <li class="nav-item"><a class="nav-link <?= activePage('pdf_importer.php') ?>"<?= hub_nav_current(['pdf_importer.php']) ?> href="/admin/pdf_importer.php"><i class="fa-solid fa-file-pdf me-1" aria-hidden="true"></i>PDF Importer <span class="badge bg-secondary ms-1">Temporary</span></a></li>
-                            <?php endif; ?>
                         </ul>
                     </section>
 
@@ -554,7 +550,7 @@ $documentTitle = $documentTitle !== '' ? $documentTitle . ' – ' . APP_NAME : A
 
                     <?php if ($isAdmin): ?>
                     <section class="nav-section">
-                        <?php $shopActive = activeGroup(['shop_overview.php', 'shop_products.php', 'shop_product.php', 'shop_categories.php', 'shop_modifiers.php', 'shop_orders.php', 'shop_order.php', 'shop_settings.php']); ?>
+                        <?php $shopActive = activeGroup(['shop_overview.php', 'shop_products.php', 'shop_product.php', 'shop_categories.php', 'shop_modifiers.php', 'shop_orders.php', 'shop_order.php', 'shop_settings.php', 'shop_discount_codes.php']); ?>
                         <button class="nav-section-toggle <?= $shopActive ?>" type="button" data-bs-toggle="collapse" data-bs-target="#hubShopNavigation" data-nav-section="shop" aria-expanded="<?= $shopActive === 'active' ? 'true' : 'false' ?>" aria-controls="hubShopNavigation">
                             <span>Shop</span><i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
                         </button>
@@ -564,6 +560,7 @@ $documentTitle = $documentTitle !== '' ? $documentTitle . ' – ' . APP_NAME : A
                             <li class="nav-item"><a class="nav-link <?= activeGroup(['shop_products.php', 'shop_product.php']) ?>"<?= hub_nav_current(['shop_products.php', 'shop_product.php']) ?> href="/admin/shop_products.php"><i class="fa-solid fa-shirt me-1" aria-hidden="true"></i>Products</a></li>
                             <li class="nav-item"><a class="nav-link <?= activePage('shop_categories.php') ?>"<?= hub_nav_current(['shop_categories.php']) ?> href="/admin/shop_categories.php"><i class="fa-solid fa-layer-group me-1" aria-hidden="true"></i>Categories</a></li>
                             <li class="nav-item"><a class="nav-link <?= activePage('shop_modifiers.php') ?>"<?= hub_nav_current(['shop_modifiers.php']) ?> href="/admin/shop_modifiers.php"><i class="fa-solid fa-sliders me-1" aria-hidden="true"></i>Modifiers</a></li>
+                            <li class="nav-item"><a class="nav-link <?= activePage('shop_discount_codes.php') ?>"<?= hub_nav_current(['shop_discount_codes.php']) ?> href="/admin/shop_discount_codes.php"><i class="fa-solid fa-tag me-1" aria-hidden="true"></i>Discount codes</a></li>
                             <li class="nav-item"><a class="nav-link <?= activePage('shop_settings.php') ?>"<?= hub_nav_current(['shop_settings.php']) ?> href="/admin/shop_settings.php"><i class="fa-solid fa-gear me-1" aria-hidden="true"></i>Shop settings</a></li>
                             <li class="nav-item"><a class="nav-link" href="/shop/" target="_blank" rel="noopener"><i class="fa-solid fa-arrow-up-right-from-square me-1" aria-hidden="true"></i>View storefront</a></li>
                         </ul>

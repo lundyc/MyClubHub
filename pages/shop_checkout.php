@@ -24,6 +24,8 @@ if ($summary['has_blocked']) {
 $origin = current_url_origin();
 $deliveryEnabled = shop_delivery_enabled(db());
 $deliveryFee = shop_delivery_fee(db());
+$schedulingEnabled = shop_scheduling_enabled(db());
+$availableDates = $schedulingEnabled ? shop_available_collection_dates(db()) : [];
 $errors = [];
 $form = [
     'name' => trim((string) ($_POST['customer_name'] ?? '')),
@@ -33,6 +35,7 @@ $form = [
     'marketing' => !empty($_POST['marketing_opt_in']),
     'fulfilment_method' => ($deliveryEnabled && (string) ($_POST['fulfilment_method'] ?? 'collection') === 'delivery') ? 'delivery' : 'collection',
     'delivery_address' => trim((string) ($_POST['delivery_address'] ?? '')),
+    'requested_date' => trim((string) ($_POST['requested_date'] ?? '')),
 ];
 
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && (string) ($_POST['action'] ?? '') === 'place_order') {
@@ -54,6 +57,9 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && (string) ($_POST['action
     if ($form['fulfilment_method'] === 'delivery' && $form['delivery_address'] === '') {
         $errors[] = 'Please enter a delivery address.';
     }
+    if ($schedulingEnabled && !in_array($form['requested_date'], $availableDates, true)) {
+        $errors[] = 'Please choose an available ' . ($form['fulfilment_method'] === 'delivery' ? 'delivery' : 'collection') . ' date.';
+    }
     if (!stripe_is_configured()) {
         $errors[] = 'Online payment is not available right now. Please contact the club to place your order.';
     }
@@ -67,6 +73,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && (string) ($_POST['action
     }
 
     if (!$errors) {
+        $createdOrder = null;
         try {
             $order = shop_create_order(
                 db(),
@@ -78,8 +85,10 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && (string) ($_POST['action
                 [
                     'discount_code' => $summary['discount_code'], 'terms_accepted' => true,
                     'fulfilment_method' => $form['fulfilment_method'], 'delivery_address' => $form['delivery_address'],
+                    'requested_date' => $form['requested_date'], 'enforce_schedule' => true,
                 ]
             );
+            $createdOrder = $order;
 
             $viewUrl = $origin . url('shop/order/' . rawurlencode((string) $order['access_token']));
 
@@ -99,6 +108,13 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && (string) ($_POST['action
             redirect($checkout['url']);
         } catch (Throwable $e) {
             error_log('[public shop checkout] ' . $e->getMessage());
+            // The order was created (reserving stock) but never got a Stripe
+            // session to redeem it — release that reservation so it isn't
+            // held forever with no checkout.session.expired to free it.
+            if ($createdOrder && (string) ($createdOrder['status'] ?? '') === 'pending_payment'
+                && empty($createdOrder['stripe_checkout_session_id'])) {
+                shop_cancel_order(db(), (int) $createdOrder['id'], 'Failed to start Stripe checkout');
+            }
             $errors[] = 'Something went wrong starting your payment. Please try again — you have not been charged.';
         }
     }
@@ -138,6 +154,12 @@ set_meta(['title' => 'Checkout']);
             <label class="check"><input type="radio" name="fulfilment_method" value="delivery" <?= $form['fulfilment_method'] === 'delivery' ? 'checked' : '' ?>>
               <span>Delivery — <?= e(gbp($deliveryFee)) ?></span></label>
           </div>
+          <?php if (($settings['collection_address'] ?? '') !== '' || ($settings['collection_map_url'] ?? '') !== ''): ?>
+            <p class="pdp__note">
+              <?php if (($settings['collection_address'] ?? '') !== ''): ?><span style="white-space:pre-line"><?= e((string) $settings['collection_address']) ?></span><?php endif; ?>
+              <?php if (($settings['collection_map_url'] ?? '') !== ''): ?> <a href="<?= e((string) $settings['collection_map_url']) ?>" target="_blank" rel="noopener">Get directions</a><?php endif; ?>
+            </p>
+          <?php endif; ?>
           <label class="field" data-delivery-address <?= $form['fulfilment_method'] === 'delivery' ? '' : 'hidden' ?>>
             <span>Delivery address</span>
             <textarea name="delivery_address" rows="3" placeholder="Address, including postcode" <?= $form['fulfilment_method'] === 'delivery' ? 'required' : '' ?>><?= e($form['delivery_address']) ?></textarea>
@@ -145,6 +167,24 @@ set_meta(['title' => 'Checkout']);
         <?php else: ?>
           <p class="pdp__note"><strong>Collection only</strong> from <?= e((string) ($settings['collection_point'] ?? 'Campbell Park')) ?>.
             <?= e((string) ($settings['delivery_note'] ?? 'There is no delivery option for this shop.')) ?></p>
+          <?php if (($settings['collection_address'] ?? '') !== '' || ($settings['collection_map_url'] ?? '') !== ''): ?>
+            <p class="pdp__note">
+              <?php if (($settings['collection_address'] ?? '') !== ''): ?><span style="white-space:pre-line"><?= e((string) $settings['collection_address']) ?></span><?php endif; ?>
+              <?php if (($settings['collection_map_url'] ?? '') !== ''): ?> <a href="<?= e((string) $settings['collection_map_url']) ?>" target="_blank" rel="noopener">Get directions</a><?php endif; ?>
+            </p>
+          <?php endif; ?>
+        <?php endif; ?>
+        <?php if ($schedulingEnabled): ?>
+          <label class="field">
+            <span><?= $form['fulfilment_method'] === 'delivery' ? 'Delivery date' : 'Collection date' ?></span>
+            <select name="requested_date" required>
+              <option value="">Choose a date&hellip;</option>
+              <?php foreach ($availableDates as $d): ?>
+                <option value="<?= e($d) ?>" <?= $form['requested_date'] === $d ? 'selected' : '' ?>><?= e((new DateTimeImmutable($d))->format('l j F Y')) ?></option>
+              <?php endforeach; ?>
+            </select>
+            <?php if (!$availableDates): ?><div class="pdp__note">No dates are available right now — please contact the club.</div><?php endif; ?>
+          </label>
         <?php endif; ?>
         <?php if (trim((string) ($settings['terms'] ?? '')) !== ''): ?>
           <div class="checkout-terms"><?= nl2br(e((string) $settings['terms'])) ?></div>

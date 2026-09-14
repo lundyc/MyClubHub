@@ -4,8 +4,8 @@ declare(strict_types=1);
 $pageStyles = ['developer_analytics.css'];
 $pageHero = [
     'eyebrow' => 'Developer',
-    'title' => 'Product Analytics',
-    'subtitle' => 'Private usage intelligence for pages, features, journeys, users, devices, and click maps.',
+    'title' => 'Analytics & SEO',
+    'subtitle' => 'Site visitors, search performance, and hub usage — without leaving the admin.',
     'actions' => [
         ['label' => 'Developer dashboard', 'href' => '/developer.php', 'icon' => 'fa-arrow-left'],
     ],
@@ -13,6 +13,7 @@ $pageHero = [
 
 require_once __DIR__ . '/header.php';
 require_once __DIR__ . '/lib/analytics.php';
+require_once __DIR__ . '/lib/google_reporting.php';
 
 if (!hub_auth_is_developer()) {
     echo '<div class="alert alert-danger m-3">Access denied.</div>';
@@ -20,10 +21,24 @@ if (!hub_auth_is_developer()) {
     exit;
 }
 
-hub_analytics_ensure_schema($pdo);
+$view = $_GET['view'] ?? 'site';
+$view = in_array($view, ['site', 'seo', 'hub'], true) ? $view : 'site';
 
 $days = hub_analytics_interval_days($_GET['days'] ?? 30);
-$dateSql = 'created_at >= DATE_SUB(NOW(), INTERVAL ' . $days . ' DAY)';
+
+function ga_percent(int|float|null $fraction): string
+{
+    return number_format(((float) ($fraction ?? 0)) * 100, 1) . '%';
+}
+
+function ga_seconds(int|float|null $seconds): string
+{
+    $seconds = (int) round((float) ($seconds ?? 0));
+    if ($seconds < 60) {
+        return $seconds . 's';
+    }
+    return floor($seconds / 60) . 'm ' . ($seconds % 60) . 's';
+}
 
 function analytics_number(int|float|null $value): string
 {
@@ -78,6 +93,11 @@ function analytics_paginate_rows(array $rows, int $page, int $perPage = 10): arr
     ];
 }
 
+/**
+ * Windowed pager: first, last, current +/- 2 neighbours, with "…" gaps and
+ * prev/next arrows — plain 1..N lists got unusably long once a table had
+ * more than a page or two of rows.
+ */
 function analytics_render_pagination(string $pageKey, array $pagination, int $days): void
 {
     $totalPages = (int) ($pagination['total_pages'] ?? 1);
@@ -88,14 +108,41 @@ function analytics_render_pagination(string $pageKey, array $pagination, int $da
     $currentPage = (int) ($pagination['page'] ?? 1);
     $baseParams = $_GET;
     $baseParams['days'] = $days;
+
+    $link = static function (int $page) use ($pageKey, $baseParams): string {
+        $params = $baseParams;
+        $params[$pageKey] = $page;
+        return '?' . http_build_query($params);
+    };
+
+    $window = 2;
+    $pages = array_unique(array_merge(
+        [1, $totalPages],
+        range(max(1, $currentPage - $window), min($totalPages, $currentPage + $window))
+    ));
+    sort($pages);
+
     echo '<nav class="mt-3" aria-label="' . h(str_replace('_', ' ', $pageKey)) . ' pages"><ul class="pagination pagination-sm mb-0">';
-    for ($page = 1; $page <= $totalPages; $page++) {
-        $baseParams[$pageKey] = $page;
-        $href = '?' . http_build_query($baseParams);
-        echo '<li class="page-item' . ($page === $currentPage ? ' active' : '') . '"><a class="page-link" href="' . h($href) . '">' . $page . '</a></li>';
+
+    echo '<li class="page-item' . ($currentPage <= 1 ? ' disabled' : '') . '"><a class="page-link" href="' . h($link(max(1, $currentPage - 1))) . '" aria-label="Previous">&laquo;</a></li>';
+
+    $previous = 0;
+    foreach ($pages as $page) {
+        if ($previous !== 0 && $page - $previous > 1) {
+            echo '<li class="page-item disabled"><span class="page-link">&hellip;</span></li>';
+        }
+        echo '<li class="page-item' . ($page === $currentPage ? ' active' : '') . '"><a class="page-link" href="' . h($link($page)) . '">' . $page . '</a></li>';
+        $previous = $page;
     }
+
+    echo '<li class="page-item' . ($currentPage >= $totalPages ? ' disabled' : '') . '"><a class="page-link" href="' . h($link(min($totalPages, $currentPage + 1))) . '" aria-label="Next">&raquo;</a></li>';
+
     echo '</ul></nav>';
 }
+
+if ($view === 'hub') {
+    hub_analytics_ensure_schema($pdo);
+    $dateSql = 'created_at >= DATE_SUB(NOW(), INTERVAL ' . $days . ' DAY)';
 
 $summary = analytics_fetch_one($pdo, "
     SELECT
@@ -196,24 +243,296 @@ $daily = analytics_fetch_all($pdo, "
     ORDER BY event_day DESC
 ");
 
-$topPagesPagination = analytics_paginate_rows($topPages, analytics_page_param('pages_page'));
 $topFeaturesPagination = analytics_paginate_rows($topFeatures, analytics_page_param('features_page'));
-$usersPagination = analytics_paginate_rows($users, analytics_page_param('users_page'));
+$usersPagination = analytics_paginate_rows($users, analytics_page_param('users_page'), 6);
 $journeysPagination = analytics_paginate_rows($journeys, analytics_page_param('journeys_page'));
-$devicesPagination = analytics_paginate_rows($devices, analytics_page_param('devices_page'));
-$dailyPagination = analytics_paginate_rows($daily, analytics_page_param('daily_page'));
 
-$topPagesVisible = $topPagesPagination['rows'];
 $topFeaturesVisible = $topFeaturesPagination['rows'];
 $usersVisible = $usersPagination['rows'];
 $journeysVisible = $journeysPagination['rows'];
-$devicesVisible = $devicesPagination['rows'];
-$dailyVisible = $dailyPagination['rows'];
 
-$maxPageViews = max(1, ...array_map(static fn(array $row): int => (int) $row['page_views'], $topPagesVisible ?: [['page_views' => 1]]));
 $maxFeatureEvents = max(1, ...array_map(static fn(array $row): int => (int) $row['events'], $topFeaturesVisible ?: [['events' => 1]]));
-$maxDailyViews = max(1, ...array_map(static fn(array $row): int => (int) $row['page_views'], $dailyVisible ?: [['page_views' => 1]]));
+
+// $topPages is already sorted by page_views DESC — top 5 is the head, worst
+// 5 is the least-visited among whatever's left (so the two lists never
+// overlap unless fewer than 6 pages have any tracked activity at all).
+$topFivePages = array_slice($topPages, 0, 5);
+$worstFivePages = array_slice(array_reverse(array_slice($topPages, 5)), 0, 5);
+$maxPageViews = max(1, ...array_map(static fn(array $row): int => (int) $row['page_views'], $topPages ?: [['page_views' => 1]]));
+
+$dailyChart = array_reverse($daily);
+} // end $view === 'hub' data prep
 ?>
+
+<nav class="nav nav-tabs mb-4" aria-label="Analytics sections">
+    <?php foreach (['site' => 'Site Analytics', 'seo' => 'SEO', 'hub' => 'Hub Usage'] as $tabKey => $tabLabel): ?>
+        <a class="nav-link <?= $view === $tabKey ? 'active' : '' ?>" <?= $view === $tabKey ? 'aria-current="page"' : '' ?> href="?view=<?= $tabKey ?>&amp;days=<?= $days ?>"><?= h($tabLabel) ?></a>
+    <?php endforeach; ?>
+</nav>
+
+<?php if (!google_reporting_enabled() && $view !== 'hub'): ?>
+    <div class="alert alert-warning m-3">Google Analytics / Search Console credentials aren't configured yet.</div>
+<?php elseif ($view === 'site'): ?>
+    <?php
+    $gaSummary = ga4_summary($days);
+    $gaTopPages = ga4_top_pages($days);
+    $gaSources = ga4_traffic_sources($days);
+    $gaDevices = ga4_devices($days);
+    $gaDaily = ga4_daily_trend($days);
+    $gaError = $gaSummary['error'] ?? $gaTopPages['error'] ?? null;
+    $s = $gaSummary['rows'][0] ?? [];
+    $maxGaDaily = max(1, ...array_map(static fn(array $r): int => (int) ($r['screenPageViews'] ?? 0), $gaDaily['rows'] ?: [['screenPageViews' => 1]]));
+    ?>
+    <div class="analytics-dashboard">
+        <div class="analytics-toolbar">
+            <div>
+                <strong>Site Analytics</strong>
+                <div class="text-muted small">Public site visitors, via Google Analytics.</div>
+            </div>
+            <div class="analytics-range" aria-label="Date range">
+                <?php foreach ([7, 30, 90, 365] as $range): ?>
+                    <a class="btn <?= $days === $range ? 'btn-brand' : 'btn-outline-secondary' ?>" href="?view=site&amp;days=<?= $range ?>"><?= $range === 365 ? 'Year' : $range . ' days' ?></a>
+                <?php endforeach; ?>
+            </div>
+        </div>
+
+        <?php if ($gaError): ?>
+            <div class="alert alert-danger m-3">Google Analytics error: <?= h($gaError) ?></div>
+        <?php else: ?>
+            <?php
+            hub_render_metric_grid([
+                ['label' => 'Page views', 'value' => analytics_number((int) ($s['screenPageViews'] ?? 0)), 'meta' => $days . ' day window', 'icon' => 'fa-eye', 'tone' => 'primary'],
+                ['label' => 'Visitors', 'value' => analytics_number((int) ($s['activeUsers'] ?? 0)), 'meta' => analytics_number((int) ($s['newUsers'] ?? 0)) . ' new', 'icon' => 'fa-users', 'tone' => 'success'],
+                ['label' => 'Sessions', 'value' => analytics_number((int) ($s['sessions'] ?? 0)), 'meta' => ga_seconds((float) ($s['averageSessionDuration'] ?? 0)) . ' avg', 'icon' => 'fa-arrows-turn-right', 'tone' => 'info'],
+                ['label' => 'Bounce rate', 'value' => ga_percent((float) ($s['bounceRate'] ?? 0)), 'meta' => 'left after one page', 'icon' => 'fa-door-open', 'tone' => 'warning'],
+            ], 'Site analytics summary');
+            ?>
+
+            <div class="analytics-grid">
+                <section class="analytics-panel analytics-panel--wide">
+                    <div class="analytics-panel__header">
+                        <div>
+                            <h2 class="analytics-panel__title">Top Pages</h2>
+                            <p class="analytics-panel__meta">Most visited public pages.</p>
+                        </div>
+                    </div>
+                    <?php if ($gaTopPages['rows'] === []): ?>
+                        <p class="analytics-empty">No data for this date range yet.</p>
+                    <?php else: ?>
+                        <div class="table-responsive">
+                            <table class="table analytics-table align-middle">
+                                <thead><tr><th>Page</th><th>Views</th><th>Visitors</th><th>Avg time</th></tr></thead>
+                                <tbody>
+                                <?php foreach ($gaTopPages['rows'] as $row): ?>
+                                    <tr>
+                                        <td>
+                                            <div class="fw-bold"><?= h((string) $row['pageTitle']) ?></div>
+                                            <div class="small text-muted"><?= h((string) $row['pagePath']) ?></div>
+                                        </td>
+                                        <td><?= analytics_number((int) $row['screenPageViews']) ?></td>
+                                        <td><?= analytics_number((int) $row['activeUsers']) ?></td>
+                                        <td><?= ga_seconds((float) $row['averageSessionDuration']) ?></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    <?php endif; ?>
+                </section>
+
+                <section class="analytics-panel analytics-panel--side">
+                    <div class="analytics-panel__header">
+                        <div>
+                            <h2 class="analytics-panel__title">Traffic Sources</h2>
+                            <p class="analytics-panel__meta">Where visitors come from.</p>
+                        </div>
+                    </div>
+                    <?php if ($gaSources['rows'] === []): ?>
+                        <p class="analytics-empty">No data yet.</p>
+                    <?php else: ?>
+                        <table class="table analytics-table align-middle">
+                            <thead><tr><th>Source</th><th>Sessions</th></tr></thead>
+                            <tbody>
+                            <?php foreach ($gaSources['rows'] as $row): ?>
+                                <tr><td><?= h((string) $row['sessionDefaultChannelGroup']) ?></td><td><?= analytics_number((int) $row['sessions']) ?></td></tr>
+                            <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    <?php endif; ?>
+                </section>
+
+                <section class="analytics-panel analytics-panel--side">
+                    <div class="analytics-panel__header">
+                        <div>
+                            <h2 class="analytics-panel__title">Devices</h2>
+                            <p class="analytics-panel__meta">Mobile vs desktop split.</p>
+                        </div>
+                    </div>
+                    <?php if ($gaDevices['rows'] === []): ?>
+                        <p class="analytics-empty">No data yet.</p>
+                    <?php else: ?>
+                        <table class="table analytics-table align-middle">
+                            <thead><tr><th>Device</th><th>Sessions</th></tr></thead>
+                            <tbody>
+                            <?php foreach ($gaDevices['rows'] as $row): ?>
+                                <tr><td><?= h(ucfirst((string) $row['deviceCategory'])) ?></td><td><?= analytics_number((int) $row['sessions']) ?></td></tr>
+                            <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    <?php endif; ?>
+                </section>
+
+                <section class="analytics-panel analytics-panel--wide">
+                    <div class="analytics-panel__header">
+                        <div>
+                            <h2 class="analytics-panel__title">Daily Trend</h2>
+                            <p class="analytics-panel__meta">Page views by day.</p>
+                        </div>
+                    </div>
+                    <?php if ($gaDaily['rows'] === []): ?>
+                        <p class="analytics-empty">No trend data yet.</p>
+                    <?php else: ?>
+                        <table class="table analytics-table align-middle">
+                            <thead><tr><th>Day</th><th>Views</th><th>Visitors</th></tr></thead>
+                            <tbody>
+                            <?php foreach (array_reverse($gaDaily['rows']) as $row): ?>
+                                <tr>
+                                    <td><?= h(date('d M', strtotime((string) $row['date']))) ?></td>
+                                    <td>
+                                        <div class="analytics-bar">
+                                            <span><?= analytics_number((int) $row['screenPageViews']) ?></span>
+                                            <span class="analytics-bar__track"><span class="analytics-bar__fill" style="width: <?= min(100, ((int) $row['screenPageViews'] / $maxGaDaily) * 100) ?>%"></span></span>
+                                        </div>
+                                    </td>
+                                    <td><?= analytics_number((int) $row['activeUsers']) ?></td>
+                                </tr>
+                            <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    <?php endif; ?>
+                </section>
+            </div>
+        <?php endif; ?>
+    </div>
+<?php elseif ($view === 'seo'): ?>
+    <?php
+    $scSummary = gsc_summary($days);
+    $scQueries = gsc_top_queries($days);
+    $scPages = gsc_top_pages($days);
+    $scDaily = gsc_daily_trend($days);
+    $scError = $scSummary['error'] ?? $scQueries['error'] ?? null;
+    $sRow = $scSummary['rows'][0] ?? [];
+    $maxScDaily = max(1, ...array_map(static fn(array $r): float => (float) ($r['clicks'] ?? 0), $scDaily['rows'] ?: [['clicks' => 1]]));
+    ?>
+    <div class="analytics-dashboard">
+        <div class="analytics-toolbar">
+            <div>
+                <strong>SEO</strong>
+                <div class="text-muted small">Search performance, via Google Search Console. Data lags by about 2 days.</div>
+            </div>
+            <div class="analytics-range" aria-label="Date range">
+                <?php foreach ([7, 30, 90, 365] as $range): ?>
+                    <a class="btn <?= $days === $range ? 'btn-brand' : 'btn-outline-secondary' ?>" href="?view=seo&amp;days=<?= $range ?>"><?= $range === 365 ? 'Year' : $range . ' days' ?></a>
+                <?php endforeach; ?>
+            </div>
+        </div>
+
+        <?php if ($scError): ?>
+            <div class="alert alert-danger m-3">Search Console error: <?= h($scError) ?></div>
+        <?php else: ?>
+            <?php
+            hub_render_metric_grid([
+                ['label' => 'Search clicks', 'value' => analytics_number((float) ($sRow['clicks'] ?? 0)), 'meta' => $days . ' day window', 'icon' => 'fa-arrow-pointer', 'tone' => 'primary'],
+                ['label' => 'Impressions', 'value' => analytics_number((float) ($sRow['impressions'] ?? 0)), 'meta' => 'times shown in search', 'icon' => 'fa-eye', 'tone' => 'success'],
+                ['label' => 'Click-through rate', 'value' => ga_percent((float) ($sRow['ctr'] ?? 0)), 'meta' => 'of impressions clicked', 'icon' => 'fa-percent', 'tone' => 'info'],
+                ['label' => 'Avg position', 'value' => number_format((float) ($sRow['position'] ?? 0), 1), 'meta' => 'lower is better', 'icon' => 'fa-ranking-star', 'tone' => 'warning'],
+            ], 'SEO summary');
+            ?>
+
+            <div class="analytics-grid">
+                <section class="analytics-panel analytics-panel--wide">
+                    <div class="analytics-panel__header">
+                        <div>
+                            <h2 class="analytics-panel__title">Top Search Queries</h2>
+                            <p class="analytics-panel__meta">What people search to find this site.</p>
+                        </div>
+                    </div>
+                    <?php if ($scQueries['rows'] === []): ?>
+                        <p class="analytics-empty">No search query data yet — this can take a few days after verifying with Google.</p>
+                    <?php else: ?>
+                        <div class="table-responsive">
+                            <table class="table analytics-table align-middle">
+                                <thead><tr><th>Query</th><th>Clicks</th><th>Impressions</th><th>CTR</th><th>Position</th></tr></thead>
+                                <tbody>
+                                <?php foreach ($scQueries['rows'] as $row): ?>
+                                    <tr>
+                                        <td><?= h((string) ($row['keys'][0] ?? '')) ?></td>
+                                        <td><?= analytics_number((float) $row['clicks']) ?></td>
+                                        <td><?= analytics_number((float) $row['impressions']) ?></td>
+                                        <td><?= ga_percent((float) $row['ctr']) ?></td>
+                                        <td><?= number_format((float) $row['position'], 1) ?></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    <?php endif; ?>
+                </section>
+
+                <section class="analytics-panel analytics-panel--side">
+                    <div class="analytics-panel__header">
+                        <div>
+                            <h2 class="analytics-panel__title">Top Pages in Search</h2>
+                            <p class="analytics-panel__meta">Pages earning the most clicks.</p>
+                        </div>
+                    </div>
+                    <?php if ($scPages['rows'] === []): ?>
+                        <p class="analytics-empty">No data yet.</p>
+                    <?php else: ?>
+                        <table class="table analytics-table align-middle">
+                            <thead><tr><th>Page</th><th>Clicks</th></tr></thead>
+                            <tbody>
+                            <?php foreach ($scPages['rows'] as $row): ?>
+                                <tr><td class="small"><?= h((string) str_replace('https://myclubhub.co.uk', '', (string) ($row['keys'][0] ?? ''))) ?></td><td><?= analytics_number((float) $row['clicks']) ?></td></tr>
+                            <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    <?php endif; ?>
+                </section>
+
+                <section class="analytics-panel analytics-panel--wide">
+                    <div class="analytics-panel__header">
+                        <div>
+                            <h2 class="analytics-panel__title">Daily Trend</h2>
+                            <p class="analytics-panel__meta">Search clicks by day.</p>
+                        </div>
+                    </div>
+                    <?php if ($scDaily['rows'] === []): ?>
+                        <p class="analytics-empty">No trend data yet.</p>
+                    <?php else: ?>
+                        <table class="table analytics-table align-middle">
+                            <thead><tr><th>Day</th><th>Clicks</th><th>Impressions</th></tr></thead>
+                            <tbody>
+                            <?php foreach ($scDaily['rows'] as $row): ?>
+                                <tr>
+                                    <td><?= h(date('d M', strtotime((string) ($row['keys'][0] ?? '')))) ?></td>
+                                    <td>
+                                        <div class="analytics-bar">
+                                            <span><?= analytics_number((float) $row['clicks']) ?></span>
+                                            <span class="analytics-bar__track"><span class="analytics-bar__fill" style="width: <?= min(100, ((float) $row['clicks'] / $maxScDaily) * 100) ?>%"></span></span>
+                                        </div>
+                                    </td>
+                                    <td><?= analytics_number((float) $row['impressions']) ?></td>
+                                </tr>
+                            <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    <?php endif; ?>
+                </section>
+            </div>
+        <?php endif; ?>
+    </div>
+<?php elseif ($view === 'hub'): ?>
 
 <div class="analytics-dashboard">
     <div class="analytics-toolbar">
@@ -223,7 +542,7 @@ $maxDailyViews = max(1, ...array_map(static fn(array $row): int => (int) $row['p
         </div>
         <div class="analytics-range" aria-label="Date range">
             <?php foreach ([7, 30, 90, 365] as $range): ?>
-                <a class="btn <?= $days === $range ? 'btn-brand' : 'btn-outline-secondary' ?>" href="?days=<?= $range ?>"><?= $range === 365 ? 'Year' : $range . ' days' ?></a>
+                <a class="btn <?= $days === $range ? 'btn-brand' : 'btn-outline-secondary' ?>" href="?view=hub&amp;days=<?= $range ?>"><?= $range === 365 ? 'Year' : $range . ' days' ?></a>
             <?php endforeach; ?>
         </div>
     </div>
@@ -241,19 +560,18 @@ $maxDailyViews = max(1, ...array_map(static fn(array $row): int => (int) $row['p
         <section class="analytics-panel analytics-panel--wide">
             <div class="analytics-panel__header">
                 <div>
-                    <h2 class="analytics-panel__title">Top Pages</h2>
-                    <p class="analytics-panel__meta">Most visited areas with engagement and action volume.</p>
+                    <h2 class="analytics-panel__title">Top 5 Pages</h2>
+                    <p class="analytics-panel__meta">Most visited pages this window.</p>
                 </div>
-                <span class="analytics-pill"><i class="fa-solid fa-ranking-star" aria-hidden="true"></i><?= count($topPagesVisible) ?> / <?= count($topPages) ?></span>
             </div>
-            <?php if ($topPages === []): ?>
+            <?php if ($topFivePages === []): ?>
                 <p class="analytics-empty">No analytics have been recorded for this date range yet.</p>
             <?php else: ?>
                 <div class="table-responsive">
                     <table class="table analytics-table align-middle">
-                        <thead><tr><th>Page</th><th>Views</th><th>Users</th><th>Clicks</th><th>Avg time</th><th>Scroll</th></tr></thead>
+                        <thead><tr><th>Page</th><th>Views</th><th>Users</th><th>Avg time</th></tr></thead>
                         <tbody>
-                        <?php foreach ($topPagesVisible as $row): ?>
+                        <?php foreach ($topFivePages as $row): ?>
                             <tr>
                                 <td>
                                     <div class="fw-bold"><?= h((string) $row['page_path']) ?></div>
@@ -261,15 +579,33 @@ $maxDailyViews = max(1, ...array_map(static fn(array $row): int => (int) $row['p
                                 </td>
                                 <td><?= analytics_number((int) $row['page_views']) ?></td>
                                 <td><?= analytics_number((int) $row['users']) ?></td>
-                                <td><?= analytics_number((int) $row['clicks']) ?></td>
                                 <td><?= analytics_seconds((float) ($row['avg_duration_ms'] ?? 0)) ?></td>
-                                <td><?= analytics_percent((float) ($row['avg_scroll_depth'] ?? 0)) ?></td>
                             </tr>
                         <?php endforeach; ?>
                         </tbody>
                     </table>
                 </div>
-                <?php analytics_render_pagination('pages_page', $topPagesPagination, $days); ?>
+            <?php endif; ?>
+        </section>
+
+        <section class="analytics-panel analytics-panel--side">
+            <div class="analytics-panel__header">
+                <div>
+                    <h2 class="analytics-panel__title">Worst 5 Pages</h2>
+                    <p class="analytics-panel__meta">Least visited, with tracked activity.</p>
+                </div>
+            </div>
+            <?php if ($worstFivePages === []): ?>
+                <p class="analytics-empty">Not enough tracked pages yet.</p>
+            <?php else: ?>
+                <table class="table analytics-table align-middle">
+                    <thead><tr><th>Page</th><th>Views</th></tr></thead>
+                    <tbody>
+                    <?php foreach ($worstFivePages as $row): ?>
+                        <tr><td><?= h((string) $row['page_path']) ?></td><td><?= analytics_number((int) $row['page_views']) ?></td></tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                </table>
             <?php endif; ?>
         </section>
 
@@ -286,16 +622,58 @@ $maxDailyViews = max(1, ...array_map(static fn(array $row): int => (int) $row['p
                 <table class="table analytics-table align-middle">
                     <thead><tr><th>Device</th><th>Sessions</th><th>Events</th></tr></thead>
                     <tbody>
-                    <?php foreach ($devicesVisible as $row): ?>
+                    <?php foreach ($devices as $row): ?>
                         <tr><td><?= h((string) $row['device']) ?></td><td><?= analytics_number((int) $row['sessions']) ?></td><td><?= analytics_number((int) $row['events']) ?></td></tr>
                     <?php endforeach; ?>
                     </tbody>
                 </table>
-                <?php analytics_render_pagination('devices_page', $devicesPagination, $days); ?>
             <?php endif; ?>
         </section>
 
-        <section class="analytics-panel analytics-panel--wide">
+        <section class="analytics-panel analytics-panel--side">
+            <div class="analytics-panel__header">
+                <div>
+                    <h2 class="analytics-panel__title">Daily Trend</h2>
+                    <p class="analytics-panel__meta">Page views and active users by day.</p>
+                </div>
+            </div>
+            <?php if ($daily === []): ?>
+                <p class="analytics-empty">No trend data yet.</p>
+            <?php else: ?>
+                <div style="position:relative;height:260px"><canvas id="hubDailyTrendChart"></canvas></div>
+            <?php endif; ?>
+        </section>
+
+        <section class="analytics-panel analytics-panel--side">
+            <div class="analytics-panel__header">
+                <div>
+                    <h2 class="analytics-panel__title">User Activity</h2>
+                    <p class="analytics-panel__meta">Who is using the Hub.</p>
+                </div>
+            </div>
+            <?php if ($users === []): ?>
+                <p class="analytics-empty">No user activity has been recorded yet.</p>
+            <?php else: ?>
+                <table class="table analytics-table align-middle">
+                    <thead><tr><th>User</th><th>Sessions</th><th>Views</th></tr></thead>
+                    <tbody>
+                    <?php foreach ($usersVisible as $row): ?>
+                        <tr>
+                            <td>
+                                <div class="fw-bold"><?= h((string) $row['name']) ?></div>
+                                <div class="small text-muted"><?= h((string) $row['user_role']) ?> &middot; <?= h(date('d M H:i', strtotime((string) $row['last_seen']))) ?></div>
+                            </td>
+                            <td><?= analytics_number((int) $row['sessions']) ?></td>
+                            <td><?= analytics_number((int) $row['page_views']) ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                </table>
+                <?php analytics_render_pagination('users_page', $usersPagination, $days); ?>
+            <?php endif; ?>
+        </section>
+
+        <section class="analytics-panel analytics-panel--full">
             <div class="analytics-panel__header">
                 <div>
                     <h2 class="analytics-panel__title">Feature Usage</h2>
@@ -328,70 +706,7 @@ $maxDailyViews = max(1, ...array_map(static fn(array $row): int => (int) $row['p
             <?php endif; ?>
         </section>
 
-        <section class="analytics-panel analytics-panel--side">
-            <div class="analytics-panel__header">
-                <div>
-                    <h2 class="analytics-panel__title">Daily Trend</h2>
-                    <p class="analytics-panel__meta">Recent page views by day.</p>
-                </div>
-            </div>
-            <?php if ($daily === []): ?>
-                <p class="analytics-empty">No trend data yet.</p>
-            <?php else: ?>
-                <table class="table analytics-table align-middle">
-                    <thead><tr><th>Day</th><th>Views</th><th>Users</th></tr></thead>
-                    <tbody>
-                    <?php foreach ($dailyVisible as $row): ?>
-                        <tr>
-                            <td><?= h(date('d M', strtotime((string) $row['event_day']))) ?></td>
-                            <td>
-                                <div class="analytics-bar">
-                                    <span><?= analytics_number((int) $row['page_views']) ?></span>
-                                    <span class="analytics-bar__track"><span class="analytics-bar__fill" style="width: <?= min(100, ((int) $row['page_views'] / $maxDailyViews) * 100) ?>%"></span></span>
-                                </div>
-                            </td>
-                            <td><?= analytics_number((int) $row['users']) ?></td>
-                        </tr>
-                    <?php endforeach; ?>
-                    </tbody>
-                </table>
-                <?php analytics_render_pagination('daily_page', $dailyPagination, $days); ?>
-            <?php endif; ?>
-        </section>
-
-        <section class="analytics-panel analytics-panel--wide">
-            <div class="analytics-panel__header">
-                <div>
-                    <h2 class="analytics-panel__title">User Activity</h2>
-                    <p class="analytics-panel__meta">Who is using the Hub and how actively.</p>
-                </div>
-            </div>
-            <?php if ($users === []): ?>
-                <p class="analytics-empty">No user activity has been recorded yet.</p>
-            <?php else: ?>
-                <div class="table-responsive">
-                    <table class="table analytics-table align-middle">
-                        <thead><tr><th>User</th><th>Role</th><th>Sessions</th><th>Views</th><th>Clicks</th><th>Avg time</th><th>Last seen</th></tr></thead>
-                        <tbody>
-                        <?php foreach ($usersVisible as $row): ?>
-                            <tr>
-                                <td class="fw-bold"><?= h((string) $row['name']) ?></td>
-                                <td><?= h((string) $row['user_role']) ?></td>
-                                <td><?= analytics_number((int) $row['sessions']) ?></td>
-                                <td><?= analytics_number((int) $row['page_views']) ?></td>
-                                <td><?= analytics_number((int) $row['clicks']) ?></td>
-                                <td><?= analytics_seconds((float) ($row['avg_duration_ms'] ?? 0)) ?></td>
-                                <td><?= h(date('d M H:i', strtotime((string) $row['last_seen']))) ?></td>
-                            </tr>
-                        <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                </div>
-                <?php analytics_render_pagination('users_page', $usersPagination, $days); ?>
-            <?php endif; ?>
-        </section>
-
-        <section class="analytics-panel analytics-panel--side">
+        <section class="analytics-panel analytics-panel--full">
             <div class="analytics-panel__header">
                 <div>
                     <h2 class="analytics-panel__title">Recent Journeys</h2>
@@ -401,22 +716,90 @@ $maxDailyViews = max(1, ...array_map(static fn(array $row): int => (int) $row['p
             <?php if ($journeys === []): ?>
                 <p class="analytics-empty">No journeys have been recorded yet.</p>
             <?php else: ?>
-                <div class="vstack gap-3">
-                    <?php foreach ($journeysVisible as $row): ?>
-                        <article>
-                            <div class="d-flex justify-content-between gap-2">
-                                <strong><?= h((string) $row['name']) ?></strong>
-                                <span class="analytics-pill"><?= analytics_number((int) $row['page_views']) ?> views</span>
-                            </div>
-                            <div class="small text-muted mt-1"><?= h((string) $row['pages']) ?></div>
-                            <div class="small text-muted mt-1"><?= h(date('d M H:i', strtotime((string) $row['started_at']))) ?> to <?= h(date('H:i', strtotime((string) $row['ended_at']))) ?></div>
-                        </article>
-                    <?php endforeach; ?>
+                <div class="table-responsive">
+                    <table class="table analytics-table align-middle">
+                        <thead><tr><th>User</th><th>Started</th><th>Duration</th><th>Steps</th><th>Path</th></tr></thead>
+                        <tbody>
+                        <?php foreach ($journeysVisible as $row): ?>
+                            <?php
+                            $steps = array_values(array_filter(explode(' > ', (string) $row['pages']), static fn(string $p): bool => $p !== ''));
+                            $stepCount = count($steps);
+                            $shownSteps = array_slice($steps, 0, 4);
+                            $pathText = implode(' › ', $shownSteps) . ($stepCount > 4 ? ' … +' . ($stepCount - 4) . ' more' : '');
+                            $duration = max(0, strtotime((string) $row['ended_at']) - strtotime((string) $row['started_at']));
+                            ?>
+                            <tr>
+                                <td class="fw-bold"><?= h((string) $row['name']) ?></td>
+                                <td class="small text-muted"><?= h(date('d M H:i', strtotime((string) $row['started_at']))) ?></td>
+                                <td><?= ga_seconds($duration) ?></td>
+                                <td><?= analytics_number($stepCount) ?></td>
+                                <td class="small text-muted" title="<?= h(str_replace(' > ', ' › ', (string) $row['pages'])) ?>"><?= h($pathText) ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                        </tbody>
+                    </table>
                 </div>
                 <?php analytics_render_pagination('journeys_page', $journeysPagination, $days); ?>
             <?php endif; ?>
         </section>
     </div>
 </div>
+
+<?php if ($daily !== []): ?>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js"></script>
+<script>
+(() => {
+    const canvas = document.getElementById('hubDailyTrendChart');
+    if (!canvas) return;
+    const labels = <?= json_encode(array_map(static fn(array $r): string => date('d M', strtotime((string) $r['event_day'])), $dailyChart), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+    const views = <?= json_encode(array_map(static fn(array $r): int => (int) $r['page_views'], $dailyChart), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+    const users = <?= json_encode(array_map(static fn(array $r): int => (int) $r['users'], $dailyChart), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+
+    const brandFont = getComputedStyle(document.body).fontFamily;
+    Chart.defaults.font.family = brandFont;
+    Chart.defaults.plugins.legend.labels.usePointStyle = true;
+
+    new Chart(canvas, {
+        type: 'line',
+        data: {
+            labels,
+            datasets: [
+                {
+                    label: 'Page views',
+                    data: views,
+                    borderColor: '#17734f',
+                    backgroundColor: 'rgba(23,115,79,0.08)',
+                    fill: true,
+                    tension: 0.3,
+                    pointRadius: 0,
+                    borderWidth: 2,
+                },
+                {
+                    label: 'Active users',
+                    data: users,
+                    borderColor: '#5b7fdb',
+                    backgroundColor: 'rgba(91,127,219,0.08)',
+                    fill: true,
+                    tension: 0.3,
+                    pointRadius: 0,
+                    borderWidth: 2,
+                },
+            ],
+        },
+        options: {
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            scales: {
+                x: { grid: { display: false } },
+                y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.06)' } },
+            },
+            plugins: { legend: { position: 'bottom' } },
+        },
+    });
+})();
+</script>
+<?php endif; ?>
+
+<?php endif; ?>
 
 <?php require_once __DIR__ . '/footer.php'; ?>

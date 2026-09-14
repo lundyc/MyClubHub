@@ -30,8 +30,10 @@ if ($stoPartial) {
 require_once __DIR__ . '/lib/season_tickets.php';
 require_once __DIR__ . '/lib/season_passes.php';
 require_once __DIR__ . '/lib/audit.php';
+require_once __DIR__ . '/lib/invoices.php';
 hub_auth_require_permission('tickets.view');
 ensureSeasonPassSchema($pdo);
+invoices_ensure_schema($pdo);
 
 $seasons = $pdo->query('SELECT id, name FROM seasons ORDER BY start_date DESC')->fetchAll(PDO::FETCH_ASSOC);
 $currentSeason = getCurrentSeason($pdo);
@@ -159,6 +161,15 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                 header('Location: /admin/season_ticket_orders.php?id=' . $orderId . '&refunded=1');
                 exit;
             }
+            if ($action === 'generate_invoice') {
+                $result = invoices_generate_for_season_pass_order($pdo, $orderId, (string) ($currentUser['display_name'] ?? $currentUser['username'] ?? $currentUser['email'] ?? ''));
+                if ($result['errors']) {
+                    throw new RuntimeException(implode(' ', $result['errors']));
+                }
+                auditLog($pdo, 'invoice_generated', "Generated invoice for season ticket order #{$orderId}");
+                header('Location: /admin/season_ticket_orders.php?id=' . $orderId . '&invoice_generated=1');
+                exit;
+            }
         } catch (Throwable $exception) {
             $errors[] = $exception->getMessage();
         }
@@ -235,6 +246,12 @@ if ($orderId > 0) {
                     <div class="d-flex justify-content-between border-bottom py-2"><span>Payment</span><strong><?= h((string) $order['payment_status']) ?></strong></div>
                     <div class="d-flex justify-content-between border-bottom py-2"><span>Ticket</span><strong><?= h((string) $order['pass_status']) ?></strong></div>
                     <div class="d-flex justify-content-between fw-bold pt-2"><span>Total</span><span><?= gbp((float) $order['total_amount']) ?></span></div>
+                </div>
+            </section>
+
+            <section class="card shadow-sm border-0 mb-3">
+                <div class="card-body">
+                    <?= invoices_render_admin_section(invoices_list_for_source($pdo, 'season_pass_order', (int) $order['id']), '<form method="post" action="/admin/season_ticket_orders.php">' . csrf_field() . '<input type="hidden" name="order_id" value="' . (int) $order['id'] . '"><input type="hidden" name="action" value="generate_invoice"><button type="submit" class="btn btn-outline-primary btn-sm">Generate invoice</button></form>') ?>
                 </div>
             </section>
 

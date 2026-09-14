@@ -67,8 +67,8 @@ $now = new DateTimeImmutable('now');
     <?php if (isset($_GET['m'])): ?><div class="alert alert-success"><?= h((string) $_GET['m']) ?></div><?php endif; ?>
     <?php if (isset($_GET['e'])): ?><div class="alert alert-warning"><?= h((string) $_GET['e']) ?></div><?php endif; ?>
 
-    <section class="card hub-panel table-responsive">
-        <table class="table align-middle mb-0">
+    <section class="card hub-panel">
+        <table class="table align-middle mb-0 hub-data-table hub-data-table--responsive">
             <thead><tr><th></th><th>Product</th><th>Category</th><th class="text-end">Price</th><th class="text-end">Stock</th><th>Flags</th><th>Status</th><th></th></tr></thead>
             <tbody>
             <?php if (!$products): ?>
@@ -80,23 +80,23 @@ $now = new DateTimeImmutable('now');
                 $closed = $close !== null && $now > $close;
                 ?>
                 <tr>
-                    <td style="width:52px;">
+                    <td data-label="Image" style="width:52px;">
                         <?php if (!empty($p['image_path'])): ?>
                             <img src="<?= h((string) $p['image_path']) ?>" alt="" style="width:44px;height:52px;object-fit:cover;border-radius:6px;">
                         <?php else: ?>
                             <span class="text-muted"><i class="fa-solid fa-shirt"></i></span>
                         <?php endif; ?>
                     </td>
-                    <td class="fw-bold"><a class="text-decoration-none" href="/admin/shop_product.php?id=<?= (int) $p['id'] ?>"><?= h((string) $p['name']) ?></a>
+                    <td data-label="Product" class="fw-bold"><a class="text-decoration-none" href="/admin/shop_product.php?id=<?= (int) $p['id'] ?>"><?= h((string) $p['name']) ?></a>
                         <div class="small text-muted">/shop/p/<?= h((string) $p['slug']) ?></div></td>
-                    <td><?= h((string) $p['category_name']) ?></td>
-                    <td class="text-end"><?= gbp((float) $p['price']) ?></td>
-                    <td class="text-end"><?= $p['stock_qty'] === null ? '<span class="text-muted">∞</span>' : (int) $p['stock_qty'] ?></td>
-                    <td class="small">
+                    <td data-label="Category"><?= h((string) $p['category_name']) ?></td>
+                    <td data-label="Price" class="text-end"><?= gbp((float) $p['price']) ?></td>
+                    <td data-label="Stock" class="text-end"><?= $p['stock_qty'] === null ? '<span class="text-muted">∞</span>' : (int) $p['stock_qty'] ?></td>
+                    <td data-label="Flags" class="small">
                         <?php if ((int) $p['is_preorder'] === 1): ?><span class="badge text-bg-warning">Pre-order<?= $closed ? ' (closed)' : '' ?></span><?php endif; ?>
                         <?php if ((int) $p['is_featured'] === 1): ?><span class="badge text-bg-info">Featured</span><?php endif; ?>
                     </td>
-                    <td>
+                    <td data-label="Status">
                         <form method="post" class="d-inline">
                             <?= csrf_field() ?><input type="hidden" name="action" value="toggle_active"><input type="hidden" name="id" value="<?= (int) $p['id'] ?>">
                             <button type="submit" class="btn btn-sm <?= (int) $p['is_active'] === 1 ? 'btn-success' : 'btn-outline-secondary' ?>">
@@ -104,7 +104,7 @@ $now = new DateTimeImmutable('now');
                             </button>
                         </form>
                     </td>
-                    <td class="text-end text-nowrap">
+                    <td data-label="Actions" class="text-end text-nowrap">
                         <a class="btn btn-sm btn-outline-secondary" href="/admin/shop_product.php?id=<?= (int) $p['id'] ?>">Edit</a>
                         <form method="post" class="d-inline" onsubmit="return confirm('Delete this product? Orders keep their history.');">
                             <?= csrf_field() ?><input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="<?= (int) $p['id'] ?>">

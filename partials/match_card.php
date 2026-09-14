@@ -29,6 +29,9 @@ $href = url('match/' . (int) $fixture['id']);
     <span><?= e($awayName) ?></span>
     <?php if ($played): ?><b><?= $awayScore ?></b><?php endif; ?>
   </div>
+  <?php if ($outcome['decided_by_penalties']): ?>
+    <div class="matchcard__pens">(Pens <?= (int) $outcome['penalties_us'] ?>&ndash;<?= (int) $outcome['penalties_them'] ?>)</div>
+  <?php endif; ?>
 
   <div class="matchcard__foot">
     <span><?= e(format_date($fixture['match_date'], 'D j M Y')) ?><?php

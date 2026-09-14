@@ -28,6 +28,7 @@ function pub_fixture_select(): string
                    f.competition_stage, f.is_home, f.venue, f.status,
                    f.full_time_home_score, f.full_time_away_score,
                    f.half_time_home_score, f.half_time_away_score, f.veo_url,
+                   f.home_penalties, f.away_penalties,
                    o.clubname      AS opponent_name,
                    o.logo_path     AS opponent_logo,
                    o.ground_location AS opponent_ground
@@ -43,8 +44,12 @@ function pub_fixture_is_played(array $f): bool
 }
 
 /**
- * Result from the club's point of view.
- * @return array{outcome:'W'|'D'|'L'|null,label:string,us:int,them:int}
+ * Result from the club's point of view. A cup tie drawn after full time and
+ * decided on penalties resolves to 'W'/'L' (never 'D') using the shootout
+ * score — the label calls this out explicitly, and penalties_us/them carry
+ * the shootout score for display, while us/them stay the full-time score.
+ *
+ * @return array{outcome:'W'|'D'|'L'|null,label:string,us:int,them:int,decided_by_penalties:bool,penalties_us:?int,penalties_them:?int}
  */
 function pub_fixture_outcome(array $f): array
 {
@@ -52,15 +57,41 @@ function pub_fixture_outcome(array $f): array
         || $f['full_time_home_score'] === null
         || $f['full_time_away_score'] === null
     ) {
-        return ['outcome' => null, 'label' => '', 'us' => 0, 'them' => 0];
+        return ['outcome' => null, 'label' => '', 'us' => 0, 'them' => 0, 'decided_by_penalties' => false, 'penalties_us' => null, 'penalties_them' => null];
     }
     $home = (int) $f['full_time_home_score'];
     $away = (int) $f['full_time_away_score'];
     $us = $f['is_home'] ? $home : $away;
     $them = $f['is_home'] ? $away : $home;
-    $outcome = $us > $them ? 'W' : ($us < $them ? 'L' : 'D');
-    $label = ['W' => 'Win', 'L' => 'Defeat', 'D' => 'Draw'][$outcome];
-    return ['outcome' => $outcome, 'label' => $label, 'us' => $us, 'them' => $them];
+
+    $penaltiesUs = null;
+    $penaltiesThem = null;
+    $decidedByPenalties = false;
+    if ($us === $them && $f['home_penalties'] !== null && $f['away_penalties'] !== null) {
+        $homePens = (int) $f['home_penalties'];
+        $awayPens = (int) $f['away_penalties'];
+        $penaltiesUs = $f['is_home'] ? $homePens : $awayPens;
+        $penaltiesThem = $f['is_home'] ? $awayPens : $homePens;
+        $decidedByPenalties = true;
+    }
+
+    if ($decidedByPenalties) {
+        $outcome = $penaltiesUs > $penaltiesThem ? 'W' : 'L';
+        $label = $outcome === 'W' ? 'Won on penalties' : 'Lost on penalties';
+    } else {
+        $outcome = $us > $them ? 'W' : ($us < $them ? 'L' : 'D');
+        $label = ['W' => 'Win', 'L' => 'Defeat', 'D' => 'Draw'][$outcome];
+    }
+
+    return [
+        'outcome' => $outcome,
+        'label' => $label,
+        'us' => $us,
+        'them' => $them,
+        'decided_by_penalties' => $decidedByPenalties,
+        'penalties_us' => $penaltiesUs,
+        'penalties_them' => $penaltiesThem,
+    ];
 }
 
 /** The next unplayed fixture (this season), or null. */
@@ -173,14 +204,24 @@ function pub_season(int $id): ?array
     return $stmt->fetch() ?: null;
 }
 
-/** Distinct competition names used by a season's fixtures. @return list<string> */
+/**
+ * Distinct competition names used by a season's fixtures, or across every
+ * season when $seasonId is 0 (the "All seasons" filter). @return list<string>
+ */
 function pub_competitions_in_season(int $seasonId): array
 {
-    $stmt = db()->prepare(
-        "SELECT DISTINCT competition FROM match_fixtures
-         WHERE season_id = :s AND competition <> '' ORDER BY competition"
-    );
-    $stmt->execute([':s' => $seasonId]);
+    if ($seasonId > 0) {
+        $stmt = db()->prepare(
+            "SELECT DISTINCT competition FROM match_fixtures
+             WHERE season_id = :s AND competition <> '' ORDER BY competition"
+        );
+        $stmt->execute([':s' => $seasonId]);
+    } else {
+        $stmt = db()->query(
+            "SELECT DISTINCT competition FROM match_fixtures
+             WHERE competition <> '' ORDER BY competition"
+        );
+    }
     return array_map('strval', $stmt->fetchAll(PDO::FETCH_COLUMN));
 }
 
@@ -222,6 +263,7 @@ function pub_fixture_has_tickets(int $fixtureId): bool
 
 /**
  * @param array{season_id?:int,competition?:string,type?:'upcoming'|'results'|'all'} $opts
+ *        season_id 0 = every season (the "All seasons" filter).
  * @return list<array<string,mixed>>
  */
 function pub_fixtures(array $opts = []): array
@@ -229,22 +271,29 @@ function pub_fixtures(array $opts = []): array
     $seasonId = (int) ($opts['season_id'] ?? pub_current_season_id());
     $type = $opts['type'] ?? 'all';
 
-    $sql = pub_fixture_select() . ' WHERE f.season_id = :s';
-    $params = [':s' => $seasonId];
-
+    $conds = [];
+    $params = [];
+    if ($seasonId > 0) {
+        $conds[] = 'f.season_id = :s';
+        $params[':s'] = $seasonId;
+    }
     if (!empty($opts['competition'])) {
-        $sql .= ' AND f.competition = :c';
+        $conds[] = 'f.competition = :c';
         $params[':c'] = (string) $opts['competition'];
     }
     if ($type === 'results') {
-        $sql .= ' AND (f.status = "played" OR f.full_time_home_score IS NOT NULL)';
-        $sql .= ' ORDER BY f.match_date DESC, f.kickoff_time DESC';
+        $conds[] = '(f.status = "played" OR f.full_time_home_score IS NOT NULL)';
+        $order = ' ORDER BY f.match_date DESC, f.kickoff_time DESC';
     } elseif ($type === 'upcoming') {
-        $sql .= ' AND (f.status IS NULL OR f.status <> "played") AND f.full_time_home_score IS NULL';
-        $sql .= ' ORDER BY f.match_date ASC, f.kickoff_time ASC';
+        $conds[] = '(f.status IS NULL OR f.status <> "played") AND f.full_time_home_score IS NULL';
+        $order = ' ORDER BY f.match_date ASC, f.kickoff_time ASC';
     } else {
-        $sql .= ' ORDER BY f.match_date ASC, f.kickoff_time ASC';
+        $order = ' ORDER BY f.match_date ASC, f.kickoff_time ASC';
     }
+
+    $sql = pub_fixture_select()
+        . ($conds ? ' WHERE ' . implode(' AND ', $conds) : '')
+        . $order;
 
     $stmt = db()->prepare($sql);
     $stmt->execute($params);
@@ -505,11 +554,16 @@ function pub_head_to_head(array $fixture, int $limit = 6): ?array
     }
     try {
         $rows = db()->query(
-            "SELECT match_date, season, competition, is_home, opponent,
-                    home_score, away_score, result, slug, has_report
-             FROM history_matches
-             WHERE home_score IS NOT NULL AND away_score IS NOT NULL AND opponent <> ''
-             ORDER BY match_date DESC, id DESC"
+            "SELECT f.id, f.match_date, s.name AS season, f.competition, f.is_home,
+                    COALESCE(o.clubname, f.opponent) AS opponent,
+                    f.full_time_home_score AS fh, f.full_time_away_score AS fa
+             FROM match_fixtures f
+             LEFT JOIN match_opponents o ON o.id = f.opponent_id
+             LEFT JOIN seasons s ON s.id = f.season_id
+             WHERE f.status = 'played'
+               AND f.full_time_home_score IS NOT NULL AND f.full_time_away_score IS NOT NULL
+               AND COALESCE(o.clubname, f.opponent) <> ''
+             ORDER BY f.match_date DESC, f.id DESC"
         )->fetchAll();
     } catch (Throwable) {
         return null;
@@ -543,9 +597,9 @@ function pub_head_to_head(array $fixture, int $limit = 6): ?array
         if (!$isMatch((string) $r['opponent'])) {
             continue;
         }
-        $us = (int) $r['home_score'];
-        $them = (int) $r['away_score'];
-        $res = strtoupper((string) $r['result']) ?: ($us > $them ? 'W' : ($us < $them ? 'L' : 'D'));
+        $us = (int) ($r['is_home'] ? $r['fh'] : $r['fa']);
+        $them = (int) ($r['is_home'] ? $r['fa'] : $r['fh']);
+        $res = $us > $them ? 'W' : ($us < $them ? 'L' : 'D');
         $res === 'W' ? $w++ : ($res === 'L' ? $l++ : $d++);
         $gf += $us;
         $ga += $them;
@@ -558,8 +612,7 @@ function pub_head_to_head(array $fixture, int $limit = 6): ?array
                 'us' => $us,
                 'them' => $them,
                 'result' => $res,
-                'slug' => (string) $r['slug'],
-                'has_report' => (bool) $r['has_report'],
+                'url' => url('match/' . (int) $r['id']),
             ];
         }
     }

@@ -233,6 +233,9 @@ require_once __DIR__ . '/header.php';
     $ourScore = $resolved['score']['svfc'];
     $oppScoreValue = $resolved['score']['opponent'];
     $scoreText = ($ourScore !== null && $oppScoreValue !== null) ? $ourScore . ' – ' . $oppScoreValue : 'not read';
+    $ourPens = $resolved['penalties']['svfc'] ?? null;
+    $oppPens = $resolved['penalties']['opponent'] ?? null;
+    $pensText = ($ourPens !== null && $oppPens !== null) ? ' (pens ' . $ourPens . '–' . $oppPens . ')' : '';
     ?>
 
     <div class="card shadow-sm mb-4">
@@ -244,6 +247,7 @@ require_once __DIR__ . '/header.php';
                     Saltcoats Victoria (<?= $resolved['is_home'] ? 'home' : 'away' ?>)
                     <strong><?= h((string) $scoreText) ?></strong>
                     <?= h((string) $resolved['opponent']) ?>
+                    <?php if ($pensText !== ''): ?><span class="text-muted"><?= h($pensText) ?></span><?php endif; ?>
                 </dd>
                 <?php if ($resolved['competition'] !== ''): ?>
                     <dt class="col-sm-3">Competition</dt>

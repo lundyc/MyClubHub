@@ -107,6 +107,18 @@ $lineupNames = array_values(array_unique(array_merge(
     matchStarting11PrepareLineup($fixture['starting11_starters'] ?? []),
     matchStarting11PrepareLineup($fixture['starting11_substitutes'] ?? [])
 )));
+
+// Keep an already-recorded Man of the Match on the list even if the line-up was
+// edited afterwards and no longer includes them.
+if ($selectedPlayer !== '' && !in_array($selectedPlayer, $lineupNames, true)) {
+    $lineupNames[] = $selectedPlayer;
+}
+
+// The award only makes sense for players who were in the match: the starting XI
+// and the named bench. The full squad is only shown as a fallback when no
+// line-up has been recorded for the fixture yet.
+$lineupRecorded = $lineupNames !== [];
+
 $orderedPlayers = [];
 foreach ($lineupNames as $lineupName) {
     $orderedPlayers[] = $playersByName[$lineupName] ?? [
@@ -117,8 +129,10 @@ foreach ($lineupNames as $lineupName) {
     ];
     unset($playersByName[$lineupName]);
 }
-foreach ($playersByName as $playerRow) {
-    $orderedPlayers[] = $playerRow;
+if (!$lineupRecorded) {
+    foreach ($playersByName as $playerRow) {
+        $orderedPlayers[] = $playerRow;
+    }
 }
 
 $opponent = trim((string) ($fixture['opponent'] ?? 'Opponent'));
@@ -155,6 +169,10 @@ require_once __DIR__ . '/header.php';
             <?= csrf_field() ?>
             <input type="hidden" name="fixture_id" value="<?= $fixtureId ?>">
             <input type="hidden" name="season_id" value="<?= $seasonId ?>">
+
+            <?php if (!$lineupRecorded): ?>
+                <div class="alert alert-warning">No starting XI or bench has been recorded for this match yet, so the full squad is shown. <a href="/admin/match.php?id=<?= (int) $fixtureId ?>&amp;season_id=<?= (int) $seasonId ?>&amp;tab=starting11">Set the line-up</a> to limit this to the matchday squad.</div>
+            <?php endif; ?>
 
             <div class="potm-grid" role="radiogroup" aria-label="Select Man of the Match">
                 <?php foreach ($orderedPlayers as $player): ?>

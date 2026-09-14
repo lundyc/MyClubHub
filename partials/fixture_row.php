@@ -29,6 +29,9 @@ $showTickets = !$played && $fixture['is_home'] && pub_fixture_has_tickets((int) 
   <span class="fxrow__score">
     <?php if ($played): ?>
       <b><?= (int) $fixture['full_time_home_score'] ?><span>–</span><?= (int) $fixture['full_time_away_score'] ?></b>
+      <?php if ($outcome['decided_by_penalties']): ?>
+        <span class="fxrow__pens">(Pens <?= (int) $fixture['home_penalties'] ?>&ndash;<?= (int) $fixture['away_penalties'] ?>)</span>
+      <?php endif; ?>
     <?php else: ?>
       <span class="fxrow__v">v</span>
     <?php endif; ?>

@@ -341,6 +341,7 @@ $pageHero = [
     'subtitle' => $leagueConfig['league_title'] . ' standings and publish tools.',
     'actions' => [
         ['label' => 'Update from WOSFL', 'href' => '/league_table_manual_update.php', 'class' => 'btn btn-brand btn-sm'],
+        ['label' => 'Historical tables', 'href' => '/league_table_history.php', 'class' => 'btn btn-outline-secondary btn-sm'],
     ],
 ];
 

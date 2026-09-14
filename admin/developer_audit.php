@@ -24,6 +24,7 @@ $logs = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
           <div class="card border-0 shadow-sm">
                     <div class="card-body p-0">
+                              <div class="table-responsive">
                               <table class="table table-modern table-sm mb-0">
                                         <thead class="table-dark">
                                                   <tr>
@@ -46,6 +47,7 @@ $logs = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                                   <?php endforeach; ?>
                                         </tbody>
                               </table>
+                              </div>
                     </div>
           </div>
 </div>

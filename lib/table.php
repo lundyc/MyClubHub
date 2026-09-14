@@ -79,6 +79,77 @@ function pub_league_config(): array
     ];
 }
 
+/* -------------------------------------------------------------------------
+ * Season picker (/table?season=<id>)
+ *
+ * The current season always reads the live scraper cache above — untouched.
+ * Any other season reads a snapshot an admin pasted in via the Hub's
+ * "Historical tables" tool (admin/league_table_history.php,
+ * league_table_history DB table) — a separate, parallel store nothing
+ * scrapes automatically, so read-only here just like every other public
+ * query against Hub-managed data.
+ * ---------------------------------------------------------------------- */
+
+/** @return list<array{id:int,name:string,is_current:int}> every season, newest first. */
+function pub_league_table_seasons(): array
+{
+    try {
+        return db()->query('SELECT id, name, is_current FROM seasons ORDER BY start_date DESC, id DESC')->fetchAll();
+    } catch (Throwable) {
+        return [];
+    }
+}
+
+/**
+ * The league table for a given season: the live scrape for the current
+ * season, otherwise whatever was pasted into league_table_history for it.
+ *
+ * @return array{ok:bool, rows:list<array<string,mixed>>, updated:?int, url:string, title:string, promotion:int, relegation:int, is_live:bool}
+ */
+function pub_league_table_for_season(int $seasonId): array
+{
+    $config = pub_league_config();
+
+    if ($seasonId <= 0 || $seasonId === pub_current_season_id()) {
+        $live = pub_league_table();
+        return $live + ['promotion' => $config['promotion'], 'relegation' => $config['relegation'], 'is_live' => true];
+    }
+
+    $row = null;
+    try {
+        $stmt = db()->prepare('SELECT * FROM league_table_history WHERE season_id = :s LIMIT 1');
+        $stmt->execute([':s' => $seasonId]);
+        $row = $stmt->fetch();
+    } catch (Throwable) {
+        $row = null; // table not migrated yet, or DB hiccup — degrade to "no data"
+    }
+
+    if (!$row) {
+        return [
+            'ok' => false, 'rows' => [], 'updated' => null,
+            'url' => $config['url'], 'title' => $config['title'],
+            'promotion' => $config['promotion'], 'relegation' => $config['relegation'],
+            'is_live' => false,
+        ];
+    }
+
+    $rows = json_decode((string) $row['standings_json'], true);
+    $rows = is_array($rows) ? array_values(array_filter($rows, 'is_array')) : [];
+    $title = trim((string) ($row['competition_title'] ?? ''));
+    $updatedRaw = $row['updated_at'] ?: $row['created_at'] ?? null;
+
+    return [
+        'ok' => $rows !== [],
+        'rows' => $rows,
+        'updated' => $updatedRaw ? strtotime((string) $updatedRaw) : null,
+        'url' => $config['url'],
+        'title' => $title !== '' ? $title : $config['title'],
+        'promotion' => $row['promotion_spots'] !== null ? (int) $row['promotion_spots'] : $config['promotion'],
+        'relegation' => $row['relegation_spots'] !== null ? (int) $row['relegation_spots'] : $config['relegation'],
+        'is_live' => false,
+    ];
+}
+
 /** Is this row our club? */
 function pub_league_is_us(array $row): bool
 {
