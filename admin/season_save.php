@@ -2,7 +2,7 @@
 
 // PHASE3B_GUARD_MARKER
 require_once __DIR__ . '/auth.php';
-if (!hub_auth_has_capability('football_ops')) {
+if (!hub_auth_has_capability('club_setup')) {
     http_response_code(403);
     exit('Access denied.');
 }
@@ -30,6 +30,7 @@ $startDate = trim($_POST['start_date'] ?? '');
 $endDate = trim($_POST['end_date'] ?? '');
 $isCurrent = isset($_POST['is_current']) ? 1 : 0;
 $isLocked = isset($_POST['is_locked']) ? 1 : 0;
+$sponsorshipDeadline = trim((string) ($_POST['sponsorship_deadline'] ?? ''));
 $competitionId = (int)($_POST['competition_id'] ?? 0);
 $seasonTicketTerms = trim((string) ($_POST['season_ticket_terms'] ?? ''));
 $playerHomeAmount = (float)($_POST['player_home_amount'] ?? 50.00);
@@ -50,6 +51,12 @@ if ($startDate === '') {
 if ($endDate === '') {
           $endDate = null;
 }
+if ($sponsorshipDeadline === '') {
+          $sponsorshipDeadline = null;
+}
+if ($seasonId <= 0 && !hub_auth_is_sponsorship_editor()) {
+          $sponsorshipDeadline = null;
+}
 
 template_packs_ensure_schema($pdo);
 ensureCompetitionStructureSchema($pdo);
@@ -65,6 +72,14 @@ try {
                     if ((int)$existing['is_locked'] === 1) {
                               throw new RuntimeException('This season is locked.');
                     }
+                    // The sponsorship deadline gates who can touch player sponsorships
+                    // (see assertSponsorshipEditable()); this form is otherwise open to
+                    // anyone with the club_setup capability, so only the configured
+                    // sponsorship editor may move it. Anyone else's submission keeps
+                    // whatever value was already stored.
+                    if (!hub_auth_is_sponsorship_editor()) {
+                              $sponsorshipDeadline = $existing['sponsorship_deadline'];
+                    }
 
                     $stmt = $pdo->prepare("
                               UPDATE seasons
@@ -73,6 +88,7 @@ try {
                                   end_date = :end_date,
                                   is_current = :is_current,
                                   is_locked = :is_locked,
+                                  sponsorship_deadline = :sponsorship_deadline,
                                   competition_id = :competition_id,
                                   season_ticket_terms = :season_ticket_terms
                               WHERE id = :id
@@ -84,6 +100,7 @@ try {
                               ':end_date' => $endDate,
                               ':is_current' => $isCurrent,
                               ':is_locked' => $isLocked,
+                              ':sponsorship_deadline' => $sponsorshipDeadline,
                               ':competition_id' => $competitionId > 0 ? $competitionId : null,
                               ':season_ticket_terms' => $seasonTicketTerms !== '' ? $seasonTicketTerms : null,
                               ':id' => $seasonId,
@@ -91,9 +108,9 @@ try {
           } else {
                     $stmt = $pdo->prepare("
                               INSERT INTO seasons
-                                        (name, start_date, end_date, is_current, is_locked, competition_id, season_ticket_terms)
+                                        (name, start_date, end_date, is_current, is_locked, sponsorship_deadline, competition_id, season_ticket_terms)
                               VALUES
-                                        (:name, :start_date, :end_date, :is_current, :is_locked, :competition_id, :season_ticket_terms)
+                                        (:name, :start_date, :end_date, :is_current, :is_locked, :sponsorship_deadline, :competition_id, :season_ticket_terms)
                     ");
                     $stmt->execute([
                               ':name' => $name,
@@ -101,6 +118,7 @@ try {
                               ':end_date' => $endDate,
                               ':is_current' => $isCurrent,
                               ':is_locked' => $isLocked,
+                              ':sponsorship_deadline' => $sponsorshipDeadline,
                               ':competition_id' => $competitionId > 0 ? $competitionId : null,
                               ':season_ticket_terms' => $seasonTicketTerms !== '' ? $seasonTicketTerms : null,
                     ]);

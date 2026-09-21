@@ -2,6 +2,42 @@
 
 declare(strict_types=1);
 
+/**
+ * Throws if the signed-in account must not change player sponsorship data
+ * for this season — i.e. before doing anything that inserts, updates, ends,
+ * or transfers a row in `sponsorships`. Checked in this order:
+ *  1. Season's sponsorship deadline passed — blocks everyone, no exceptions
+ *     (including the configured editor), so a deadline is a real freeze.
+ *  2. Season is_locked — existing whole-season lock.
+ *  3. Signed-in account isn't the configured sponsorship editor
+ *     (hub_auth_is_sponsorship_editor()) — logged to the audit trail so
+ *     blocked attempts are visible, not just successful edits.
+ *
+ * Call this from every entry point that touches the sponsorships table
+ * (assign_sponsors.php, sponsorship_delete.php, sponsor_ajax.php's
+ * add_slot/delete_slot, player_edit_ajax.php's sponsorship actions) rather
+ * than duplicating these checks — that's how the season-lock check ended up
+ * present in some of those files and missing from others.
+ */
+function assertSponsorshipEditable(PDO $pdo, int $seasonId): void
+{
+    $season = getSeasonById($pdo, $seasonId);
+    if (!$season) {
+        throw new RuntimeException('Invalid season selected.');
+    }
+    if (!empty($season['sponsorship_deadline']) && strtotime((string) $season['sponsorship_deadline']) <= time()) {
+        throw new RuntimeException('The sponsorship deadline for this season has passed. Player sponsorships are locked.');
+    }
+    if ((int) $season['is_locked'] === 1) {
+        throw new RuntimeException('This season is locked.');
+    }
+    if (!hub_auth_is_sponsorship_editor()) {
+        $user = hub_auth_current_user();
+        auditLog($pdo, 'player_sponsorship_edit_blocked', 'Blocked sponsorship edit attempt by ' . ($user['email'] ?? $user['username'] ?? 'unknown account') . '.');
+        throw new RuntimeException('You do not have permission to edit player sponsorships.');
+    }
+}
+
 function ensureSponsorshipCatalogSchema(PDO $pdo): void
 {
     static $done = false;
@@ -175,7 +211,7 @@ function seedSponsorshipPackages(PDO $pdo): void
         ['Social Media Sponsor', 'social_media_sponsor', 'digital', 'Digital & Media', 0, 'season', null, 1, 'social_media', 'white', 40, 'Sponsor placement on club social media content.'],
         ['Matchday', 'match_day', 'match', 'Match', 50, 'fixture', 1, 1, 'matchday', 'package_default', 100, 'Sponsor of the overall matchday.'],
         ['Match Ball', 'match_ball', 'match', 'Match', 40, 'fixture', 1, 1, 'match_ball', 'package_default', 110, 'Sponsor of the match ball for a fixture.'],
-        ['MOTM', 'motm', 'match', 'Match', 30, 'fixture', 1, 1, 'motm', 'package_default', 120, 'Sponsor of the Man of the Match award.'],
+        ['MOTM', 'motm', 'match', 'Match', 30, 'fixture', 1, 1, 'motm', 'package_default', 120, 'Sponsor of the Player of the Match award.'],
         ['Player Home Kit Sponsor', 'player_home', 'player', 'Player', 50, 'season', 1, 1, 'player_graphic', 'package_default', 200, 'Home-kit sponsorship for an individual player.'],
         ['Player Away Kit Sponsor', 'player_away', 'player', 'Player', 50, 'season', 1, 1, 'player_graphic', 'package_default', 210, 'Away-kit sponsorship for an individual player.'],
         ['Player Third Kit Sponsor', 'player_third', 'player', 'Player', 0, 'season', 1, 1, 'player_graphic', 'package_default', 220, 'Third-kit sponsorship for an individual player.'],

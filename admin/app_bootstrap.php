@@ -74,7 +74,7 @@ function app_render_login_modal(string $title, string $message): void
         <div class="auth-modal-card p-4">
             <h1 id="loginModalTitle" class="h4 mb-2"><?= safe($title) ?></h1>
             <p class="text-muted mb-4"><?= safe($message) ?></p>
-            <a class="btn btn-maroon w-100" href="/admin/login.php">Go to sign in</a>
+            <a class="btn btn-brand w-100" href="/admin/login.php">Go to sign in</a>
         </div>
     </div>
     <?php

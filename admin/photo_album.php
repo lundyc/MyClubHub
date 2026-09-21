@@ -312,7 +312,7 @@ $statusText = [
                     <div class="card-body">
                         <h2 class="h6 text-danger">Delete album</h2>
                         <p class="text-muted small mb-2">Removes the album and all <?= count($photos) ?> photo(s), including the image files. This cannot be undone.</p>
-                        <form method="post" onsubmit="return confirm('Delete this album and all its photos? This cannot be undone.');">
+                        <form method="post" data-confirm="Delete this album and all its photos? This cannot be undone." data-confirm-action="Delete">
                             <?= csrf_field() ?>
                             <input type="hidden" name="action" value="delete_album">
                             <button type="submit" class="btn btn-outline-danger btn-sm">Delete album</button>
@@ -373,7 +373,7 @@ $statusText = [
                                                     <input type="hidden" name="photo_id" value="<?= $pid ?>">
                                                     <button class="btn btn-sm btn-outline-secondary" title="Use as cover" <?= $isCover ? 'disabled' : '' ?>>★</button>
                                                 </form>
-                                                <form method="post" class="d-inline" onsubmit="return confirm('Delete this photo?');">
+                                                <form method="post" class="d-inline" data-confirm="Delete this photo?" data-confirm-action="Delete">
                                                     <?= csrf_field() ?>
                                                     <input type="hidden" name="action" value="delete_photo">
                                                     <input type="hidden" name="photo_id" value="<?= $pid ?>">

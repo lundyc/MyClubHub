@@ -45,7 +45,9 @@ set_meta(['title' => 'Order ' . (string) $order['order_ref']]);
         <?php else: ?>
           <h1><?= empty($order['stripe_checkout_session_id']) ? 'Awaiting payment' : 'Payment processing' ?></h1>
         <?php endif; ?>
-        <p><?= e((string) $order['order_ref']) ?></p>
+        <p><?= e((string) $order['order_ref']) ?>
+          <button type="button" class="copybtn" data-copy="<?= e((string) $order['order_ref']) ?>" data-copy-type="order_reference">Copy</button>
+        </p>
       </div>
 
       <div class="confirm__body">

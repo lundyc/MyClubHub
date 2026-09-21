@@ -21,6 +21,10 @@ try {
     throw new Exception('Invalid request method.');
   }
 
+  if (!csrf_check()) {
+    throw new Exception('Your session expired. Please refresh the page and try again.');
+  }
+
   $playerId = isset($_POST['player_id']) ? (int)$_POST['player_id'] : 0;
   if ($playerId <= 0) {
     throw new Exception('Missing or invalid player_id.');

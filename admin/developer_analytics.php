@@ -320,7 +320,7 @@ $dailyChart = array_reverse($daily);
                         <p class="analytics-empty">No data for this date range yet.</p>
                     <?php else: ?>
                         <div class="table-responsive">
-                            <table class="table analytics-table align-middle">
+                            <table class="table analytics-table align-middle hub-data-table">
                                 <thead><tr><th>Page</th><th>Views</th><th>Visitors</th><th>Avg time</th></tr></thead>
                                 <tbody>
                                 <?php foreach ($gaTopPages['rows'] as $row): ?>
@@ -350,7 +350,7 @@ $dailyChart = array_reverse($daily);
                     <?php if ($gaSources['rows'] === []): ?>
                         <p class="analytics-empty">No data yet.</p>
                     <?php else: ?>
-                        <table class="table analytics-table align-middle">
+                        <table class="table analytics-table align-middle hub-data-table">
                             <thead><tr><th>Source</th><th>Sessions</th></tr></thead>
                             <tbody>
                             <?php foreach ($gaSources['rows'] as $row): ?>
@@ -371,7 +371,7 @@ $dailyChart = array_reverse($daily);
                     <?php if ($gaDevices['rows'] === []): ?>
                         <p class="analytics-empty">No data yet.</p>
                     <?php else: ?>
-                        <table class="table analytics-table align-middle">
+                        <table class="table analytics-table align-middle hub-data-table">
                             <thead><tr><th>Device</th><th>Sessions</th></tr></thead>
                             <tbody>
                             <?php foreach ($gaDevices['rows'] as $row): ?>
@@ -392,7 +392,7 @@ $dailyChart = array_reverse($daily);
                     <?php if ($gaDaily['rows'] === []): ?>
                         <p class="analytics-empty">No trend data yet.</p>
                     <?php else: ?>
-                        <table class="table analytics-table align-middle">
+                        <table class="table analytics-table align-middle hub-data-table">
                             <thead><tr><th>Day</th><th>Views</th><th>Visitors</th></tr></thead>
                             <tbody>
                             <?php foreach (array_reverse($gaDaily['rows']) as $row): ?>
@@ -461,7 +461,7 @@ $dailyChart = array_reverse($daily);
                         <p class="analytics-empty">No search query data yet — this can take a few days after verifying with Google.</p>
                     <?php else: ?>
                         <div class="table-responsive">
-                            <table class="table analytics-table align-middle">
+                            <table class="table analytics-table align-middle hub-data-table">
                                 <thead><tr><th>Query</th><th>Clicks</th><th>Impressions</th><th>CTR</th><th>Position</th></tr></thead>
                                 <tbody>
                                 <?php foreach ($scQueries['rows'] as $row): ?>
@@ -489,7 +489,7 @@ $dailyChart = array_reverse($daily);
                     <?php if ($scPages['rows'] === []): ?>
                         <p class="analytics-empty">No data yet.</p>
                     <?php else: ?>
-                        <table class="table analytics-table align-middle">
+                        <table class="table analytics-table align-middle hub-data-table">
                             <thead><tr><th>Page</th><th>Clicks</th></tr></thead>
                             <tbody>
                             <?php foreach ($scPages['rows'] as $row): ?>
@@ -510,7 +510,7 @@ $dailyChart = array_reverse($daily);
                     <?php if ($scDaily['rows'] === []): ?>
                         <p class="analytics-empty">No trend data yet.</p>
                     <?php else: ?>
-                        <table class="table analytics-table align-middle">
+                        <table class="table analytics-table align-middle hub-data-table">
                             <thead><tr><th>Day</th><th>Clicks</th><th>Impressions</th></tr></thead>
                             <tbody>
                             <?php foreach ($scDaily['rows'] as $row): ?>
@@ -568,7 +568,7 @@ $dailyChart = array_reverse($daily);
                 <p class="analytics-empty">No analytics have been recorded for this date range yet.</p>
             <?php else: ?>
                 <div class="table-responsive">
-                    <table class="table analytics-table align-middle">
+                    <table class="table analytics-table align-middle hub-data-table">
                         <thead><tr><th>Page</th><th>Views</th><th>Users</th><th>Avg time</th></tr></thead>
                         <tbody>
                         <?php foreach ($topFivePages as $row): ?>
@@ -598,7 +598,7 @@ $dailyChart = array_reverse($daily);
             <?php if ($worstFivePages === []): ?>
                 <p class="analytics-empty">Not enough tracked pages yet.</p>
             <?php else: ?>
-                <table class="table analytics-table align-middle">
+                <table class="table analytics-table align-middle hub-data-table">
                     <thead><tr><th>Page</th><th>Views</th></tr></thead>
                     <tbody>
                     <?php foreach ($worstFivePages as $row): ?>
@@ -619,7 +619,7 @@ $dailyChart = array_reverse($daily);
             <?php if ($devices === []): ?>
                 <p class="analytics-empty">No device data yet.</p>
             <?php else: ?>
-                <table class="table analytics-table align-middle">
+                <table class="table analytics-table align-middle hub-data-table">
                     <thead><tr><th>Device</th><th>Sessions</th><th>Events</th></tr></thead>
                     <tbody>
                     <?php foreach ($devices as $row): ?>
@@ -654,7 +654,7 @@ $dailyChart = array_reverse($daily);
             <?php if ($users === []): ?>
                 <p class="analytics-empty">No user activity has been recorded yet.</p>
             <?php else: ?>
-                <table class="table analytics-table align-middle">
+                <table class="table analytics-table align-middle hub-data-table">
                     <thead><tr><th>User</th><th>Sessions</th><th>Views</th></tr></thead>
                     <tbody>
                     <?php foreach ($usersVisible as $row): ?>
@@ -684,7 +684,7 @@ $dailyChart = array_reverse($daily);
                 <p class="analytics-empty">No feature clicks have been recorded yet.</p>
             <?php else: ?>
                 <div class="table-responsive">
-                    <table class="table analytics-table align-middle">
+                    <table class="table analytics-table align-middle hub-data-table">
                         <thead><tr><th>Feature</th><th>Page</th><th>Type</th><th>Events</th><th>Users</th></tr></thead>
                         <tbody>
                         <?php foreach ($topFeaturesVisible as $row): ?>
@@ -717,7 +717,7 @@ $dailyChart = array_reverse($daily);
                 <p class="analytics-empty">No journeys have been recorded yet.</p>
             <?php else: ?>
                 <div class="table-responsive">
-                    <table class="table analytics-table align-middle">
+                    <table class="table analytics-table align-middle hub-data-table">
                         <thead><tr><th>User</th><th>Started</th><th>Duration</th><th>Steps</th><th>Path</th></tr></thead>
                         <tbody>
                         <?php foreach ($journeysVisible as $row): ?>

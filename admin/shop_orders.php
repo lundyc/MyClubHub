@@ -8,8 +8,21 @@ require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/lib/functions.php';
 require_once __DIR__ . '/lib/shop.php';
 require_once __DIR__ . '/account_auth.php';
+require_once __DIR__ . '/lib/audit.php';
+hub_auth_require_capability('shop');
 
 shop_ensure_schema($pdo);
+
+if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && (string) ($_POST['action'] ?? '') === 'mark_all_vsn_ordered') {
+    if (!hub_auth_verify_csrf_token((string) ($_POST['csrf_token'] ?? ''))) {
+        header('Location: shop_orders.php?vsn_error=1');
+        exit;
+    }
+    $marked = shop_mark_all_vsn_ordered($pdo);
+    auditLog($pdo, 'shop_order_vsn_ordered_bulk', $marked . ' shop order(s) flagged as sent to VSN');
+    header('Location: shop_orders.php?vsn_marked=' . $marked);
+    exit;
+}
 
 $status = (string) ($_GET['status'] ?? '');
 $search = trim((string) ($_GET['q'] ?? ''));
@@ -66,17 +79,12 @@ $pageHero = [
 ];
 require_once __DIR__ . '/header.php';
 
-if ((string) ($currentRole ?? 'guest') !== 'admin') {
-    http_response_code(403);
-    echo '<div><div class="alert alert-danger">You do not have permission to manage the shop.</div></div>';
-    require __DIR__ . '/footer.php';
-    exit;
-}
 
 $orders = shop_order_list($pdo, $filters);
 $statuses = ['' => 'All statuses', 'pending_payment' => 'Pending payment', 'paid' => 'Paid', 'collected' => 'Collected', 'cancelled' => 'Cancelled', 'refunded' => 'Refunded'];
 
 $exportQuery = http_build_query(array_merge($_GET, ['export' => 'csv']));
+$pendingVsnOrders = shop_orders_pending_vsn($pdo);
 
 function shop_status_badge(string $status): string
 {
@@ -86,6 +94,29 @@ function shop_status_badge(string $status): string
 ?>
 <div class="shop-admin-page">
     <nav class="hub-breadcrumb" aria-label="Breadcrumb"><a href="/admin/shop_overview.php">Shop</a> <i class="fa-solid fa-chevron-right" aria-hidden="true"></i> <span aria-current="page">Orders</span></nav>
+
+    <?php if (isset($_GET['vsn_marked'])): ?>
+        <div class="alert alert-success"><?= (int) $_GET['vsn_marked'] ?> order(s) flagged as sent to VSN.</div>
+    <?php elseif (isset($_GET['vsn_error'])): ?>
+        <div class="alert alert-danger">Your session could not be verified. Reload the page and try again.</div>
+    <?php endif; ?>
+
+    <?php if ($pendingVsnOrders !== []): ?>
+        <div class="card hub-panel p-3 mb-3 d-flex flex-row flex-wrap justify-content-between align-items-center gap-3">
+            <div>
+                <strong><?= count($pendingVsnOrders) ?> pre-order<?= count($pendingVsnOrders) === 1 ? '' : 's' ?> not yet sent to VSN</strong>
+                <div class="small text-muted">Download the combined order form for VSN — product, size and customer details for every order below.</div>
+            </div>
+            <div class="d-flex gap-2">
+                <a class="btn btn-brand" href="/admin/shop_vsn_order_form_pdf.php?download=1"><i class="fa-solid fa-file-pdf me-1" aria-hidden="true"></i>Download VSN order form (PDF)</a>
+                <form method="post" data-confirm="Only do this after you've actually sent the order form to VSN." data-confirm-title="Mark these orders as sent to VSN?" data-confirm-action="Mark as sent">
+                    <input type="hidden" name="csrf_token" value="<?= h(hub_auth_csrf_token()) ?>">
+                    <input type="hidden" name="action" value="mark_all_vsn_ordered">
+                    <button type="submit" class="btn btn-outline-secondary">Mark all as sent to VSN</button>
+                </form>
+            </div>
+        </div>
+    <?php endif; ?>
 
     <div class="d-flex gap-2 mb-3">
         <a class="btn btn-dark" href="/admin/shop_order_new.php">Add manual order</a>

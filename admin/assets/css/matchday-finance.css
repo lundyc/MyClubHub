@@ -8,9 +8,9 @@
 /* ---- list ---- */
 .matchday-finance-table__sub {
     display: block;
-    font-size: 0.78rem;
+    font-size: var(--fs-078, 0.78rem);
     color: var(--hub-muted, #70676b);
-    margin-top: 0.1rem;
+    margin-top: var(--space-01rem, 0.1rem);
 }
 
 .matchday-finance-net {
@@ -32,7 +32,7 @@
     flex-wrap: wrap;
     align-items: flex-start;
     justify-content: space-between;
-    gap: 1rem;
+    gap: var(--space-4, 1rem);
     padding: var(--hub-space, 1.15rem);
     margin-bottom: var(--mf-gap);
     border: 1px solid var(--hub-line, rgba(75, 8, 24, 0.12));
@@ -44,7 +44,7 @@
 
 .mf-fixture__eyebrow {
     display: inline-block;
-    font-size: 0.68rem;
+    font-size: var(--fs-068, 0.68rem);
     font-weight: 800;
     letter-spacing: 0.11em;
     text-transform: uppercase;
@@ -53,7 +53,7 @@
 
 .mf-fixture__title {
     margin: 0.25rem 0 0.4rem;
-    font-size: 1.2rem;
+    font-size: var(--fs-12, 1.2rem);
     font-weight: 750;
     color: var(--brand-light, #f6ecde);
 }
@@ -69,12 +69,12 @@
     flex-wrap: wrap;
     gap: 0.35rem 1rem;
     margin: 0;
-    font-size: 0.86rem;
+    font-size: var(--fs-086, 0.86rem);
     color: rgba(246, 236, 222, 0.82);
 }
 
 .mf-fixture__meta i {
-    margin-right: 0.35rem;
+    margin-right: var(--space-035rem, 0.35rem);
     opacity: 0.7;
 }
 
@@ -82,8 +82,8 @@
     display: flex;
     flex-direction: column;
     align-items: flex-end;
-    gap: 0.3rem;
-    font-size: 0.78rem;
+    gap: var(--space-03rem, 0.3rem);
+    font-size: var(--fs-078, 0.78rem);
     color: rgba(246, 236, 222, 0.75);
 }
 
@@ -115,37 +115,37 @@
     align-items: baseline;
     justify-content: space-between;
     gap: 0.5rem 1rem;
-    margin-bottom: 0.9rem;
+    margin-bottom: var(--space-9rem, 0.9rem);
 }
 
 .mf-card__head h3,
 .mf-card__head-plain {
     margin: 0;
-    font-size: 1.05rem;
+    font-size: var(--fs-105, 1.05rem);
     font-weight: 750;
     letter-spacing: -0.015em;
     color: var(--hub-ink, #1f1a1d);
 }
 
 .mf-card__head-plain {
-    margin-bottom: 0.9rem;
+    margin-bottom: var(--space-9rem, 0.9rem);
 }
 
 .mf-card__total {
-    font-size: 0.85rem;
+    font-size: var(--fs-sm, 0.85rem);
     color: var(--hub-muted, #70676b);
 }
 
 .mf-card__total strong {
-    margin-left: 0.35rem;
-    font-size: 1rem;
+    margin-left: var(--space-035rem, 0.35rem);
+    font-size: var(--fs-base, 1rem);
     font-variant-numeric: tabular-nums;
     color: var(--hub-ink, #1f1a1d);
 }
 
 .mf-card__hint {
     flex-basis: 100%;
-    font-size: 0.8rem;
+    font-size: var(--fs-08, 0.8rem);
     line-height: 1.45;
     color: var(--hub-muted, #70676b);
 }
@@ -154,14 +154,14 @@
 .mf-lines {
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
+    gap: var(--space-2, 0.5rem);
 }
 
 .mf-line {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 1rem;
+    gap: var(--space-4, 1rem);
     padding: 0.3rem 0;
     border-bottom: 1px dashed var(--hub-line, rgba(75, 8, 24, 0.12));
 }
@@ -172,7 +172,7 @@
 
 .mf-line__label {
     margin: 0;
-    font-size: 0.9rem;
+    font-size: var(--fs-09, 0.9rem);
     color: var(--hub-ink, #1f1a1d);
 }
 
@@ -194,7 +194,7 @@
 /* ---- edit: balance readout ---- */
 .mf-balance {
     display: grid;
-    gap: 0.75rem;
+    gap: var(--space-3, 0.75rem);
     grid-template-columns: 1fr;
 }
 
@@ -206,7 +206,7 @@
 
 .mf-balance__item {
     padding: 0.85rem 1rem;
-    border-radius: 0.7rem;
+    border-radius: var(--radius-07rem, 0.7rem);
     background: var(--hub-surface-muted, #faf5ed);
     border: 1px solid var(--hub-line, rgba(75, 8, 24, 0.12));
 }
@@ -218,7 +218,7 @@
 
 .mf-balance__label {
     display: block;
-    font-size: 0.76rem;
+    font-size: var(--fs-076, 0.76rem);
     font-weight: 700;
     letter-spacing: 0.04em;
     text-transform: uppercase;
@@ -227,8 +227,8 @@
 
 .mf-balance__value {
     display: block;
-    margin-top: 0.3rem;
-    font-size: 1.35rem;
+    margin-top: var(--space-03rem, 0.3rem);
+    font-size: var(--fs-135, 1.35rem);
     font-weight: 780;
     font-variant-numeric: tabular-nums;
     color: var(--hub-ink, #1f1a1d);
@@ -236,19 +236,19 @@
 
 .mf-balance__hint {
     display: block;
-    margin-top: 0.25rem;
-    font-size: 0.78rem;
+    margin-top: var(--space-1, 0.25rem);
+    font-size: var(--fs-078, 0.78rem);
     font-variant-numeric: tabular-nums;
     color: var(--hub-muted, #70676b);
 }
 
 /* ---- edit: takings table ---- */
 .mf-recon {
-    font-size: 0.9rem;
+    font-size: var(--fs-09, 0.9rem);
 }
 
 .mf-recon thead th {
-    font-size: 0.72rem;
+    font-size: var(--fs-072, 0.72rem);
     text-transform: uppercase;
     letter-spacing: 0.04em;
     color: var(--hub-muted, #70676b);
@@ -285,7 +285,7 @@
     display: flex;
     flex-wrap: wrap;
     justify-content: flex-end;
-    gap: 0.6rem;
+    gap: var(--space-06rem, 0.6rem);
     margin-top: var(--mf-gap);
 }
 
@@ -293,7 +293,7 @@
     .mf-line {
         align-items: flex-start;
         flex-direction: column;
-        gap: 0.35rem;
+        gap: var(--space-035rem, 0.35rem);
     }
 
     .mf-money,

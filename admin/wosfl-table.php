@@ -98,12 +98,35 @@ if ($cookieFile === false) {
     });
 }
 
+$userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36';
+
+// wosfl.co.uk sits behind an AWS WAF that challenges cold requests straight to
+// a standings page (HTTP 202, x-amzn-waf-action: challenge, empty body) but
+// lets the same request through once it carries the ALB/session cookies a
+// normal visit to the homepage first picks up. So warm up a session there
+// before asking for the page we actually want — same cookie jar for both.
+$urlParts = parse_url($url);
+if ($cookieFile !== '' && isset($urlParts['scheme'], $urlParts['host'])) {
+    $homepageUrl = $urlParts['scheme'] . '://' . $urlParts['host'] . '/';
+    $warmupCh = curl_init($homepageUrl);
+    curl_setopt_array($warmupCh, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_FOLLOWLOCATION => true,
+        CURLOPT_TIMEOUT => 15,
+        CURLOPT_USERAGENT => $userAgent,
+        CURLOPT_COOKIEFILE => $cookieFile,
+        CURLOPT_COOKIEJAR => $cookieFile,
+    ]);
+    curl_exec($warmupCh);
+    curl_close($warmupCh);
+}
+
 $ch = curl_init($url);
 curl_setopt_array($ch, [
     CURLOPT_RETURNTRANSFER => true,
     CURLOPT_FOLLOWLOCATION => true,
     CURLOPT_TIMEOUT => 20,
-    CURLOPT_USERAGENT => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36',
+    CURLOPT_USERAGENT => $userAgent,
     CURLOPT_REFERER => 'https://www.wosfl.co.uk/',
     CURLOPT_COOKIEFILE => $cookieFile,
     CURLOPT_COOKIEJAR => $cookieFile,

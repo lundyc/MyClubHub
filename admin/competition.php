@@ -353,7 +353,7 @@ $assignedEditionCount = count(array_filter($formEditionBySeason, static fn(array
                     </div>
           <?php endif; ?>
 
-          <form method="post" enctype="multipart/form-data" action="competition.php?action=<?= h($action) ?><?= $id > 0 ? '&amp;id=' . $id : '' ?>">
+          <form method="post" enctype="multipart/form-data" action="competition.php?action=<?= h($action) ?><?= $id > 0 ? '&amp;id=' . $id : '' ?>" data-warn-unsaved>
                     <?= csrf_field() ?>
                     <input type="hidden" name="competition_id" value="<?= $id ?>">
                     <div class="competition-editor__layout">

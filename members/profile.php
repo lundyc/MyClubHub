@@ -91,18 +91,13 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
         $country = trim((string) ($_POST['country'] ?? ''));
         $postcode = trim((string) ($_POST['postcode'] ?? ''));
         $marketingOptIn = isset($_POST['marketing_opt_in']);
-        $useLoginAsContact = isset($_POST['use_login_as_contact_email']);
-        $updateBothEmails = isset($_POST['update_both_emails']);
         $profileImagePath = (string) ($person['profile_image_path'] ?? '');
 
-        if ($useLoginAsContact) {
-            $contactEmail = (string) ($account['email'] ?? '');
-        }
         if ($name === '') {
             $errors[] = 'Name is required.';
         }
-        if ($contactEmail !== '' && !filter_var($contactEmail, FILTER_VALIDATE_EMAIL)) {
-            $errors[] = 'Enter a valid contact email address.';
+        if (!filter_var($contactEmail, FILTER_VALIDATE_EMAIL)) {
+            $errors[] = 'Enter a valid email address.';
         }
 
         if (!$errors) {
@@ -118,6 +113,8 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
 
         if (!$errors) {
             try {
+                $pdo->beginTransaction();
+                updateAccountLogin($pdo, (int) $account['id'], $contactEmail, (int) ($account['is_active'] ?? 1) === 1, accountPrimaryRole($pdo, (int) $account['id']));
                 updatePerson($pdo, (int) $person['id'], [
                     'display_name' => $name,
                     'date_of_birth' => $dob,
@@ -134,13 +131,14 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                 if ($profileImagePath !== (string) ($person['profile_image_path'] ?? '')) {
                     updatePersonProfileImage($pdo, (int) $person['id'], $profileImagePath);
                 }
-                if ($updateBothEmails && $contactEmail !== '') {
-                    updateAccountLogin($pdo, (int) $account['id'], $contactEmail, (int) ($account['is_active'] ?? 1) === 1, accountPrimaryRole($pdo, (int) $account['id']));
-                }
+                $pdo->commit();
                 $success = 'Profile updated.';
                 $person = member_auth_current_person() ?: $person;
                 $account = member_auth_current_account() ?: $account;
             } catch (Throwable $e) {
+                if ($pdo->inTransaction()) {
+                    $pdo->rollBack();
+                }
                 $errors[] = $e->getMessage();
             }
         }
@@ -166,11 +164,11 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     }
 }
 
-$contactEmail = (string) ($person['email'] ?? '');
-$loginEmail = (string) ($account['email'] ?? '');
+$contactEmail = (string) ($account['email'] ?? '');
 ?>
 
-<div class="member-page">
+<link rel="stylesheet" href="/admin/assets/css/member-profile.css?v=2">
+<div class="member-page profile-page">
     <section class="member-hero">
         <div class="member-hero__content">
             <div class="member-hero__eyebrow">Account Settings</div>
@@ -185,71 +183,64 @@ $loginEmail = (string) ($account['email'] ?? '');
     <div class="member-grid member-grid--aside">
         <div class="member-list">
             <section class="member-card">
-                <div class="member-card__header"><h2>Profile Information</h2></div>
+                <div class="member-card__header"><h2>Profile information</h2></div>
                 <div class="member-card__body">
                     <form method="post" enctype="multipart/form-data">
                         <input type="hidden" name="csrf_token" value="<?= h($profileCsrfToken) ?>">
                         <input type="hidden" name="form_action" value="profile">
 
-                        <div class="d-flex flex-wrap align-items-center gap-3 mb-4">
-                            <div class="member-avatar">
-                                <?php if (!empty($person['profile_image_path'])): ?><img src="/<?= h((string) $person['profile_image_path']) ?>" alt=""><?php else: ?><?= h(member_initials((string) $person['display_name'])) ?><?php endif; ?>
+                        <div class="profile-identity">
+                            <div class="profile-photo-control">
+                                <input type="file" class="profile-photo-input" id="profileImage" name="profile_image" accept="image/jpeg,image/png,image/webp" aria-label="Change profile photo" aria-describedby="profilePhotoHelp profilePhotoStatus">
+                                <label class="member-avatar profile-photo" for="profileImage" title="Change profile photo">
+                                    <?php if (!empty($person['profile_image_path'])): ?><img id="profilePhotoPreview" src="/<?= h((string) $person['profile_image_path']) ?>" alt="Your profile photo"><?php else: ?><span id="profilePhotoInitials"><?= h(member_initials((string) $person['display_name'])) ?></span><img id="profilePhotoPreview" alt="Selected profile photo" hidden><?php endif; ?>
+                                    <span class="profile-photo-overlay"><i class="fa-solid fa-camera" aria-hidden="true"></i><span>Change photo</span></span>
+                                    <span class="profile-photo-badge"><i class="fa-solid fa-camera" aria-hidden="true"></i></span>
+                                </label>
                             </div>
-                            <div class="flex-grow-1">
-                                <label class="form-label" for="profileImage">Profile photo</label>
-                                <input type="file" class="form-control" id="profileImage" name="profile_image" accept="image/jpeg,image/png,image/webp">
-                                <div class="form-text">JPG, PNG or WebP. Maximum 2MB.</div>
+                            <div class="profile-identity-copy">
+                                <h2><?= h((string) $person['display_name']) ?></h2>
+                                <p>Make your profile your own.</p>
+                                <div class="form-text" id="profilePhotoHelp">Select your photo to change it. JPG, PNG or WebP, up to 2MB.</div>
+                                <div class="profile-photo-status" id="profilePhotoStatus" role="status" aria-live="polite"></div>
                             </div>
                         </div>
+                        <div class="profile-section-heading"><h3>Personal details</h3><p>Your name and the best way to reach you.</p></div>
 
                         <div class="row g-3">
                             <div class="col-md-6">
                                 <label class="form-label" for="profileName">Name</label>
-                                <input type="text" class="form-control" id="profileName" name="name" value="<?= h((string) $person['display_name']) ?>" required>
+                                <input type="text" class="form-control" id="profileName" name="name" autocomplete="name" value="<?= h((string) $person['display_name']) ?>" required>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label" for="profileDob">Date of birth</label>
                                 <input type="date" class="form-control" id="profileDob" name="date_of_birth" value="<?= h((string) ($person['date_of_birth'] ?? '')) ?>">
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label" for="profileContactEmail">Contact email</label>
-                                <input type="email" class="form-control" id="profileContactEmail" name="contact_email" value="<?= h($contactEmail) ?>">
-                                <div class="form-text">Used by the club for contact and mailing list exports.</div>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label">Login email</label>
-                                <input type="email" class="form-control" value="<?= h($loginEmail) ?>" disabled>
-                                <div class="form-text">Used to sign in to your Hub account.</div>
-                            </div>
-                            <div class="col-12">
-                                <div class="form-check">
-                                    <input type="checkbox" class="form-check-input" id="useLoginEmail" name="use_login_as_contact_email" value="1">
-                                    <label class="form-check-label" for="useLoginEmail">Use login email as contact email</label>
-                                </div>
-                                <div class="form-check">
-                                    <input type="checkbox" class="form-check-input" id="updateBothEmails" name="update_both_emails" value="1">
-                                    <label class="form-check-label" for="updateBothEmails">Update both contact email and login email to the contact email above</label>
-                                </div>
+                                <label class="form-label" for="profileContactEmail">Email</label>
+                                <input type="email" class="form-control" id="profileContactEmail" name="contact_email" value="<?= h($contactEmail) ?>" autocomplete="email" required>
+                                <div class="form-text">Used to sign in and for club communications.</div>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label" for="profilePhone">Phone</label>
-                                <input type="text" class="form-control" id="profilePhone" name="phone" value="<?= h((string) ($person['phone'] ?? '')) ?>">
+                                <input type="text" class="form-control" id="profilePhone" name="phone" autocomplete="tel" value="<?= h((string) ($person['phone'] ?? '')) ?>">
                             </div>
-                            <div class="col-md-6"></div>
+                            <div class="col-12 profile-section-heading"><h3>Address</h3><p>Keep your club contact record up to date.</p></div>
                             <div class="col-md-6"><label class="form-label" for="addressLine1">Address line 1</label><input type="text" class="form-control" id="addressLine1" name="address_line1" value="<?= h((string) ($person['address_line1'] ?? '')) ?>"></div>
                             <div class="col-md-6"><label class="form-label" for="addressLine2">Address line 2</label><input type="text" class="form-control" id="addressLine2" name="address_line2" value="<?= h((string) ($person['address_line2'] ?? '')) ?>"></div>
                             <div class="col-md-4"><label class="form-label" for="addressTown">Town</label><input type="text" class="form-control" id="addressTown" name="town" value="<?= h((string) ($person['town'] ?? '')) ?>"></div>
                             <div class="col-md-4"><label class="form-label" for="addressCountry">Country</label><input type="text" class="form-control" id="addressCountry" name="country" value="<?= h((string) ($person['country'] ?? '')) ?>"></div>
                             <div class="col-md-4"><label class="form-label" for="addressPostcode">Postcode</label><input type="text" class="form-control" id="addressPostcode" name="postcode" value="<?= h((string) ($person['postcode'] ?? '')) ?>"></div>
                             <div class="col-12">
-                                <div class="form-check">
+                                <div class="profile-section-heading"><h3>Communication preferences</h3></div>
+                                <div class="form-check profile-preference">
                                     <input type="checkbox" class="form-check-input" id="profileOptIn" name="marketing_opt_in" value="1" <?= (int) ($person['marketing_opt_in'] ?? 0) === 1 ? 'checked' : '' ?>>
                                     <label class="form-check-label" for="profileOptIn">Keep me posted about club news, deals and offers</label>
                                 </div>
                             </div>
                         </div>
 
-                        <button type="submit" class="btn btn-brand mt-4">Save profile</button>
+                        <div class="profile-form-footer"><span>Your photo and details are saved together.</span><button type="submit" class="btn btn-brand">Save changes</button></div>
                     </form>
                 </div>
             </section>
@@ -258,10 +249,9 @@ $loginEmail = (string) ($account['email'] ?? '');
         <aside class="member-grid">
             <section class="member-card">
                 <div class="member-card__body">
-                    <h2>Account Summary</h2>
+                    <h2>Account summary</h2>
                     <div class="member-list mt-3">
-                        <div><strong>Contact email</strong><div class="text-muted small"><?= h($contactEmail !== '' ? $contactEmail : 'Not set') ?></div></div>
-                        <div><strong>Login email</strong><div class="text-muted small"><?= h($loginEmail) ?></div></div>
+                        <div><strong>Email</strong><div class="text-muted small"><?= h($contactEmail !== '' ? $contactEmail : 'Not set') ?></div></div>
                         <div><strong>Primary address</strong><div class="text-muted small"><?= h(member_profile_address_summary($person) ?: 'Not set') ?></div></div>
                         <div><strong>Marketing</strong><div class="text-muted small"><?= (int) ($person['marketing_opt_in'] ?? 0) === 1 ? 'Opted in' : 'Opted out' ?></div></div>
                     </div>
@@ -269,22 +259,22 @@ $loginEmail = (string) ($account['email'] ?? '');
             </section>
 
             <section class="member-card">
-                <div class="member-card__header"><h2>Change Password</h2></div>
+                <div class="member-card__header"><h2>Change password</h2></div>
                 <div class="member-card__body">
                     <form method="post">
                         <input type="hidden" name="csrf_token" value="<?= h($profileCsrfToken) ?>">
                         <input type="hidden" name="form_action" value="password">
                         <div class="mb-3">
                             <label class="form-label" for="currentPassword">Current password</label>
-                            <input type="password" class="form-control" id="currentPassword" name="current_password" required>
+                            <input type="password" class="form-control" id="currentPassword" name="current_password" autocomplete="current-password" required>
                         </div>
                         <div class="mb-3">
                             <label class="form-label" for="newPassword">New password</label>
-                            <input type="password" class="form-control" id="newPassword" name="new_password" minlength="8" required>
+                            <input type="password" class="form-control" id="newPassword" name="new_password" autocomplete="new-password" minlength="8" required>
                         </div>
                         <div class="mb-3">
                             <label class="form-label" for="newPasswordConfirm">Confirm new password</label>
-                            <input type="password" class="form-control" id="newPasswordConfirm" name="new_password_confirm" minlength="8" required>
+                            <input type="password" class="form-control" id="newPasswordConfirm" name="new_password_confirm" autocomplete="new-password" minlength="8" required>
                         </div>
                         <button type="submit" class="btn btn-outline-secondary">Update password</button>
                     </form>
@@ -294,4 +284,5 @@ $loginEmail = (string) ($account['email'] ?? '');
     </div>
 </div>
 
+<script src="/admin/assets/js/member-profile.js?v=1" defer></script>
 <?php require_once __DIR__ . '/footer.php'; ?>

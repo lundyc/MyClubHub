@@ -9,6 +9,7 @@ require_once __DIR__ . '/lib/functions.php';
 require_once __DIR__ . '/lib/shop.php';
 require_once __DIR__ . '/lib/notification_recipients.php';
 require_once __DIR__ . '/account_auth.php';
+hub_auth_require_capability('shop');
 require_once __DIR__ . '/lib/audit.php';
 
 shop_ensure_schema($pdo);
@@ -105,12 +106,6 @@ $pageHero = [
 ];
 require_once __DIR__ . '/header.php';
 
-if ((string) ($currentRole ?? 'guest') !== 'admin') {
-    http_response_code(403);
-    echo '<div><div class="alert alert-danger">You do not have permission to manage the shop.</div></div>';
-    require __DIR__ . '/footer.php';
-    exit;
-}
 
 $s = shop_get_settings($pdo);
 $closeValue = '';

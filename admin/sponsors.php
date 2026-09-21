@@ -165,9 +165,9 @@ if (!in_array($paymentFilter, ['all', 'paid', 'partial', 'unpaid', 'complimentar
   $paymentFilter = 'all';
 }
 
-$statusFilter = $_GET['status'] ?? 'all';
+$statusFilter = $_GET['status'] ?? 'active';
 if (!in_array($statusFilter, ['all', 'active', 'inactive'], true)) {
-  $statusFilter = 'all';
+  $statusFilter = 'active';
 }
 
 $scopeLabels = ['club' => 'Club-wide', 'team' => 'Team', 'match' => 'Match', 'player' => 'Player', 'digital' => 'Digital'];
@@ -474,7 +474,7 @@ $visibleOutstanding = array_sum(array_map(
           <select id="statusFilter" name="status" class="form-select">
             <option value="all" <?= $statusFilter === 'all' ? 'selected' : '' ?>>All records</option>
             <option value="active" <?= $statusFilter === 'active' ? 'selected' : '' ?>>Active</option>
-            <option value="inactive" <?= $statusFilter === 'inactive' ? 'selected' : '' ?>>Inactive</option>
+            <option value="inactive" <?= $statusFilter === 'inactive' ? 'selected' : '' ?>>Archived</option>
           </select>
         </div>
         <div class="col-6 col-lg-2">
@@ -552,204 +552,8 @@ $visibleOutstanding = array_sum(array_map(
     </div>
   </div>
 
-  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
-    <div class="text-muted small">
-      Showing <?= (int)count($visibleSponsors) ?> sponsors
-      in the current view with <?= gbp($visibleOutstanding) ?> outstanding.
-    </div>
-    <div class="d-flex flex-wrap gap-1">
-      <span class="badge hub-status bg-brand-paid">Paid: <?= (int)$paidSponsorsCount ?></span>
-      <span class="badge hub-status bg-brand-partial">Partial: <?= (int)$partialSponsorsCount ?></span>
-      <span class="badge hub-status bg-brand-unpaid">Unpaid: <?= (int)$unpaidSponsorsCount ?></span>
-      <span class="badge hub-status text-bg-info">Complimentary: <?= (int)$complimentarySponsorsCount ?></span>
-      <span class="badge hub-status text-bg-light">No charge: <?= (int)$noChargeSponsorsCount ?></span>
-      <span class="badge hub-status bg-secondary">No agreements: <?= (int)$noAgreementsSponsorsCount ?></span>
-    </div>
-  </div>
-
-  <?php if (!$visibleSponsors): ?>
-    <div class="alert alert-info mb-0 hub-empty-state">
-      No sponsors match the current filters.
-    </div>
-  <?php else: ?>
-    <div class="d-xl-none d-flex flex-column gap-2 mb-3">
-      <?php foreach ($visibleSponsors as $s): ?>
-        <?php
-          $state = sponsorPaymentState($s);
-          $outstanding = max(0, (float)$s['total_amount'] - (float)$s['total_paid']);
-          $paymentPercent = (float)$s['total_amount'] > 0 ? min(100, round(((float)$s['total_paid'] / (float)$s['total_amount']) * 100)) : 0;
-          $packageNames = (array)$s['package_names'];
-        ?>
-        <article class="sponsors-mobile-card hub-record-card">
-          <div class="sponsors-mobile-head">
-            <div class="d-flex align-items-start gap-2">
-              <div class="sponsors-mobile-avatar">
-                <?php if (!empty($s['logo_path'])): ?>
-                  <img src="/uploads/sponsors/<?= h($s['logo_path']) ?>" alt="<?= h($s['name']) ?> logo">
-                <?php else: ?>
-                  <span><?= strtoupper(substr($s['name'], 0, 1)) ?></span>
-                <?php endif; ?>
-              </div>
-              <div>
-                <div class="fw-semibold"><?= h($s['name']) ?></div>
-                <div class="d-flex flex-wrap gap-1 mt-1">
-                  <span class="badge hub-status <?= h($state['badge']) ?>"><?= h($state['label']) ?></span>
-                  <?php if (!(int)$s['is_active']): ?><span class="badge text-bg-secondary">Inactive record</span><?php endif; ?>
-                  <?php if ((int)$s['is_main_sponsor']): ?><span class="badge text-bg-warning">Main sponsor</span><?php endif; ?>
-                  <?php if ((int)$s['facebook_spotlight_posted'] === 1): ?><span class="badge text-bg-primary">Facebook posted</span><?php endif; ?>
-                </div>
-              </div>
-            </div>
-            <div class="btn-group sponsors-mobile-actions hub-actions" role="group" aria-label="Sponsor actions">
-              <a href="/admin/sponsor.php?id=<?= (int)$s['id'] ?>" class="btn btn-sm btn-outline-secondary" title="View sponsor" aria-label="View <?= h($s['name']) ?>">
-                <i class="fa-regular fa-eye" aria-hidden="true"></i>
-              </a>
-              <a href="/admin/sponsor.php?action=edit&id=<?= (int)$s['id'] ?>" class="btn btn-sm btn-outline-primary" title="Edit sponsor" aria-label="Edit <?= h($s['name']) ?>">
-                <i class="fa-solid fa-pen" aria-hidden="true"></i>
-              </a>
-            </div>
-          </div>
-
-          <div class="sponsors-mobile-portfolio">
-            <div><strong><?= (int)$s['agreement_count'] ?> agreement<?= (int)$s['agreement_count'] === 1 ? '' : 's' ?></strong><span><?= (int)$s['active_agreement_count'] ?> active<?php if ((int)$s['complimentary_count'] > 0): ?> · <?= (int)$s['complimentary_count'] ?> complimentary<?php endif; ?></span></div>
-            <?php if ($packageNames !== []): ?>
-              <div class="sponsor-package-list"><?php foreach (array_slice($packageNames, 0, 2) as $packageName): ?><span><?= h($packageName) ?></span><?php endforeach; ?><?php if (count($packageNames) > 2): ?><span>+<?= count($packageNames) - 2 ?> more</span><?php endif; ?></div>
-            <?php else: ?><span class="text-muted small">No packages assigned</span><?php endif; ?>
-          </div>
-
-          <?php if ((array)$s['scope_counts'] !== []): ?>
-            <div class="sponsor-coverage-list" aria-label="Sponsorship coverage">
-              <?php foreach ((array)$s['scope_counts'] as $scope => $count): ?><span><i class="fa-solid <?= $scope === 'player' ? 'fa-shirt' : ($scope === 'match' ? 'fa-futbol' : ($scope === 'team' ? 'fa-people-group' : 'fa-shield-halved')) ?>" aria-hidden="true"></i><?= h(ucfirst((string)$scope)) ?> <?= (int)$count ?></span><?php endforeach; ?>
-            </div>
-          <?php endif; ?>
-
-          <label class="form-check form-switch sponsor-facebook-toggle sponsor-facebook-toggle--mobile">
-            <input
-              class="form-check-input"
-              type="checkbox"
-              role="switch"
-              data-facebook-spotlight-toggle
-              data-sponsor-id="<?= (int)$s['id'] ?>"
-              aria-label="Advertised on Facebook for <?= h($s['name']) ?>"
-              <?= (int)$s['facebook_spotlight_posted'] === 1 ? 'checked' : '' ?>
-              <?= $seasonLocked ? 'disabled' : '' ?>>
-            <span>Advertised on Facebook</span>
-          </label>
-
-          <div class="sponsors-mobile-metrics">
-            <div class="sponsors-mobile-metric">
-              <span class="label">Value</span>
-              <span class="value"><?= gbp((float)$s['total_amount']) ?></span>
-            </div>
-            <div class="sponsors-mobile-metric">
-              <span class="label">Paid</span>
-              <span class="value"><?= gbp((float)$s['total_paid']) ?></span>
-            </div>
-            <div class="sponsors-mobile-metric">
-              <span class="label">Outstanding</span>
-              <span class="value"><?= gbp($outstanding) ?></span>
-            </div>
-            <div class="sponsors-mobile-metric">
-              <span class="label">Last payment</span>
-              <span class="value"><?= !empty($s['last_payment']) ? h(date('d M Y', strtotime((string)$s['last_payment']))) : 'No payment recorded' ?></span>
-            </div>
-          </div>
-          <?php if ((float)$s['total_amount'] > 0): ?><div class="sponsor-payment-progress" role="progressbar" aria-label="<?= h($s['name']) ?> payment progress" aria-valuenow="<?= (int)$paymentPercent ?>" aria-valuemin="0" aria-valuemax="100"><span style="width:<?= (int)$paymentPercent ?>%"></span></div><?php endif; ?>
-        </article>
-      <?php endforeach; ?>
-    </div>
-
-    <div class="card sponsors-section-card border-0 shadow-sm d-none d-xl-block hub-table-card">
-      <div class="card-body p-0">
-        <div class="table-responsive">
-          <table class="table table-modern table-hover hub-data-table align-middle mb-0" id="sponsorsLedgerTable">
-            <caption class="visually-hidden">Sponsor portfolios, coverage, values and payment progress</caption>
-            <thead>
-              <tr>
-                <th data-sort-key="sponsor" data-sort-type="text"><button type="button" class="sponsor-sort-button">Sponsor <span class="sponsor-sort-icon" aria-hidden="true"></span></button></th>
-                <th data-sort-key="portfolio" data-sort-type="number"><button type="button" class="sponsor-sort-button">Portfolio <span class="sponsor-sort-icon" aria-hidden="true"></span></button></th>
-                <th data-sort-key="coverage" data-sort-type="text"><button type="button" class="sponsor-sort-button">Coverage <span class="sponsor-sort-icon" aria-hidden="true"></span></button></th>
-                <th class="text-end" data-sort-key="value" data-sort-type="number"><button type="button" class="sponsor-sort-button sponsor-sort-button--end">Value <span class="sponsor-sort-icon" aria-hidden="true"></span></button></th>
-                <th data-sort-key="payment" data-sort-type="number"><button type="button" class="sponsor-sort-button">Payment <span class="sponsor-sort-icon" aria-hidden="true"></span></button></th>
-                <th data-sort-key="last-payment" data-sort-type="number"><button type="button" class="sponsor-sort-button">Last payment <span class="sponsor-sort-icon" aria-hidden="true"></span></button></th>
-                <th class="text-center" data-sort-key="facebook" data-sort-type="number"><button type="button" class="sponsor-sort-button sponsor-sort-button--center">Facebook <span class="sponsor-sort-icon" aria-hidden="true"></span></button></th>
-                <th class="text-center" data-export-ignore="1">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              <?php foreach ($visibleSponsors as $s): ?>
-                <?php
-                  $state = sponsorPaymentState($s);
-                  $outstanding = max(0, (float)$s['total_amount'] - (float)$s['total_paid']);
-                  $paymentPercent = (float)$s['total_amount'] > 0 ? min(100, round(((float)$s['total_paid'] / (float)$s['total_amount']) * 100)) : 0;
-                  $packageNames = (array)$s['package_names'];
-                  $scopeSummary = implode(' ', array_map(
-                    static fn($scope, $count): string => ucfirst((string)$scope) . ' ' . (int)$count,
-                    array_keys((array)$s['scope_counts']),
-                    array_values((array)$s['scope_counts'])
-                  ));
-                  $paymentSortOrder = ['unpaid' => 0, 'partial' => 1, 'paid' => 2, 'complimentary' => 3, 'nocharge' => 4, 'noagreements' => 5];
-                  $lastPaymentSort = !empty($s['last_payment']) ? strtotime((string)$s['last_payment']) : 0;
-                ?>
-                <tr
-                  class="<?= in_array($state['key'], ['unpaid', 'partial'], true) ? 'sponsor-ledger-row--attention' : '' ?>"
-                  data-sort-sponsor="<?= h(strtolower((string)$s['name'])) ?>"
-                  data-sort-portfolio="<?= (int)$s['agreement_count'] ?>"
-                  data-sort-coverage="<?= h(strtolower($scopeSummary)) ?>"
-                  data-sort-value="<?= h(number_format((float)$s['total_amount'], 2, '.', '')) ?>"
-                  data-sort-payment="<?= (int)($paymentSortOrder[$state['key']] ?? 99) ?>"
-                  data-sort-last-payment="<?= (int)$lastPaymentSort ?>"
-                  data-sort-facebook="<?= (int)$s['facebook_spotlight_posted'] ?>">
-                  <td>
-                    <div class="sponsor-ledger-identity">
-                      <div class="sponsor-ledger-logo"><?php if (!empty($s['logo_path'])): ?><img src="/uploads/sponsors/<?= h($s['logo_path']) ?>" alt=""><?php else: ?><span><?= h(strtoupper(substr((string)$s['name'], 0, 1))) ?></span><?php endif; ?></div>
-                      <div><a class="sponsor-ledger-name" href="/admin/sponsor.php?id=<?= (int)$s['id'] ?>"><?= h($s['name']) ?></a><div class="sponsor-ledger-flags"><?php if ((int)$s['is_main_sponsor']): ?><span>Main sponsor</span><?php endif; ?><?php if (!(int)$s['is_active']): ?><span>Inactive record</span><?php endif; ?><?php if (empty($s['logo_path'])): ?><span>No logo</span><?php endif; ?></div></div>
-                    </div>
-                  </td>
-                  <td>
-                    <div class="sponsor-portfolio-count"><strong><?= (int)$s['agreement_count'] ?></strong><span>agreement<?= (int)$s['agreement_count'] === 1 ? '' : 's' ?> · <?= (int)$s['active_agreement_count'] ?> active</span></div>
-                    <?php if ($packageNames !== []): ?><div class="sponsor-package-list"><?php foreach (array_slice($packageNames, 0, 2) as $packageName): ?><span><?= h($packageName) ?></span><?php endforeach; ?><?php if (count($packageNames) > 2): ?><span>+<?= count($packageNames) - 2 ?> more</span><?php endif; ?></div><?php else: ?><span class="text-muted small">No packages assigned</span><?php endif; ?>
-                  </td>
-                  <td><div class="sponsor-coverage-list"><?php foreach ((array)$s['scope_counts'] as $scope => $count): ?><span><i class="fa-solid <?= $scope === 'player' ? 'fa-shirt' : ($scope === 'match' ? 'fa-futbol' : ($scope === 'team' ? 'fa-people-group' : 'fa-shield-halved')) ?>" aria-hidden="true"></i><?= h(ucfirst((string)$scope)) ?> <?= (int)$count ?></span><?php endforeach; ?><?php if ((array)$s['scope_counts'] === []): ?><span class="is-empty">—</span><?php endif; ?></div></td>
-                  <td class="text-end sponsor-ledger-value"><strong><?= gbp((float)$s['total_amount']) ?></strong><?php if ((int)$s['complimentary_count'] > 0): ?><span><?= (int)$s['complimentary_count'] ?> complimentary</span><?php endif; ?></td>
-                  <td class="sponsor-ledger-payment">
-                    <div class="d-flex justify-content-between align-items-center gap-2"><span class="badge hub-status <?= h($state['badge']) ?>"><?= h($state['label']) ?></span><?php if ((float)$s['total_amount'] > 0): ?><span class="small text-muted"><?= (int)$paymentPercent ?>%</span><?php endif; ?></div>
-                    <?php if ((float)$s['total_amount'] > 0): ?><div class="sponsor-payment-progress" role="progressbar" aria-label="<?= h($s['name']) ?> payment progress" aria-valuenow="<?= (int)$paymentPercent ?>" aria-valuemin="0" aria-valuemax="100"><span style="width:<?= (int)$paymentPercent ?>%"></span></div><div class="sponsor-payment-detail"><span><?= gbp((float)$s['total_paid']) ?> paid</span><span><?= gbp($outstanding) ?> due</span></div><?php endif; ?>
-                  </td>
-                  <td class="sponsor-ledger-date">
-                    <?= !empty($s['last_payment']) ? h(date('d M Y', strtotime((string)$s['last_payment']))) : '<span class="text-muted">None recorded</span>' ?>
-                  </td>
-                  <td class="text-center sponsor-facebook-cell">
-                    <label class="form-check form-switch sponsor-facebook-toggle" title="Mark sponsor spotlight advertised on Facebook">
-                      <input
-                        class="form-check-input"
-                        type="checkbox"
-                        role="switch"
-                        data-facebook-spotlight-toggle
-                        data-sponsor-id="<?= (int)$s['id'] ?>"
-                        aria-label="Advertised on Facebook for <?= h($s['name']) ?>"
-                        <?= (int)$s['facebook_spotlight_posted'] === 1 ? 'checked' : '' ?>
-                        <?= $seasonLocked ? 'disabled' : '' ?>>
-                    </label>
-                  </td>
-                  <td class="text-center" data-export-ignore="1">
-                    <div class="hub-row-actions hub-actions" role="group" aria-label="Sponsor actions">
-                      <a href="/admin/sponsor.php?id=<?= (int)$s['id'] ?>" class="btn btn-sm btn-outline-secondary" title="View sponsor" aria-label="View <?= h($s['name']) ?>">
-                        <i class="fa-regular fa-eye" aria-hidden="true"></i>
-                      </a>
-                      <a href="/admin/sponsor.php?action=edit&id=<?= (int)$s['id'] ?>" class="btn btn-sm btn-outline-primary" title="Edit sponsor" aria-label="Edit <?= h($s['name']) ?>">
-                        <i class="fa-solid fa-pen" aria-hidden="true"></i>
-                      </a>
-                    </div>
-                  </td>
-                </tr>
-              <?php endforeach; ?>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  <?php endif; ?>
+  <p class="text-muted small mb-2" id="sponsorsListSummary">Showing <?= count($visibleSponsors) ?> sponsors · <?= gbp($visibleOutstanding) ?> outstanding</p>
+  <?php require __DIR__ . '/partials/sponsors_list.php'; ?>
 </div>
 
 <style>
@@ -996,7 +800,7 @@ $visibleOutstanding = array_sum(array_map(
           })
           .catch(function (error) {
             toggle.checked = !checked;
-            alert(error.message || 'Unable to save Facebook status.');
+            window.hubToast(error.message || 'Unable to save Facebook status.', 'danger');
           })
           .finally(function () {
             document.querySelectorAll(matchingSelector).forEach(function (matchingToggle) {

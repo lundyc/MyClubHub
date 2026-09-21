@@ -18,7 +18,7 @@ $feedbackPage = basename($_SERVER['PHP_SELF'] ?? '');
     </main>
     <footer class="member-public-footer">
         <p><a href="/tickets">Buy match tickets</a> &middot; <a href="/season-tickets">Season tickets</a> &middot; <a href="/playersponsors">Sponsor a player</a></p>
-        <p class="mt-2">Season ticket holders also get a digital ticket, announcements and Man of the Match voting. <a href="/members/register.php">Create a free account</a> or <a href="/members/login.php">log in</a>.</p>
+        <p class="mt-2">Season ticket holders also get a digital ticket, announcements and Player of the Match voting. <a href="/members/register.php">Create a free account</a> or <a href="/members/login.php">log in</a>.</p>
     </footer>
 <?php else: ?>
     </div>

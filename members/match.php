@@ -606,7 +606,7 @@ $topStats = member_match_top_stats($detail['events']);
         <aside class="member-list">
             <?php if ($isPlayed && $motmCandidates): ?>
                 <section class="member-card">
-                    <div class="member-card__header"><h2>Man of the Match</h2></div>
+                    <div class="member-card__header"><h2>Player of the Match</h2></div>
                     <div class="member-card__body">
                         <?php if ($motmError !== ''): ?><div class="alert alert-danger py-2"><?= h($motmError) ?></div><?php endif; ?>
                         <?php if (member_auth_is_authenticated()): ?>
@@ -614,7 +614,7 @@ $topStats = member_match_top_stats($detail['events']);
                             <input type="hidden" name="csrf_token" value="<?= h(member_auth_csrf_token()) ?>">
                             <input type="hidden" name="form_action" value="motm_vote">
                             <div class="col-sm-8">
-                                <label class="form-label">Who was your Man of the Match?</label>
+                                <label class="form-label">Who was your Player of the Match?</label>
                                 <select class="form-select" name="player_name">
                                     <?php foreach ($motmCandidates as $name): ?>
                                         <option value="<?= h($name) ?>" <?= $myMotmVote === $name ? 'selected' : '' ?>><?= h($name) ?></option>

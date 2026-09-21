@@ -12,7 +12,7 @@ require_once __DIR__ . '/lib/admissions.php';
 require_once __DIR__ . '/lib/season.php';
 require_once __DIR__ . '/lib/audit.php';
 
-hub_auth_require_permission('tickets.comp');
+hub_auth_require_capability('tickets_ops');
 ensureAdmissionsSchema($pdo);
 
 $seasonContext = getSeasonContext($pdo);

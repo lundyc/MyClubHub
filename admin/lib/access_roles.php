@@ -1,0 +1,195 @@
+<?php
+
+declare(strict_types=1);
+
+require_once __DIR__ . '/people.php'; // for identityAuditLog()
+
+/**
+ * WordPress-style roles & capabilities — CRUD helpers for the
+ * access_roles / capabilities / access_role_capabilities /
+ * person_access_roles tables added by
+ * database/migrations/2026_09_14_001_access_roles_capabilities.php.
+ *
+ * @return list<array<string, mixed>>
+ */
+function getCapabilitiesCatalog(PDO $pdo): array
+{
+    return $pdo->query('SELECT * FROM capabilities ORDER BY sort_order, label')->fetchAll(PDO::FETCH_ASSOC);
+}
+
+/**
+ * @return list<array<string, mixed>>
+ */
+function getAccessRoles(PDO $pdo): array
+{
+    return $pdo->query('SELECT * FROM access_roles ORDER BY sort_order, name')->fetchAll(PDO::FETCH_ASSOC);
+}
+
+function getAccessRole(PDO $pdo, int $roleId): ?array
+{
+    $stmt = $pdo->prepare('SELECT * FROM access_roles WHERE id = :id LIMIT 1');
+    $stmt->execute([':id' => $roleId]);
+    return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+}
+
+/**
+ * Capability slugs granted to $roleId (ignores bypass_all — callers that
+ * need "does this role effectively have X" should check bypass_all
+ * themselves first, same as hub_auth_has_capability() does).
+ *
+ * @return list<string>
+ */
+function getAccessRoleCapabilitySlugs(PDO $pdo, int $roleId): array
+{
+    $stmt = $pdo->prepare('SELECT c.slug
+        FROM access_role_capabilities arc
+        JOIN capabilities c ON c.id = arc.capability_id
+        WHERE arc.role_id = :role_id');
+    $stmt->execute([':role_id' => $roleId]);
+    return array_map('strval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+}
+
+/**
+ * Replaces the full set of capabilities granted to a role — the save
+ * handler for one column of the Roles & Capabilities grid.
+ *
+ * @param list<int> $capabilityIds
+ */
+function setAccessRoleCapabilities(PDO $pdo, int $roleId, array $capabilityIds): void
+{
+    $pdo->prepare('DELETE FROM access_role_capabilities WHERE role_id = :role_id')->execute([':role_id' => $roleId]);
+    if ($capabilityIds === []) {
+        return;
+    }
+    $insert = $pdo->prepare('INSERT IGNORE INTO access_role_capabilities (role_id, capability_id) VALUES (:role_id, :capability_id)');
+    foreach ($capabilityIds as $capabilityId) {
+        $insert->execute([':role_id' => $roleId, ':capability_id' => (int) $capabilityId]);
+    }
+    identityAuditLog($pdo, 'access_role_capabilities_changed', 'Updated capability grants for access role #' . $roleId);
+}
+
+function createAccessRole(PDO $pdo, string $name): int
+{
+    $slug = access_role_slugify($pdo, $name);
+    $maxSort = (int) $pdo->query('SELECT COALESCE(MAX(sort_order), 0) FROM access_roles')->fetchColumn();
+    $stmt = $pdo->prepare('INSERT INTO access_roles (slug, name, bypass_all, is_system, sort_order) VALUES (:slug, :name, 0, 0, :sort_order)');
+    $stmt->execute([':slug' => $slug, ':name' => $name, ':sort_order' => $maxSort + 10]);
+    $roleId = (int) $pdo->lastInsertId();
+    identityAuditLog($pdo, 'access_role_created', 'Created access role "' . $name . '" (#' . $roleId . ')');
+    return $roleId;
+}
+
+/**
+ * System roles (Administrator, Staff, Volunteer) keep their fixed name —
+ * only a custom role's name can be changed. Returns false without renaming
+ * if $roleId is a system role, doesn't exist, or $name is blank.
+ */
+function renameAccessRole(PDO $pdo, int $roleId, string $name): bool
+{
+    $name = trim($name);
+    $role = getAccessRole($pdo, $roleId);
+    if ($role === null || (int) $role['is_system'] === 1 || $name === '') {
+        return false;
+    }
+    $pdo->prepare('UPDATE access_roles SET name = :name WHERE id = :id')->execute([':name' => $name, ':id' => $roleId]);
+    identityAuditLog($pdo, 'access_role_renamed', 'Renamed access role #' . $roleId . ' to "' . $name . '"');
+    return true;
+}
+
+/**
+ * How many people directly hold $roleId (person_access_roles), plus how many
+ * committee positions link to it (hub_positions.access_role_id) — shown on
+ * the Roles & Capabilities list so an admin can see what's using a role
+ * before deleting it.
+ *
+ * @return array{people: int, positions: int}
+ */
+function getAccessRoleUsageCounts(PDO $pdo, int $roleId): array
+{
+    $peopleStmt = $pdo->prepare('SELECT COUNT(*) FROM person_access_roles WHERE role_id = :role_id');
+    $peopleStmt->execute([':role_id' => $roleId]);
+
+    $positionsStmt = $pdo->prepare('SELECT COUNT(*) FROM hub_positions WHERE access_role_id = :role_id');
+    $positionsStmt->execute([':role_id' => $roleId]);
+
+    return [
+        'people' => (int) $peopleStmt->fetchColumn(),
+        'positions' => (int) $positionsStmt->fetchColumn(),
+    ];
+}
+
+/**
+ * System roles (Administrator, Staff, Volunteer) can't be deleted — they
+ * back the base account role used for login itself, not just capability
+ * delegation. A role still assigned to a person or linked from a committee
+ * position can't be deleted either (reassign them first, same rule
+ * deleteHubPosition() already applies to positions).
+ *
+ * @return array{ok: bool, error?: string}
+ */
+function deleteAccessRole(PDO $pdo, int $roleId): array
+{
+    $role = getAccessRole($pdo, $roleId);
+    if ($role === null) {
+        return ['ok' => false, 'error' => 'That role no longer exists.'];
+    }
+    if ((int) $role['is_system'] === 1) {
+        return ['ok' => false, 'error' => 'System roles (Administrator, Staff, Volunteer) can\'t be deleted.'];
+    }
+    $usage = getAccessRoleUsageCounts($pdo, $roleId);
+    if ($usage['people'] > 0 || $usage['positions'] > 0) {
+        return ['ok' => false, 'error' => 'This role is still assigned to ' . $usage['people'] . ' people or linked from ' . $usage['positions'] . ' position(s). Reassign them first.'];
+    }
+    $pdo->prepare('DELETE FROM access_roles WHERE id = :id')->execute([':id' => $roleId]);
+    identityAuditLog($pdo, 'access_role_deleted', 'Deleted access role "' . $role['name'] . '" (#' . $roleId . ')');
+    return ['ok' => true];
+}
+
+function access_role_slugify(PDO $pdo, string $name): string
+{
+    $base = strtolower(trim((string) preg_replace('/[^a-zA-Z0-9]+/', '_', $name), '_'));
+    if ($base === '') {
+        $base = 'role';
+    }
+    $slug = $base;
+    $suffix = 2;
+    $stmt = $pdo->prepare('SELECT COUNT(*) FROM access_roles WHERE slug = :slug');
+    while (true) {
+        $stmt->execute([':slug' => $slug]);
+        if ((int) $stmt->fetchColumn() === 0) {
+            return $slug;
+        }
+        $slug = $base . '_' . $suffix;
+        $suffix++;
+    }
+}
+
+/**
+ * @return list<array<string, mixed>>
+ */
+function getPersonAccessRoles(PDO $pdo, int $personId): array
+{
+    $stmt = $pdo->prepare('SELECT ar.*
+        FROM person_access_roles par
+        JOIN access_roles ar ON ar.id = par.role_id
+        WHERE par.person_id = :person_id
+        ORDER BY ar.sort_order, ar.name');
+    $stmt->execute([':person_id' => $personId]);
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
+/**
+ * Replaces the full set of access roles assigned to a person — the save
+ * handler for club_person.php's "Access roles" panel.
+ *
+ * @param list<int> $roleIds
+ */
+function setPersonAccessRoles(PDO $pdo, int $personId, array $roleIds): void
+{
+    $pdo->prepare('DELETE FROM person_access_roles WHERE person_id = :person_id')->execute([':person_id' => $personId]);
+    $insert = $pdo->prepare('INSERT IGNORE INTO person_access_roles (person_id, role_id) VALUES (:person_id, :role_id)');
+    foreach ($roleIds as $roleId) {
+        $insert->execute([':person_id' => $personId, ':role_id' => (int) $roleId]);
+    }
+    identityAuditLog($pdo, 'person_access_roles_changed', 'Updated access roles for person #' . $personId);
+}

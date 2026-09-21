@@ -344,7 +344,7 @@ $bodyClass = 'bg-cream' . ($isRender ? ' page-render' : '') . ' starting11-graph
         <section class="utility-panel">
           <p class="page-kicker">Graphic Not Found</p>
           <h1 class="feature-card__title">The requested match could not be found.</h1>
-          <a class="btn btn-maroon" href="matches.php">Back to Matches</a>
+          <a class="btn btn-brand" href="matches.php">Back to Matches</a>
         </section>
       </div>
     </main>

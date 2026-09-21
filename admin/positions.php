@@ -4,13 +4,16 @@ declare(strict_types=1);
 $pageHero = [
     'eyebrow' => 'Administration',
     'title' => 'Roles & Positions',
-    'subtitle' => 'Club titles attach to people. Login access is controlled by each person\'s Hub account role and permissions.',
-    'actions' => [],
+    'subtitle' => 'Club titles with season-dated history. Each links to a Roles & Capabilities role, which is what actually grants Hub access.',
+    'actions' => [
+        ['label' => 'Roles & Capabilities', 'href' => '/admin/access_roles.php', 'class' => 'btn btn-outline-light btn-sm'],
+    ],
 ];
 
 require_once __DIR__ . '/header.php';
+require_once __DIR__ . '/lib/access_roles.php';
 
-if ((string) ($currentRole ?? 'guest') !== 'admin') {
+if (!hub_auth_has_capability('admin_settings')) {
     http_response_code(403);
     echo '<div><div class="alert alert-danger">You do not have permission to manage positions.</div></div>';
     require __DIR__ . '/footer.php';
@@ -37,7 +40,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
         } elseif ($action === 'save') {
             $name = isset($_POST['name']) && is_string($_POST['name']) ? trim($_POST['name']) : '';
             $department = isset($_POST['department']) && is_string($_POST['department']) ? $_POST['department'] : 'other';
-            $capabilities = isset($_POST['capabilities']) && is_array($_POST['capabilities']) ? $_POST['capabilities'] : [];
+            $accessRoleId = (int) ($_POST['access_role_id'] ?? 0);
 
             if ($name === '') {
                 $formErrors[] = 'Enter a position name.';
@@ -53,7 +56,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                 saveHubPosition($pdo, $positionId > 0 ? $positionId : null, [
                     'name' => $name,
                     'department' => $department,
-                    'capabilities' => $capabilities,
+                    'access_role_id' => $accessRoleId,
                 ]);
                 header('Location: positions.php?status=' . ($positionId > 0 ? 'updated' : 'created'));
                 exit;
@@ -84,6 +87,12 @@ $holderCounts = [];
 foreach ($pdo->query('SELECT position_id, COUNT(*) AS c FROM person_positions GROUP BY position_id') as $row) {
     $holderCounts[(int) $row['position_id']] = (int) $row['c'];
 }
+
+$accessRoles = getAccessRoles($pdo);
+$accessRoleNameById = [];
+foreach ($accessRoles as $role) {
+    $accessRoleNameById[(int) $role['id']] = (string) $role['name'];
+}
 ?>
 
 <div class="positions-page">
@@ -102,7 +111,7 @@ foreach ($pdo->query('SELECT position_id, COUNT(*) AS c FROM person_positions GR
     <?php endif; ?>
 
     <div class="hub-section-commandbar">
-        <div><h2>Club Positions</h2><p>Assign these to people from <a href="/admin/club_people.php">People &amp; Users</a>. Positions are club titles; account roles decide Hub access.</p></div>
+        <div><h2>Club Positions</h2><p>Assign these to people from <a href="/admin/club_people.php">People &amp; Users</a>, with season dates. Each position's Hub access comes from the <a href="/admin/access_roles.php">Access Role</a> it's linked to below.</p></div>
         <div class="hub-local-actions"><button class="btn btn-brand" type="button" id="addPositionBtn" data-bs-toggle="modal" data-bs-target="#positionEditorModal"><i class="fa-solid fa-plus me-1" aria-hidden="true"></i>Add position</button></div>
     </div>
 
@@ -119,7 +128,7 @@ foreach ($pdo->query('SELECT position_id, COUNT(*) AS c FROM person_positions GR
                         <thead>
                             <tr>
                                 <th>Position</th>
-                                <th>Capabilities</th>
+                                <th>Access role</th>
                                 <th>People</th>
                                 <th class="text-end">Actions</th>
                             </tr>
@@ -131,16 +140,14 @@ foreach ($pdo->query('SELECT position_id, COUNT(*) AS c FROM person_positions GR
                                 </tr>
                             <?php else: ?>
                                 <?php foreach ($departmentPositions as $position): ?>
-                                    <?php $caps = hub_position_capabilities($position); ?>
+                                    <?php $accessRoleId = (int) ($position['access_role_id'] ?? 0); ?>
                                     <tr>
                                         <td><?= htmlspecialchars((string) $position['name'], ENT_QUOTES, 'UTF-8') ?></td>
                                         <td>
-                                            <?php if ($caps === []): ?>
-                                                <span class="text-muted">None yet</span>
+                                            <?php if ($accessRoleId <= 0 || !isset($accessRoleNameById[$accessRoleId])): ?>
+                                                <span class="text-muted">None — no Hub access</span>
                                             <?php else: ?>
-                                                <?php foreach ($caps as $cap): ?>
-                                                    <span class="badge text-bg-secondary me-1"><?= htmlspecialchars(HUB_CAPABILITIES[$cap] ?? $cap, ENT_QUOTES, 'UTF-8') ?></span>
-                                                <?php endforeach; ?>
+                                                <span class="badge text-bg-secondary"><?= htmlspecialchars($accessRoleNameById[$accessRoleId], ENT_QUOTES, 'UTF-8') ?></span>
                                             <?php endif; ?>
                                         </td>
                                         <td><?= (int) ($holderCounts[(int) $position['id']] ?? 0) ?></td>
@@ -155,7 +162,7 @@ foreach ($pdo->query('SELECT position_id, COUNT(*) AS c FROM person_positions GR
                                                         'id' => (int) $position['id'],
                                                         'name' => (string) $position['name'],
                                                         'department' => (string) ($position['department'] ?? 'other'),
-                                                        'capabilities' => $caps,
+                                                        'access_role_id' => $accessRoleId,
                                                     ], JSON_UNESCAPED_SLASHES), ENT_QUOTES, 'UTF-8') ?>"
                                                     title="Edit position"
                                                 ><i class="fa-solid fa-pen" aria-hidden="true"></i></button>
@@ -207,13 +214,15 @@ foreach ($pdo->query('SELECT position_id, COUNT(*) AS c FROM person_positions GR
                         <div class="form-text">Groups this position on People &amp; Users. Site Admin access is set per-person on the Account tab, not here.</div>
                     </div>
                     <div class="mb-2">
-                        <label class="form-label d-block">Capabilities</label>
-                        <?php foreach (HUB_CAPABILITIES as $capKey => $capLabel): ?>
-                            <div class="form-check">
-                                <input class="form-check-input js-position-capability" type="checkbox" name="capabilities[]" value="<?= htmlspecialchars($capKey, ENT_QUOTES, 'UTF-8') ?>" id="cap_<?= htmlspecialchars($capKey, ENT_QUOTES, 'UTF-8') ?>">
-                                <label class="form-check-label" for="cap_<?= htmlspecialchars($capKey, ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($capLabel, ENT_QUOTES, 'UTF-8') ?></label>
-                            </div>
-                        <?php endforeach; ?>
+                        <label class="form-label" for="positionEditorAccessRole">Access role</label>
+                        <select class="form-select" id="positionEditorAccessRole" name="access_role_id">
+                            <option value="0">None — no Hub access</option>
+                            <?php foreach ($accessRoles as $role): ?>
+                                <?php if ((int) $role['bypass_all'] === 1) { continue; } ?>
+                                <option value="<?= (int) $role['id'] ?>"><?= htmlspecialchars((string) $role['name'], ENT_QUOTES, 'UTF-8') ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        <div class="form-text">What this position grants — edit the role's own capabilities on <a href="/admin/access_roles.php" target="_blank" rel="noopener">Roles &amp; Capabilities</a>.</div>
                     </div>
                 </div>
                 <div class="modal-footer hub-actions">
@@ -233,7 +242,7 @@ foreach ($pdo->query('SELECT position_id, COUNT(*) AS c FROM person_positions GR
         var idInput = document.getElementById('positionEditorId');
         var nameInput = document.getElementById('positionEditorName');
         var departmentInput = document.getElementById('positionEditorDepartment');
-        var capabilityInputs = document.querySelectorAll('.js-position-capability');
+        var accessRoleInput = document.getElementById('positionEditorAccessRole');
 
         function resetEditor() {
             form.reset();
@@ -252,10 +261,7 @@ foreach ($pdo->query('SELECT position_id, COUNT(*) AS c FROM person_positions GR
                 idInput.value = String(position.id || 0);
                 nameInput.value = position.name || '';
                 departmentInput.value = position.department || 'other';
-                var granted = position.capabilities || [];
-                capabilityInputs.forEach(function (input) {
-                    input.checked = granted.indexOf(input.value) !== -1;
-                });
+                accessRoleInput.value = String(position.access_role_id || 0);
                 title.textContent = 'Edit position';
             });
         });

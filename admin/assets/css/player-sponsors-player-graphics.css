@@ -7,7 +7,7 @@
     user-select: none;
     -webkit-user-select: none;
     background: #fff;
-    border-radius: .5rem;
+    border-radius: var(--radius-05rem, .5rem);
     box-shadow: 0 10px 30px rgba(0, 0, 0, .08);
     overflow: hidden;
   }
@@ -68,7 +68,7 @@
 
   /* Toolbar area */
   .editor-toolbar .btn+.btn {
-    margin-left: .5rem;
+    margin-left: var(--space-2, .5rem);
   }
 
   #canvas-shell {
@@ -87,25 +87,25 @@
 
   .editor-panel {
     border: 1px solid rgba(18, 78, 102, 0.08);
-    border-radius: 1rem;
+    border-radius: var(--radius-1rem, 1rem);
     background: rgba(255, 255, 255, 0.95);
     box-shadow: 0 8px 20px rgba(0, 0, 0, 0.07);
   }
 
   .editor-panel .toolbar-group {
     border: 1px solid rgba(18, 78, 102, 0.08);
-    border-radius: .9rem;
+    border-radius: var(--radius-09rem, .9rem);
     background: rgba(211, 217, 212, 0.14);
-    padding: .75rem;
+    padding: var(--space-3, .75rem);
   }
 
   .editor-panel .toolbar-label {
-    font-size: .72rem;
+    font-size: var(--fs-072, .72rem);
     letter-spacing: .08em;
     text-transform: uppercase;
     color: rgba(33, 42, 49, .7);
     font-weight: 700;
-    margin-bottom: .5rem;
+    margin-bottom: var(--space-2, .5rem);
   }
 
   .editor-panel .btn-toolbar .btn {
@@ -193,7 +193,7 @@
 
     .editor-toolbar .btn {
       width: 100%;
-      margin-top: .5rem;
+      margin-top: var(--space-2, .5rem);
     }
 
     #editorControls .text-end {

@@ -752,7 +752,7 @@ $hubDynamicStyleHref1 = hub_dynamic_stylesheet_register($hubDynamicCss1);
     const postType = currentPostType();
     const postTypeLabel = postType === 'matchday' ? 'Matchday' : 'Next Match';
     const platformLabels = selectedPlatforms.map(platformLabel);
-    if (confirmBeforeLivePost && !window.confirm(`Publish this ${postTypeLabel} post to ${platformLabels.join(', ')}?`)) return;
+    if (confirmBeforeLivePost && !(await window.hubConfirm(`Publish this ${postTypeLabel} post to ${platformLabels.join(', ')}?`, { actionLabel: 'Publish', actionClass: 'btn-primary' }))) return;
     const xWindow = selectedPlatforms.includes('x') ? window.open('', '_blank') : null;
     publishSelectedButton.disabled = true;
     channelInputs.forEach((input) => { input.disabled = true; });

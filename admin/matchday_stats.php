@@ -23,7 +23,7 @@ $pageHero = [
 require_once __DIR__ . '/header.php';
 require_once __DIR__ . '/lib/matchday_record_stats.php';
 
-if (!hub_auth_has_capability('football_ops')) {
+if (!hub_auth_has_capability('matchday')) {
     http_response_code(403);
     echo '<div class="container-fluid"><div class="alert alert-danger">Access denied.</div></div>';
     require __DIR__ . '/footer.php';
@@ -93,7 +93,7 @@ $team = $stats['team'];
         </p>
 
         <div class="table-responsive">
-            <table class="table table-sm table-hover align-middle">
+            <table class="table table-sm table-hover align-middle mb-0 hub-data-table">
                 <thead class="table-light">
                     <tr>
                         <th>Player</th>

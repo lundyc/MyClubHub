@@ -284,7 +284,7 @@ $renderUrl = 'match_graphic_render.php?fixture_id=' . urlencode((string)$fixture
                                                                                           <?php if ($eventIsShareable): ?>
                                                                                                     <button type="button" class="btn btn-sm btn-outline-primary js-social-event" data-event-id="<?= h((string)($event['id'] ?? '')) ?>" title="Prepare social post" aria-label="Prepare social post"><i class="fa-solid fa-share-nodes"></i></button>
                                                                                           <?php endif; ?>
-                                                                                          <form method="post" onsubmit="return confirm('Delete this event?');">
+                                                                                          <form method="post" data-confirm="Delete this event?" data-confirm-action="Delete">
                                                                                                     <?= csrf_field() ?>
                                                                                                     <input type="hidden" name="action" value="delete_match_event">
                                                                                                     <input type="hidden" name="event_id" value="<?= h((string)($event['id'] ?? '')) ?>">
@@ -899,7 +899,7 @@ $renderUrl = 'match_graphic_render.php?fixture_id=' . urlencode((string)$fixture
         setStatus('Wait for the graphic to finish generating first.', 'warning');
         return;
       }
-      if (confirmBeforeLivePost && !window.confirm(`Publish this event to ${platform} now?`)) return;
+      if (confirmBeforeLivePost && !(await window.hubConfirm(`Publish this event to ${platform} now?`, { actionLabel: 'Post', actionClass: 'btn-primary' }))) return;
 
       const original = button.innerHTML;
       button.disabled = true;
@@ -936,14 +936,14 @@ $renderUrl = 'match_graphic_render.php?fixture_id=' . urlencode((string)$fixture
           if (json && json.blocked && json.can_override) {
             const overrideMessage = (json.summary || 'Facebook publishing is disabled for this event type.')
               + '\n\nPost to Facebook Anyway? This is an exceptional manual action and will be recorded as a manual override.';
-            if (window.confirm(overrideMessage)) {
+            if (await window.hubConfirm(overrideMessage, { actionLabel: 'Post anyway', actionClass: 'btn-primary' })) {
               payload.override = '1';
               result = await request('/post_event_to_facebook.php', payload);
             } else {
               throw new Error('Facebook post not sent.');
             }
           } else if (json && json.requires_confirmation) {
-            if (window.confirm(json.summary || 'Publish anyway?')) {
+            if (await window.hubConfirm(json.summary || 'Publish anyway?', { actionLabel: 'Publish anyway', actionClass: 'btn-primary' })) {
               payload.confirm_burst = '1';
               result = await request('/post_event_to_facebook.php', payload);
             } else {

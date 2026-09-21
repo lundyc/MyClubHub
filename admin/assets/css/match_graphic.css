@@ -10,7 +10,7 @@
       display: flex;
       justify-content: center;
       overflow-x: auto;
-      padding-bottom: 1rem;
+      padding-bottom: var(--space-4, 1rem);
     }
 
     .starting11-graphic-card {
@@ -75,14 +75,14 @@
 
     .starting11-graphic-card__header {
       display: grid;
-      gap: 0.4rem;
+      gap: var(--space-4rem, 0.4rem);
       justify-items: center;
     }
 
     .starting11-graphic-card__title {
       display: flex;
       align-items: flex-end;
-      gap: 0.8rem;
+      gap: var(--space-08rem, 0.8rem);
       line-height: 0.9;
       text-transform: uppercase;
       font-family: var(--s11-display-font);
@@ -90,7 +90,7 @@
 
     .starting11-graphic-card__title-main {
       color: #fff;
-      font-size: 7.4rem;
+      font-size: var(--fs-74, 7.4rem);
       font-weight: 900;
       letter-spacing: -0.08em;
       text-shadow: 0 6px 16px rgba(0, 0, 0, 0.22);
@@ -98,7 +98,7 @@
 
     .starting11-graphic-card__title-accent {
       color: var(--s11-gold);
-      font-size: 6.6rem;
+      font-size: var(--fs-66, 6.6rem);
       font-weight: 900;
       letter-spacing: -0.08em;
       text-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
@@ -107,7 +107,7 @@
     .starting11-graphic-card__meta {
       display: flex;
       align-items: center;
-      gap: 1.3rem;
+      gap: var(--space-13rem, 1.3rem);
     }
 
     .starting11-graphic-card__line {
@@ -120,7 +120,7 @@
 
     .starting11-graphic-card__opponent {
       color: #fff;
-      font-size: 2.1rem;
+      font-size: var(--fs-21, 2.1rem);
       font-weight: 800;
       text-transform: uppercase;
       font-family: var(--s11-display-font);
@@ -128,17 +128,17 @@
 
     .starting11-graphic-card__lineup {
       display: grid;
-      gap: 0.15rem;
-      margin-top: 30px;
+      gap: var(--space-015rem, 0.15rem);
+      margin-top: var(--space-30px, 30px);
     }
 
     .starting11-graphic-card__player {
       display: flex;
       align-items: baseline;
       justify-content: center;
-      gap: 0.55rem;
+      gap: var(--space-055rem, 0.55rem);
       color: #fff;
-      font-size: 2.9rem;
+      font-size: var(--fs-29, 2.9rem);
       font-weight: 800;
       letter-spacing: -0.04em;
       line-height: 0.98;
@@ -159,8 +159,8 @@
       position: relative;
       width: 1.6rem;
       height: 2rem;
-      margin-left: 0.15rem;
-      border-radius: 0.12rem;
+      margin-left: var(--space-015rem, 0.15rem);
+      border-radius: var(--radius-012rem, 0.12rem);
       overflow: hidden;
       transform: translateY(0.08rem);
     }
@@ -186,16 +186,16 @@
 
     .starting11-graphic-card__subs {
       display: grid;
-      gap: 0.6rem;
-      margin-top: 1.4rem;
-      padding-top: 0.8rem;
+      gap: var(--space-06rem, 0.6rem);
+      margin-top: var(--space-14rem, 1.4rem);
+      padding-top: var(--space-08rem, 0.8rem);
       justify-items: center;
     }
 
     .starting11-graphic-card__subs-title {
       margin: 0;
       color: var(--s11-gold) !important;
-      font-size: 4rem;
+      font-size: var(--fs-4, 4rem);
       font-weight: 900;
       letter-spacing: -0.06em;
       line-height: 0.96;
@@ -209,7 +209,7 @@
       display: block;
       margin: 0;
       color: #fff;
-      font-size: 1.3rem;
+      font-size: var(--fs-13, 1.3rem);
       font-weight: 700;
       line-height: 1.1;
       text-align: center;
@@ -265,14 +265,14 @@
       align-content: stretch;
       height: 100%;
       padding: 0.65rem 0.85rem 0.8rem 1.15rem;
-      gap: 0.35rem;
+      gap: var(--space-035rem, 0.35rem);
     }
 
     .starting11-graphic-card__grid-intro-badge-wrap {
       display: flex;
       justify-content: center;
       align-items: flex-start;
-      gap: 0.55rem;
+      gap: var(--space-055rem, 0.55rem);
       min-height: 70px;
     }
 
@@ -298,7 +298,7 @@
 
     .starting11-graphic-card__grid-intro-abbr {
       color: #fff;
-      font-size: 3.15rem;
+      font-size: var(--fs-315, 3.15rem);
       font-weight: 900;
       line-height: 0.85;
       letter-spacing: -0.08em;
@@ -323,7 +323,7 @@
 
     .starting11-graphic-card__grid-intro-vs {
       color: #fff;
-      font-size: 1.5rem;
+      font-size: var(--fs-xl, 1.5rem);
       font-weight: 200;
       line-height: 1;
       letter-spacing: -0.06em;
@@ -337,7 +337,7 @@
 
     .starting11-graphic-card__grid-intro-opponent {
       color: rgba(255, 255, 255, 0.72);
-      font-size: 0.78rem;
+      font-size: var(--fs-078, 0.78rem);
       font-weight: 800;
       line-height: 1.1;
       letter-spacing: 0.06em;
@@ -354,7 +354,7 @@
       z-index: 3;
       min-width: 2.1rem;
       color: #fff;
-      font-size: 7.35rem;
+      font-size: var(--fs-735, 7.35rem);
       font-weight: 900;
       line-height: 0.88;
       letter-spacing: -0.08em;
@@ -375,7 +375,7 @@
       background: linear-gradient(180deg, rgba(255, 136, 0, 0.96) 0%, rgba(236, 106, 0, 0.98) 100%);
       color: #fff;
       padding: 0.35rem 0.55rem;
-      font-size: 0.88rem;
+      font-size: var(--fs-088, 0.88rem);
       font-weight: 900;
       letter-spacing: 0.02em;
       line-height: 1;
@@ -391,13 +391,13 @@
       background: #f4e6cf;
       color: var(--s11-maroon-dark);
       padding: 0.55rem 0.55rem 0.55rem;
-      font-size: 1.4rem;
+      font-size: var(--fs-14, 1.4rem);
       text-transform: uppercase;
       text-align: center;
       display: flex;
       justify-content: center;
       align-items: center;
-      gap: 0.35rem;
+      gap: var(--space-035rem, 0.35rem);
       font-weight: 600;
       letter-spacing: 0.02em;
       line-height: 1.05;
@@ -435,7 +435,7 @@
       justify-content: center;
       height: 100%;
       color: #fff;
-      font-size: 2.2rem;
+      font-size: var(--fs-22, 2.2rem);
       font-weight: 800;
       background: linear-gradient(180deg, rgba(145, 48, 73, 0.95) 0%, rgba(94, 21, 39, 0.98) 100%);
       font-family: var(--s11-display-font);
@@ -445,14 +445,14 @@
       grid-template-rows: 1fr;
       align-items: center;
       justify-items: center;
-      padding: 1rem;
+      padding: var(--space-4, 1rem);
       text-align: left;
     }
 
     .starting11-graphic-card__grid-subs-title {
       margin: 0;
       color: var(--s11-gold) !important;
-      font-size: 3rem;
+      font-size: var(--fs-3, 3rem);
       font-weight: 900;
       line-height: 0.95;
       letter-spacing: -0.04em;
@@ -470,7 +470,7 @@
 
     .starting11-graphic-card__grid-subs-list {
       color: #fff;
-      font-size: 0.88rem;
+      font-size: var(--fs-088, 0.88rem);
       font-weight: 800;
       line-height: 1.28;
       text-transform: uppercase;

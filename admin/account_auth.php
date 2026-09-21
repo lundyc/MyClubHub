@@ -23,6 +23,7 @@ require_once __DIR__ . '/lib/season_tickets.php';
 require_once __DIR__ . '/lib/positions.php';
 require_once __DIR__ . '/lib/accounts.php';
 require_once __DIR__ . '/lib/permissions.php';
+require_once __DIR__ . '/lib/access_roles.php';
 require_once __DIR__ . '/lib/people.php';
 require_once __DIR__ . '/lib/season.php';
 
@@ -85,6 +86,13 @@ const HUB_AUTH_ACCOUNT_ID_KEY = 'hub_account_id';
 const HUB_AUTH_PERSON_ID_KEY = 'hub_person_id';
 const HUB_AUTH_CSRF_KEY = 'hub_csrf_token';
 const HUB_AUTH_COOKIE_LIFETIME = 2592000;
+// A hash of the password hash in force when this session was issued. Bound
+// into the session at login and re-checked on every request in
+// hub_auth_current_user(), so a session survives only as long as the
+// password it was created under — a reset/change revokes every other
+// session for that account without needing a server-side session store.
+// Mirrors the credential binding already used by admin/lib/mobile_api/Auth.php.
+const HUB_AUTH_CREDENTIAL_KEY = 'hub_credential_hash';
 
 function hub_auth_start_session(): void
 {
@@ -150,6 +158,15 @@ function hub_auth_current_user(): ?array
     }
 
     if ($account) {
+        $sessionCredential = (string) ($_SESSION[HUB_AUTH_CREDENTIAL_KEY] ?? '');
+        $currentCredential = hash('sha256', (string) ($account['password_hash'] ?? ''));
+        if ($sessionCredential === '' || !hash_equals($currentCredential, $sessionCredential)) {
+            // Password changed (or reset) since this session was issued, or
+            // this session predates credential binding — treat it as
+            // revoked rather than silently trusting a stale identity.
+            unset($_SESSION[HUB_AUTH_ACCOUNT_ID_KEY], $_SESSION[HUB_AUTH_USER_ID_KEY], $_SESSION[HUB_AUTH_PERSON_ID_KEY], $_SESSION[HUB_AUTH_CREDENTIAL_KEY]);
+            return null;
+        }
         $role = accountPrimaryRole($pdo, (int) $account['id']);
         if (!in_array($role, ACCOUNT_STAFF_ROLES, true) || (int) ($account['is_active'] ?? 0) !== 1 || (int) ($account['person_is_active'] ?? 0) !== 1) {
             return null;
@@ -176,7 +193,7 @@ function hub_auth_current_user(): ?array
     }
 
     $stmt = $pdo->prepare("
-        SELECT id, username, email, name AS display_name, role, position_id, is_active, last_login_at
+        SELECT id, username, email, name AS display_name, role, position_id, is_active, last_login_at, password_hash
         FROM season_ticket_holders
         WHERE id = :id AND role IN ('volunteer','staff','admin')
         LIMIT 1
@@ -187,6 +204,14 @@ function hub_auth_current_user(): ?array
     if (!$user || (int) ($user['is_active'] ?? 0) !== 1) {
         return null;
     }
+
+    $sessionCredential = (string) ($_SESSION[HUB_AUTH_CREDENTIAL_KEY] ?? '');
+    $currentCredential = hash('sha256', (string) ($user['password_hash'] ?? ''));
+    if ($sessionCredential === '' || !hash_equals($currentCredential, $sessionCredential)) {
+        unset($_SESSION[HUB_AUTH_ACCOUNT_ID_KEY], $_SESSION[HUB_AUTH_USER_ID_KEY], $_SESSION[HUB_AUTH_PERSON_ID_KEY], $_SESSION[HUB_AUTH_CREDENTIAL_KEY]);
+        return null;
+    }
+    unset($user['password_hash']);
 
     return $user;
 }
@@ -226,6 +251,33 @@ function hub_auth_is_developer(): bool
     }
     $user = hub_auth_current_user();
     return $user !== null && (int) ($user['id'] ?? 0) === $developerHolderId;
+}
+
+/**
+ * True only for the configured sponsorship editor (HUB_SPONSORSHIP_EDITOR_EMAIL)
+ * — not every admin. Player sponsorships feed printed graphics; an admin
+ * changing a slot after the graphic is made means redoing it, so this is
+ * deliberately not a capability (hub_auth_has_capability() always returns
+ * true for admin accounts, which defeats the point). Same fail-closed shape
+ * as hub_auth_is_developer(): empty/unmatched email denies everyone.
+ */
+function hub_auth_is_sponsorship_editor(): bool
+{
+    global $pdo;
+    if (!defined('SPONSORSHIP_EDITOR_EMAIL') || SPONSORSHIP_EDITOR_EMAIL === '') {
+        return false;
+    }
+    static $editorHolderId = null;
+    if ($editorHolderId === null) {
+        $stmt = $pdo->prepare("SELECT id FROM season_ticket_holders WHERE email_normalized = :email AND role IN ('staff','admin') LIMIT 1");
+        $stmt->execute([':email' => seasonTicketNormalizeEmail(SPONSORSHIP_EDITOR_EMAIL)]);
+        $editorHolderId = (int) ($stmt->fetchColumn() ?: 0);
+    }
+    if ($editorHolderId <= 0) {
+        return false;
+    }
+    $user = hub_auth_current_user();
+    return $user !== null && (int) ($user['id'] ?? 0) === $editorHolderId;
 }
 
 /**
@@ -274,19 +326,59 @@ function hub_auth_current_positions(): array
 }
 
 /**
+ * The current staff/volunteer user's assigned access roles (the
+ * WordPress-style Treasurer/Football Ops/... roles, distinct from the
+ * legacy committee positions in hub_auth_current_positions()) — empty for
+ * admin (bypass_all already covers it) or anyone with no role assigned.
+ *
+ * @return list<array<string, mixed>>
+ */
+function hub_auth_current_access_roles(): array
+{
+    global $pdo;
+    $user = hub_auth_current_user();
+    if ($user === null) {
+        return [];
+    }
+    $personId = (int) ($user['person_id'] ?? 0);
+    if ($personId <= 0) {
+        $personId = (int) (personIdFromLegacyHolderId($pdo, (int) ($user['id'] ?? 0)) ?? 0);
+    }
+    if ($personId <= 0) {
+        return [];
+    }
+    return getPersonAccessRoles($pdo, $personId);
+}
+
+/**
  * The single check every capability-gated page calls. Admin always passes
  * (capabilities are a way to delegate a slice of admin-only pages to
- * specific committee positions, not a ceiling on what admin can see).
- * Everyone else needs at least one assigned position whose capabilities
- * list includes $capability.
+ * specific roles, not a ceiling on what admin can see). Everyone else
+ * passes if EITHER of two independent grant sources says yes:
+ *
+ * - the WordPress-style access-roles grant matrix (access_role_capabilities,
+ *   editable via admin/access_roles.php) for any role assigned to them, or
+ * - a legacy committee position's capabilities JSON (hub_positions), kept
+ *   so existing position assignments keep working during the transition.
  */
 function hub_auth_has_capability(string $capability): bool
 {
     if (hub_auth_is_admin()) {
         return true;
     }
+    foreach (hub_auth_current_access_roles() as $role) {
+        if ((int) ($role['bypass_all'] ?? 0) === 1) {
+            return true;
+        }
+    }
+    global $pdo;
+    foreach (hub_auth_current_access_roles() as $role) {
+        if (in_array($capability, getAccessRoleCapabilitySlugs($pdo, (int) $role['id']), true)) {
+            return true;
+        }
+    }
     foreach (hub_auth_current_positions() as $position) {
-        if (in_array($capability, hub_position_capabilities($position), true)) {
+        if (in_array($capability, hub_position_capabilities($pdo, $position), true)) {
             return true;
         }
     }
@@ -296,7 +388,7 @@ function hub_auth_has_capability(string $capability): bool
 /**
  * True if the current user holds any of the given capabilities — for pages
  * that legitimately span more than one domain (e.g. reports.php mixes
- * finance and football_ops report types).
+ * finance and matchday report types).
  *
  * @param list<string> $capabilities
  */
@@ -348,6 +440,33 @@ function hub_auth_require_capability(string $capability): void
 
 const HUB_AUTH_THROTTLE_WINDOW_SECONDS = 900;
 const HUB_AUTH_THROTTLE_MAX_ATTEMPTS = 5;
+
+/**
+ * Atomic rate limit shared with admin/lib/mobile_api/Auth.php's rateLimit(),
+ * backed by the same mobile_api_rate_limits table. Replaces the old
+ * per-endpoint file-based counters here, whose read-modify-write wasn't
+ * atomic across concurrent requests and only tracked one combined
+ * IP+identity bucket.
+ *
+ * @return bool true if the request is within the limit, false if the bucket is exhausted
+ */
+function hub_auth_rate_limit(string $bucket, int $limit, int $window): bool
+{
+    global $pdo;
+
+    $windowStart = intdiv(time(), $window);
+    $hash = hash('sha256', $bucket . ':' . $windowStart);
+    $expires = gmdate('Y-m-d H:i:s', ($windowStart + 1) * $window);
+
+    $pdo->prepare('INSERT INTO mobile_api_rate_limits (bucket_hash, hits, expires_at) VALUES (:hash, 1, :expires)
+        ON DUPLICATE KEY UPDATE hits = hits + 1')
+        ->execute([':hash' => $hash, ':expires' => $expires]);
+
+    $stmt = $pdo->prepare('SELECT hits FROM mobile_api_rate_limits WHERE bucket_hash = :hash');
+    $stmt->execute([':hash' => $hash]);
+
+    return (int) $stmt->fetchColumn() <= $limit;
+}
 
 function hub_auth_throttle_file(string $identifier): string
 {
@@ -403,23 +522,22 @@ function hub_auth_attempt_login(string $email, string $password): array
     hub_auth_start_session();
 
     $identifier = seasonTicketNormalizeEmail($email) ?? '';
-    $throttle = hub_auth_throttle_check($identifier);
-    if (!$throttle['allowed']) {
+    $ip = (string) ($_SERVER['REMOTE_ADDR'] ?? 'unknown');
+    if (!hub_auth_rate_limit('web-login-ip:' . $ip, 30, HUB_AUTH_THROTTLE_WINDOW_SECONDS)
+        || !hub_auth_rate_limit('web-login-account:' . $identifier, HUB_AUTH_THROTTLE_MAX_ATTEMPTS * 2, HUB_AUTH_THROTTLE_WINDOW_SECONDS)) {
         return ['ok' => false, 'error' => 'Too many login attempts. Please try again in a few minutes.'];
     }
 
     $account = authenticateAccount($pdo, $identifier, $password);
     if (!$account || !in_array((string) $account['role'], ACCOUNT_STAFF_ROLES, true)) {
-        hub_auth_throttle_record_failure($identifier);
         return ['ok' => false, 'error' => 'Invalid email or password.'];
     }
-
-    hub_auth_throttle_clear($identifier);
 
     session_regenerate_id(true);
     $_SESSION[HUB_AUTH_ACCOUNT_ID_KEY] = (string) $account['id'];
     $_SESSION[HUB_AUTH_PERSON_ID_KEY] = (string) $account['person_id'];
     $_SESSION[HUB_AUTH_USER_ID_KEY] = (string) ((int) ($account['old_holder_id'] ?? 0));
+    $_SESSION[HUB_AUTH_CREDENTIAL_KEY] = hash('sha256', (string) ($account['password_hash'] ?? ''));
     $_SESSION['user_id'] = (int) ($account['old_holder_id'] ?? 0);
     $_SESSION['username'] = (string) ($account['display_name'] ?? $account['email'] ?? '');
     $_SESSION['role'] = (string) $account['role'];

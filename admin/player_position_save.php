@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 // PHASE3B_GUARD_MARKER
 require_once __DIR__ . '/auth.php';
-if (!hub_auth_has_capability('football_ops')) {
+if (!hub_auth_has_capability('matchday')) {
     http_response_code(403);
     exit('Access denied.');
 }

@@ -1307,7 +1307,7 @@ function matches_event_type_labels(): array
         'mistake' => 'Mistake',
         'good_play' => 'Good Play',
         'highlight' => 'Highlight',
-        'player_of_match' => 'Man of the Match',
+        'player_of_match' => 'Player of the Match',
         'note' => 'Note',
     ];
 }
@@ -1332,7 +1332,7 @@ function matches_event_form_type_labels(): array
         'mistake' => 'Mistake',
         'good_play' => 'Good Play',
         'highlight' => 'Highlight',
-        'player_of_match' => 'Man of the Match',
+        'player_of_match' => 'Player of the Match',
     ];
 }
 
@@ -1390,7 +1390,7 @@ function matches_build_event_payload(array $post): array
         $errors[] = 'Select the Saltcoats Victoria goalscorer.';
     }
     if ($type === 'player_of_match' && $player === '') {
-        $errors[] = 'Select the Man of the Match.';
+        $errors[] = 'Select the Player of the Match.';
     }
     if ($type !== 'goal') {
         $ownGoal = false;

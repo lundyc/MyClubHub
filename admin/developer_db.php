@@ -24,14 +24,21 @@ while ($row = $stmt->fetch(PDO::FETCH_NUM)) {
 // Check if a table was requested
 $selectedTable = $_GET['table'] ?? null;
 $tableData = [];
+$validTableNames = array_column($tables, 'name');
+if ($selectedTable !== null && !in_array($selectedTable, $validTableNames, true)) {
+          echo '<div class="alert alert-danger m-3">Unknown table.</div>';
+          require_once __DIR__ . '/footer.php';
+          exit;
+}
 if ($selectedTable) {
-          $stmt = $pdo->query("SELECT * FROM `$selectedTable` ORDER BY 1 DESC LIMIT 20");
+          $quotedTable = '`' . str_replace('`', '``', $selectedTable) . '`';
+          $stmt = $pdo->query("SELECT * FROM $quotedTable ORDER BY 1 DESC LIMIT 20");
           $tableData = $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 ?>
 
 <div>
-          <h1 class="mb-4"><i class="fas fa-database"></i> Database Inspector</h1>
+          <h1 class="mb-4"><i class="fa-solid fa-database"></i> Database Inspector</h1>
 
           <div class="row">
                     <div class="col-md-4">
@@ -50,7 +57,7 @@ if ($selectedTable) {
                               <?php if ($selectedTable && $tableData): ?>
                                         <h4 class="mb-3">Last 20 rows from <code><?= htmlspecialchars($selectedTable) ?></code></h4>
                                         <div class="table-responsive">
-                                                  <table class="table table-sm table-bordered table-striped">
+                                                  <table class="table table-sm table-bordered table-striped mb-0 hub-data-table">
                                                             <thead class="table-dark">
                                                                       <tr>
                                                                                 <?php foreach (array_keys($tableData[0]) as $col): ?>

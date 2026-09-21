@@ -15,11 +15,12 @@ require_once __DIR__ . '/header.php';
 require_once __DIR__ . '/lib/people.php';
 require_once __DIR__ . '/lib/accounts.php';
 require_once __DIR__ . '/lib/positions.php';
+require_once __DIR__ . '/lib/access_roles.php';
 require_once __DIR__ . '/lib/season.php';
 require_once __DIR__ . '/lib/season_tickets.php';
 require_once __DIR__ . '/lib/match_tickets.php';
 
-if ((string) ($currentRole ?? 'guest') !== 'admin') {
+if (!hub_auth_has_capability('admin_settings')) {
     http_response_code(403);
     echo '<div><div class="alert alert-danger">You do not have permission to manage people.</div></div>';
     require __DIR__ . '/footer.php';
@@ -280,10 +281,51 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                 if (!$account) {
                     throw new RuntimeException('Account not found.');
                 }
-                $isAdmin = isset($_POST['is_admin']);
-                $roleCode = deriveAccountRoleForPerson($pdo, $personId, $isAdmin);
+                // This form only ever toggles "Account active" now — role
+                // (Administrator/Staff/Volunteer) is set from the Roles tab's
+                // save_access_roles handler below, so preserve it here rather
+                // than re-deriving it, or the two save paths would fight.
+                $roleCode = accountPrimaryRole($pdo, $accountId);
                 updateAccountLogin($pdo, $accountId, (string) $account['email'], isset($_POST['account_is_active']), $roleCode);
                 club_person_redirect($personId, 'account_saved');
+            }
+
+            if ($action === 'save_access_roles') {
+                $roleIds = isset($_POST['access_role_ids']) && is_array($_POST['access_role_ids'])
+                    ? array_map('intval', $_POST['access_role_ids'])
+                    : [];
+                setPersonAccessRoles($pdo, $personId, $roleIds);
+
+                // Administrator/Staff/Volunteer are shown as ordinary role
+                // checkboxes here, but under the hood they're still the base
+                // account role that actually gates login — keep it in sync
+                // with whichever of the three (if any) got ticked, same
+                // priority order accountPrimaryRole() uses. If none of the
+                // three is ticked, leave the base role exactly as it was:
+                // this form is where an admin looks at and edits it directly
+                // now, so silently re-deriving it from legacy Club Position
+                // data behind the scenes is a trap — it previously demoted
+                // someone straight to 'public' (locked out of login) just
+                // because their only position happened to be dated to a
+                // season that wasn't current anymore.
+                $account = getAccountByPersonId($pdo, $personId);
+                if ($account) {
+                    $checkedSlugs = array_column(array_filter(
+                        getAccessRoles($pdo),
+                        static fn(array $role): bool => in_array((int) $role['id'], $roleIds, true)
+                    ), 'slug');
+                    if (in_array('admin', $checkedSlugs, true)) {
+                        $baseRole = 'admin';
+                    } elseif (in_array('staff', $checkedSlugs, true)) {
+                        $baseRole = 'staff';
+                    } elseif (in_array('volunteer', $checkedSlugs, true)) {
+                        $baseRole = 'volunteer';
+                    } else {
+                        $baseRole = accountPrimaryRole($pdo, (int) $account['id']);
+                    }
+                    setAccountRole($pdo, (int) $account['id'], $baseRole);
+                }
+                club_person_redirect($personId, 'access_roles_saved');
             }
 
             if ($action === 'disable_account' || $action === 'activate_account') {
@@ -301,9 +343,9 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                     throw new RuntimeException('This account has no email to send a reset link to.');
                 }
                 $result = issueAccountPasswordReset($pdo, (string) $account['email'], '/reset_password.php');
-                if (str_starts_with((string) ($result['message'] ?? ''), 'Link generated')) {
+                if (!empty($result['reset_url'])) {
                     // mail() isn't configured/working -- fall back to showing the link.
-                    $setupLink = (string) preg_replace('/^.*use this link:\s*/', '', (string) $result['message']);
+                    $setupLink = (string) $result['reset_url'];
                 } else {
                     club_person_redirect($personId, 'reset_link_emailed');
                 }
@@ -352,11 +394,14 @@ if (!$isNew && !$person) {
 }
 
 $account = $person ? getAccountByPersonId($pdo, $personId) : null;
-$isAdminAccount = $account && accountPrimaryRole($pdo, (int) $account['id']) === 'admin';
+$currentBaseRole = $account ? accountPrimaryRole($pdo, (int) $account['id']) : null;
+$isAdminAccount = $currentBaseRole === 'admin';
 $currentSeason = getCurrentSeason($pdo);
 $positions = getHubPositions($pdo);
 $personPositions = $person ? getPersonPositions($pdo, $personId) : [];
 $currentPersonPositions = $person ? getCurrentPersonPositions($pdo, $personId) : [];
+$allAccessRoles = getAccessRoles($pdo);
+$personAccessRoleIds = $person ? array_column(getPersonAccessRoles($pdo, $personId), 'id') : [];
 $dependents = $person ? getPersonDependents($pdo, $personId) : [];
 $managers = $person ? getPersonManagers($pdo, $personId) : [];
 $allPeople = $person ? getPeopleDirectory($pdo, ['status' => 'active']) : [];
@@ -378,6 +423,7 @@ $statusMessages = [
     'password_set' => 'Password set.',
     'relationship_added' => 'Dependant relationship added.',
     'relationship_removed' => 'Relationship removed.',
+    'access_roles_saved' => 'Access roles saved.',
 ];
 $statusMessage = $statusMessages[(string) ($_GET['status'] ?? '')] ?? '';
 
@@ -437,6 +483,7 @@ $data = array_merge([
 <ul class="nav nav-tabs mb-4" id="clubPersonTabs" role="tablist">
     <li class="nav-item" role="presentation"><button class="nav-link active" id="tab-details-btn" data-bs-toggle="tab" data-bs-target="#tab-details" type="button" role="tab">Details</button></li>
     <li class="nav-item" role="presentation"><button class="nav-link" id="tab-account-btn" data-bs-toggle="tab" data-bs-target="#tab-account" type="button" role="tab">Account</button></li>
+    <li class="nav-item" role="presentation"><button class="nav-link" id="tab-roles-btn" data-bs-toggle="tab" data-bs-target="#tab-roles" type="button" role="tab">Roles</button></li>
     <li class="nav-item" role="presentation"><button class="nav-link" id="tab-positions-btn" data-bs-toggle="tab" data-bs-target="#tab-positions" type="button" role="tab">Club Position(s)</button></li>
     <li class="nav-item" role="presentation"><button class="nav-link" id="tab-relationships-btn" data-bs-toggle="tab" data-bs-target="#tab-relationships" type="button" role="tab">Relationships</button></li>
     <li class="nav-item" role="presentation"><button class="nav-link" id="tab-history-btn" data-bs-toggle="tab" data-bs-target="#tab-history" type="button" role="tab">History</button></li>
@@ -445,7 +492,7 @@ $data = array_merge([
 <div class="tab-content" data-club-person-page data-person-id="<?= (int) $personId ?>" data-csrf-token="<?= h(hub_auth_csrf_token()) ?>">
 
     <div class="tab-pane fade show active" id="tab-details" role="tabpanel">
-        <form method="post" class="people-tab-panel">
+        <form method="post" class="people-tab-panel" data-warn-unsaved>
             <div class="people-tab-panel__header">
                 <div class="people-account__title">
                     <span class="people-account__icon"><i class="fa-solid fa-id-card" aria-hidden="true"></i></span>
@@ -573,71 +620,119 @@ $data = array_merge([
                         </div>
                     </div>
 
-                    <div class="people-account-grid">
-                        <div class="people-account-panel">
-                            <div class="people-account-panel__header">
-                                <h3>Access &amp; Permissions</h3>
-                                <p>Control whether the account can sign in and how full Hub access is granted.</p>
-                            </div>
-                            <form method="post" class="people-account-form" id="accountAccessForm">
-                                <input type="hidden" name="csrf_token" value="<?= h(hub_auth_csrf_token()) ?>">
-                                <input type="hidden" name="person_id" value="<?= (int) $personId ?>">
-                                <input type="hidden" name="account_id" value="<?= (int) $account['id'] ?>">
-                                <input type="hidden" name="action" value="save_account">
-                                <label class="people-choice-row" for="accountActive">
-                                    <input class="form-check-input" type="checkbox" id="accountActive" name="account_is_active" <?= (int) $account['is_active'] === 1 ? 'checked' : '' ?>>
-                                    <span><strong>Account active</strong><small>Allow this person to use their Hub login.</small></span>
-                                </label>
-                                <label class="people-choice-row" for="accountIsAdmin">
-                                    <input class="form-check-input" type="checkbox" id="accountIsAdmin" name="is_admin" <?= $isAdminAccount ? 'checked' : '' ?>>
-                                    <span><strong>Site Administrator</strong><small>Full access across the Hub, bypassing Club Positions.</small></span>
-                                </label>
-                                <?php if (!$isAdminAccount): ?>
-                                    <div class="people-account-note">Active position access: <?= $currentPersonPositions !== [] ? h(implode(', ', array_column($currentPersonPositions, 'name'))) : 'none, so no Hub access beyond the dashboard.' ?></div>
-                                <?php endif; ?>
-                            </form>
-                            <div class="people-account-action-row">
-                                <form method="post">
-                                    <input type="hidden" name="csrf_token" value="<?= h(hub_auth_csrf_token()) ?>">
-                                    <input type="hidden" name="person_id" value="<?= (int) $personId ?>">
-                                    <input type="hidden" name="account_id" value="<?= (int) $account['id'] ?>">
-                                    <button class="btn btn-outline-<?= (int) $account['is_active'] === 1 ? 'danger' : 'success' ?> btn-sm" type="submit" name="action" value="<?= (int) $account['is_active'] === 1 ? 'disable_account' : 'activate_account' ?>"><?= (int) $account['is_active'] === 1 ? 'Disable account' : 'Activate account' ?></button>
-                                </form>
-                                <button class="btn btn-brand" type="submit" form="accountAccessForm">Save account</button>
-                            </div>
+                    <div class="people-account-panel">
+                        <div class="people-account-panel__header">
+                            <h3>Access &amp; Permissions</h3>
+                            <p>Control whether the account can sign in. Roles (including Administrator) are set on the Roles tab.</p>
                         </div>
+                        <form method="post" class="people-account-form" id="accountAccessForm">
+                            <input type="hidden" name="csrf_token" value="<?= h(hub_auth_csrf_token()) ?>">
+                            <input type="hidden" name="person_id" value="<?= (int) $personId ?>">
+                            <input type="hidden" name="account_id" value="<?= (int) $account['id'] ?>">
+                            <input type="hidden" name="action" value="save_account">
+                            <label class="people-choice-row" for="accountActive">
+                                <input class="form-check-input" type="checkbox" id="accountActive" name="account_is_active" <?= (int) $account['is_active'] === 1 ? 'checked' : '' ?>>
+                                <span><strong>Account active</strong><small>Allow this person to use their Hub login.</small></span>
+                            </label>
+                            <?php
+                            $assignedRoleNames = array_values(array_filter(array_map(
+                                static function (array $role) use ($currentBaseRole, $personAccessRoleIds): ?string {
+                                    $slug = (string) $role['slug'];
+                                    $has = in_array($slug, ['admin', 'staff', 'volunteer'], true)
+                                        ? $currentBaseRole === $slug
+                                        : in_array((int) $role['id'], $personAccessRoleIds, true);
+                                    return $has ? (string) $role['name'] : null;
+                                },
+                                $allAccessRoles
+                            )));
+                            ?>
+                            <div class="people-account-note">Roles: <strong><?= $assignedRoleNames !== [] ? h(implode(', ', $assignedRoleNames)) : 'None' ?></strong> — <a href="#tab-roles" data-bs-toggle="tab" data-bs-target="#tab-roles">change on the Roles tab</a>.</div>
+                        </form>
+                    </div>
 
-                        <div class="people-account-panel">
-                            <div class="people-account-panel__header">
-                                <h3>Password</h3>
-                                <p>Send a reset link, generate one to share manually, or set a temporary password.</p>
-                            </div>
-                            <div class="people-password-actions">
-                                <form method="post">
-                                    <input type="hidden" name="csrf_token" value="<?= h(hub_auth_csrf_token()) ?>">
-                                    <input type="hidden" name="person_id" value="<?= (int) $personId ?>">
-                                    <input type="hidden" name="account_id" value="<?= (int) $account['id'] ?>">
-                                    <button class="btn btn-brand btn-sm" type="submit" name="action" value="email_setup_link"><i class="fa-solid fa-envelope me-1" aria-hidden="true"></i>Email reset link</button>
-                                </form>
-                                <form method="post">
-                                    <input type="hidden" name="csrf_token" value="<?= h(hub_auth_csrf_token()) ?>">
-                                    <input type="hidden" name="person_id" value="<?= (int) $personId ?>">
-                                    <input type="hidden" name="account_id" value="<?= (int) $account['id'] ?>">
-                                    <button class="btn btn-outline-secondary btn-sm" type="submit" name="action" value="setup_link"><i class="fa-solid fa-link me-1" aria-hidden="true"></i>Copy reset link</button>
-                                </form>
-                            </div>
-                            <form method="post" class="people-set-password">
+                    <div class="people-account-panel">
+                        <div class="people-account-panel__header">
+                            <h3>Password</h3>
+                            <p>Send a reset link, generate one to share manually, or set a temporary password.</p>
+                        </div>
+                        <div class="people-password-actions">
+                            <form method="post">
                                 <input type="hidden" name="csrf_token" value="<?= h(hub_auth_csrf_token()) ?>">
                                 <input type="hidden" name="person_id" value="<?= (int) $personId ?>">
                                 <input type="hidden" name="account_id" value="<?= (int) $account['id'] ?>">
-                                <input type="hidden" name="action" value="set_password">
-                                <label class="form-label" for="accountNewPassword">Set password now</label>
-                                <div class="people-set-password__row">
-                                    <input class="form-control" id="accountNewPassword" type="password" name="new_password" minlength="8" placeholder="At least 8 characters" required>
-                                    <button class="btn btn-outline-primary" type="submit">Set password</button>
-                                </div>
+                                <button class="btn btn-brand btn-sm" type="submit" name="action" value="email_setup_link"><i class="fa-solid fa-envelope me-1" aria-hidden="true"></i>Email reset link</button>
+                            </form>
+                            <form method="post">
+                                <input type="hidden" name="csrf_token" value="<?= h(hub_auth_csrf_token()) ?>">
+                                <input type="hidden" name="person_id" value="<?= (int) $personId ?>">
+                                <input type="hidden" name="account_id" value="<?= (int) $account['id'] ?>">
+                                <button class="btn btn-outline-secondary btn-sm" type="submit" name="action" value="setup_link"><i class="fa-solid fa-link me-1" aria-hidden="true"></i>Copy reset link</button>
                             </form>
                         </div>
+                        <form method="post" class="people-set-password">
+                            <input type="hidden" name="csrf_token" value="<?= h(hub_auth_csrf_token()) ?>">
+                            <input type="hidden" name="person_id" value="<?= (int) $personId ?>">
+                            <input type="hidden" name="account_id" value="<?= (int) $account['id'] ?>">
+                            <input type="hidden" name="action" value="set_password">
+                            <label class="form-label" for="accountNewPassword">Set password now</label>
+                            <div class="people-set-password__row">
+                                <input class="form-control" id="accountNewPassword" type="password" name="new_password" minlength="8" placeholder="At least 8 characters" required>
+                                <button class="btn btn-outline-primary" type="submit">Set password</button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <div class="people-tab-actions">
+                        <form method="post">
+                            <input type="hidden" name="csrf_token" value="<?= h(hub_auth_csrf_token()) ?>">
+                            <input type="hidden" name="person_id" value="<?= (int) $personId ?>">
+                            <input type="hidden" name="account_id" value="<?= (int) $account['id'] ?>">
+                            <button class="btn btn-outline-<?= (int) $account['is_active'] === 1 ? 'danger' : 'success' ?>" type="submit" name="action" value="<?= (int) $account['is_active'] === 1 ? 'disable_account' : 'activate_account' ?>"><?= (int) $account['is_active'] === 1 ? 'Disable account' : 'Activate account' ?></button>
+                        </form>
+                        <button class="btn btn-brand" type="submit" form="accountAccessForm">Save account</button>
+                    </div>
+                <?php endif; ?>
+            </div>
+        </section>
+    </div>
+
+    <div class="tab-pane fade" id="tab-roles" role="tabpanel">
+        <section class="people-tab-panel">
+            <div class="people-tab-panel__header">
+                <div class="people-account__title">
+                    <span class="people-account__icon"><i class="fa-solid fa-user-shield" aria-hidden="true"></i></span>
+                    <div>
+                        <h2>Roles</h2>
+                        <p>What this person can do in the Hub, WordPress-style. Administrator grants everything; the others grant whatever's ticked for them on <a href="/admin/access_roles.php">Roles &amp; Capabilities</a>.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="people-tab-panel__body">
+                <?php if (!$account): ?>
+                    <p class="text-muted mb-0">This person has no Hub login account yet — create one on the Account tab first.</p>
+                <?php else: ?>
+                    <form method="post" id="accessRolesForm">
+                        <input type="hidden" name="csrf_token" value="<?= h(hub_auth_csrf_token()) ?>">
+                        <input type="hidden" name="person_id" value="<?= (int) $personId ?>">
+                        <input type="hidden" name="action" value="save_access_roles">
+                        <?php foreach ($allAccessRoles as $role): ?>
+                            <?php
+                            $roleSlug = (string) $role['slug'];
+                            $checked = in_array($roleSlug, ['admin', 'staff', 'volunteer'], true)
+                                ? $currentBaseRole === $roleSlug
+                                : in_array((int) $role['id'], $personAccessRoleIds, true);
+                            ?>
+                            <label class="people-choice-row" for="accessRole<?= (int) $role['id'] ?>">
+                                <input class="form-check-input" type="checkbox" id="accessRole<?= (int) $role['id'] ?>" name="access_role_ids[]" value="<?= (int) $role['id'] ?>" <?= $checked ? 'checked' : '' ?>>
+                                <span><strong><?= h((string) $role['name']) ?></strong><?php if ((int) $role['bypass_all'] === 1): ?><small>Full access across the Hub, bypassing everything else below.</small><?php endif; ?></span>
+                            </label>
+                        <?php endforeach; ?>
+                        <?php if ($currentPersonPositions !== []): ?>
+                            <div class="people-account-note">Also currently has legacy Club Position access via: <?= h(implode(', ', array_column($currentPersonPositions, 'name'))) ?> (see the Club Position(s) tab).</div>
+                        <?php endif; ?>
+                    </form>
+                    <div class="people-account-action-row">
+                        <button class="btn btn-brand" type="submit" form="accessRolesForm">Save roles</button>
                     </div>
                 <?php endif; ?>
             </div>

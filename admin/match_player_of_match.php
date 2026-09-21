@@ -26,7 +26,7 @@ if (!$fixture) {
     http_response_code(404);
     $pageHero = [
         'eyebrow' => 'Fixture management',
-        'title' => 'Man of the Match',
+        'title' => 'POTM (Player of the Match)',
         'subtitle' => 'The requested fixture could not be found.',
     ];
     require_once __DIR__ . '/header.php';
@@ -64,7 +64,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'event_team' => 'svfc',
             'event_minute' => '',
             'event_player' => $selectedPlayer,
-            'event_note' => 'Man of the Match',
+            'event_note' => 'Player of the Match',
         ];
         $result = $existingEvent !== null
             ? matches_handle_update_event($eventPost)
@@ -74,7 +74,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $eventId = $existingEvent !== null
                 ? (string) ($existingEvent['id'] ?? '')
                 : (string) ($result['event']['id'] ?? '');
-            auditLog($pdo, 'match_player_of_match_set', ($existingEvent !== null ? 'Updated' : 'Set') . ' Man of the Match for fixture vs ' . trim((string) ($fixture['opponent'] ?? 'Opponent')) . ': ' . $selectedPlayer);
+            auditLog($pdo, 'match_player_of_match_set', ($existingEvent !== null ? 'Updated' : 'Set') . ' Player of the Match for fixture vs ' . trim((string) ($fixture['opponent'] ?? 'Opponent')) . ': ' . $selectedPlayer);
             header(
                 'Location: /admin/match_graphics.php?fixture_id=' . $fixtureId
                 . '&season_id=' . $seasonId
@@ -85,7 +85,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $errors = isset($result['errors']) && is_array($result['errors'])
             ? array_values(array_map('strval', $result['errors']))
-            : [(string) ($result['message'] ?? 'Man of the Match could not be saved.')];
+            : [(string) ($result['message'] ?? 'Player of the Match could not be saved.')];
     }
 }
 
@@ -108,7 +108,7 @@ $lineupNames = array_values(array_unique(array_merge(
     matchStarting11PrepareLineup($fixture['starting11_substitutes'] ?? [])
 )));
 
-// Keep an already-recorded Man of the Match on the list even if the line-up was
+// Keep an already-recorded Player of the Match on the list even if the line-up was
 // edited afterwards and no longer includes them.
 if ($selectedPlayer !== '' && !in_array($selectedPlayer, $lineupNames, true)) {
     $lineupNames[] = $selectedPlayer;
@@ -138,13 +138,13 @@ if (!$lineupRecorded) {
 $opponent = trim((string) ($fixture['opponent'] ?? 'Opponent'));
 $pageHero = [
     'eyebrow' => 'Fixture management',
-    'title' => 'Man of the Match',
+    'title' => 'POTM (Player of the Match)',
     'subtitle' => 'Select the standout player from Saltcoats Victoria v ' . $opponent . '.',
     'actions' => [],
 ];
 require_once __DIR__ . '/header.php';
 ?>
-<nav class="hub-breadcrumb" aria-label="Breadcrumb"><a href="/admin/matches.php">Fixtures</a><i class="fa-solid fa-chevron-right" aria-hidden="true"></i><a href="/admin/match.php?id=<?= (int)$fixtureId ?>&amp;season_id=<?= (int)$seasonId ?>"><?= h($opponent) ?></a><i class="fa-solid fa-chevron-right" aria-hidden="true"></i><span aria-current="page">Man of the Match</span></nav>
+<nav class="hub-breadcrumb" aria-label="Breadcrumb"><a href="/admin/matches.php">Fixtures</a><i class="fa-solid fa-chevron-right" aria-hidden="true"></i><a href="/admin/match.php?id=<?= (int)$fixtureId ?>&amp;season_id=<?= (int)$seasonId ?>"><?= h($opponent) ?></a><i class="fa-solid fa-chevron-right" aria-hidden="true"></i><span aria-current="page">POTM</span></nav>
 
 <link rel="stylesheet" href="/admin/assets/css/player-sponsors-match-player-of-match.css">
 
@@ -159,7 +159,7 @@ require_once __DIR__ . '/header.php';
         <section class="potm-intro">
             <div>
                 <span class="page-kicker">Match award</span>
-                <h2>Who was Man of the Match?</h2>
+                <h2>Who was Player of the Match?</h2>
                 <p>Choose a player below. Saving will create the Pack 5 graphic and open it in the Social Composer ready to review, download or publish.</p>
             </div>
             <span class="potm-status<?= $existingEvent !== null ? ' is-recorded' : '' ?>"><?= $existingEvent !== null ? 'Award recorded' : 'Awaiting selection' ?></span>
@@ -174,7 +174,7 @@ require_once __DIR__ . '/header.php';
                 <div class="alert alert-warning">No starting XI or bench has been recorded for this match yet, so the full squad is shown. <a href="/admin/match.php?id=<?= (int) $fixtureId ?>&amp;season_id=<?= (int) $seasonId ?>&amp;tab=starting11">Set the line-up</a> to limit this to the matchday squad.</div>
             <?php endif; ?>
 
-            <div class="potm-grid" role="radiogroup" aria-label="Select Man of the Match">
+            <div class="potm-grid" role="radiogroup" aria-label="Select Player of the Match">
                 <?php foreach ($orderedPlayers as $player): ?>
                     <?php
                     $name = trim((string) ($player['name'] ?? ''));

@@ -8,6 +8,7 @@ require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/lib/functions.php';
 require_once __DIR__ . '/lib/shop.php';
 require_once __DIR__ . '/account_auth.php';
+hub_auth_require_capability('shop');
 require_once __DIR__ . '/lib/audit.php';
 
 shop_ensure_schema($pdo);
@@ -46,12 +47,6 @@ $pageHero = [
 ];
 require_once __DIR__ . '/header.php';
 
-if ((string) ($currentRole ?? 'guest') !== 'admin') {
-    http_response_code(403);
-    echo '<div><div class="alert alert-danger">You do not have permission to manage the shop.</div></div>';
-    require __DIR__ . '/footer.php';
-    exit;
-}
 
 $codes = shop_discount_codes($pdo);
 $editCode = null;
@@ -117,7 +112,7 @@ foreach ($codes as $c) {
                             <td data-label="Status"><?= (int) $c['is_active'] === 1 ? '<span class="badge text-bg-success">Active</span>' : '<span class="badge text-bg-secondary">Off</span>' ?></td>
                             <td data-label="Actions" class="text-end text-nowrap">
                                 <a class="btn btn-sm btn-outline-secondary" href="/admin/shop_discount_codes.php?code=<?= (int) $c['id'] ?>">Edit</a>
-                                <form method="post" class="d-inline" onsubmit="return confirm('Delete this code?');">
+                                <form method="post" class="d-inline" data-confirm="Delete this code?" data-confirm-action="Delete">
                                     <?= csrf_field() ?><input type="hidden" name="action" value="delete_code"><input type="hidden" name="id" value="<?= (int) $c['id'] ?>">
                                     <button class="btn btn-sm btn-outline-danger" type="submit">×</button>
                                 </form>

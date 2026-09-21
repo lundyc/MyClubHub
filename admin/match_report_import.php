@@ -33,7 +33,7 @@ if (!hub_auth_is_authenticated()) {
     header('Location: /admin/login.php');
     exit;
 }
-if (!hub_auth_has_capability('football_ops')) {
+if (!hub_auth_has_capability('matchday')) {
     http_response_code(403);
     exit('Access denied.');
 }
@@ -296,7 +296,7 @@ require_once __DIR__ . '/header.php';
                     </div>
                 <?php endif; ?>
                 <div class="table-responsive">
-                    <table class="table table-sm align-middle mb-0">
+                    <table class="table table-sm align-middle mb-0 hub-data-table">
                         <thead>
                             <tr><th style="width:3rem;">#</th><th>In the report</th><th>Squad player</th></tr>
                         </thead>

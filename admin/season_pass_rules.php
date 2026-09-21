@@ -12,7 +12,7 @@ require_once __DIR__ . '/lib/season.php';
 require_once __DIR__ . '/lib/season_pass_rules.php';
 require_once __DIR__ . '/lib/audit.php';
 
-hub_auth_require_permission('season_passes.manage');
+hub_auth_require_capability('tickets_ops');
 ensureSeasonPassRuleSchema($pdo);
 
 $seasonContext = getSeasonContext($pdo);

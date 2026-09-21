@@ -6,6 +6,7 @@ require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/lib/settings_store.php';
+require_once __DIR__ . '/lib/navigation_settings.php';
 require_once __DIR__ . '/social_post_settings.php';
 require_once __DIR__ . '/lib/publishing_settings.php';
 require_once __DIR__ . '/lib/publishing_history.php';
@@ -22,7 +23,7 @@ if (!hub_auth_is_authenticated()) {
 }
 
 $currentUser = hub_auth_current_user();
-if ((string) ($currentUser['role'] ?? '') !== 'admin') {
+if (!hub_auth_has_capability('admin_settings')) {
     http_response_code(403);
     echo '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Settings</title><link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"><link href="/admin/assets/css/style.css" rel="stylesheet"></head><body class="hub-shell"><main class="hub-main"><div class="container-fluid"><div class="alert alert-danger mb-0">You do not have permission to manage Hub settings.</div></div></main></body></html>';
     exit;
@@ -39,7 +40,7 @@ $pageHero = [
 
 $fileEnv = hub_settings_load_env();
 $activeTab = isset($_GET['tab']) && is_string($_GET['tab']) ? trim($_GET['tab']) : 'general';
-$allowedTabs = ['general', 'database', 'calendar', 'payments', 'notifications', 'publishing'];
+$allowedTabs = ['navigation', 'general', 'database', 'calendar', 'payments', 'notifications', 'publishing'];
 if (!in_array($activeTab, $allowedTabs, true)) {
     $activeTab = 'general';
 }
@@ -242,6 +243,19 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
             if ($statusMessage === '') {
                 $statusType = 'error';
                 $statusMessage = 'Settings could not be saved. Check file permissions for `hub/.env`.';
+            }
+        } elseif ($section === 'navigation') {
+            $activeTab = 'navigation';
+            try {
+                $groups = isset($_POST['nav_groups']) && is_array($_POST['nav_groups']) ? $_POST['nav_groups'] : [];
+                $items = isset($_POST['nav_items']) && is_array($_POST['nav_items']) ? $_POST['nav_items'] : [];
+                hub_navigation_save($pdo, $groups, $items);
+                auditLog($pdo, 'navigation_settings_updated', 'Updated navigation visibility for all users.');
+                header('Location: /admin/settings.php?tab=navigation&saved=1');
+                exit;
+            } catch (Throwable $e) {
+                $statusType = 'error';
+                $statusMessage = 'Navigation settings could not be saved. Please try again.';
             }
         } elseif ($section === 'global_template_pack') {
             $activeTab = 'general';
@@ -487,6 +501,7 @@ require_once __DIR__ . '/header.php';
         <li class="nav-item">
             <a class="nav-link<?= $activeTab === 'general' ? ' active' : '' ?>" href="?tab=general">General</a>
         </li>
+        <li class="nav-item"><a class="nav-link<?= $activeTab === 'navigation' ? ' active' : '' ?>" href="?tab=navigation">Navigation</a></li>
         <li class="nav-item">
             <a class="nav-link<?= $activeTab === 'database' ? ' active' : '' ?>" href="?tab=database">Database</a>
         </li>
@@ -505,6 +520,9 @@ require_once __DIR__ . '/header.php';
     </ul>
 
     <div class="tab-content">
+        <?php if ($activeTab === 'navigation'): ?>
+            <?php require __DIR__ . '/partials/navigation_settings.php'; ?>
+        <?php endif; ?>
         <?php if ($activeTab === 'general'): ?>
             <div class="tab-pane fade show active">
                 <form method="post" class="settings-card hub-form-card">

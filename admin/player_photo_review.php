@@ -219,7 +219,7 @@ require_once __DIR__ . '/header.php';
 <form id="reference-save" method="post">
 <?= csrf_field() ?><input type="hidden" name="action" value="save">
 <div class="table-responsive">
-<table class="table reference-queue-table">
+<table class="table reference-queue-table mb-0 hub-data-table">
 <caption>Uploaded images compared against named player photos — pick the right name for each, or leave it as-is if there's no match.</caption>
 <thead><tr><th scope="col">Image</th><th scope="col">Filename</th><th scope="col">Likeness</th><th scope="col">Player</th><th scope="col"><span class="visually-hidden">Remove</span></th></tr></thead>
 <tbody>

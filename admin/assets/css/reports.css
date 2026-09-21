@@ -30,7 +30,7 @@
     color: var(--hub-ink);
     display: flex;
     flex-direction: column;
-    gap: 1.25rem;
+    gap: var(--space-5, 1.25rem);
 }
 
 /* ---------------------------------------------------------------------- */
@@ -42,7 +42,7 @@
     flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
-    gap: 1rem;
+    gap: var(--space-4, 1rem);
     padding: 1.5rem var(--hub-space);
     border-radius: var(--hub-radius);
     background: linear-gradient(135deg, var(--brand-dark, #4b0818), var(--brand-primary, #6a2036));
@@ -53,13 +53,13 @@
 .rpt-hero__eyebrow {
     display: inline-flex;
     align-items: center;
-    gap: .4rem;
-    font-size: .72rem;
+    gap: var(--space-4rem, .4rem);
+    font-size: var(--fs-072, .72rem);
     font-weight: 800;
     letter-spacing: .08em;
     text-transform: uppercase;
     color: rgba(253, 246, 236, .78);
-    margin-bottom: .35rem;
+    margin-bottom: var(--space-035rem, .35rem);
 }
 
 .rpt-hero h1 {
@@ -73,26 +73,26 @@
     margin: 0;
     max-width: 46rem;
     color: rgba(253, 246, 236, .88);
-    font-size: .92rem;
+    font-size: var(--fs-092, .92rem);
 }
 
 .rpt-hero__actions {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: .5rem;
+    gap: var(--space-2, .5rem);
 }
 
 .rpt-export-orientation {
     display: inline-flex;
     align-items: center;
-    gap: .45rem;
+    gap: var(--space-045rem, .45rem);
     margin: 0;
     color: inherit;
 }
 
 .rpt-export-orientation span {
-    font-size: .68rem;
+    font-size: var(--fs-068, .68rem);
     font-weight: 800;
     letter-spacing: .05em;
     text-transform: uppercase;
@@ -102,7 +102,7 @@
 .rpt-export-orientation .form-select {
     width: auto;
     min-width: 8.4rem;
-    border-radius: .55rem;
+    border-radius: var(--radius-55rem, .55rem);
     font-weight: 700;
 }
 
@@ -123,10 +123,10 @@
 .rpt-btn {
     display: inline-flex;
     align-items: center;
-    gap: .4rem;
-    border-radius: .6rem;
+    gap: var(--space-4rem, .4rem);
+    border-radius: var(--radius-06rem, .6rem);
     font-weight: 700;
-    font-size: .82rem;
+    font-size: var(--fs-082, .82rem);
     white-space: nowrap;
 }
 
@@ -173,7 +173,7 @@
 .rpt-layout {
     display: grid;
     grid-template-columns: minmax(220px, 17rem) minmax(0, 1fr);
-    gap: 1.25rem;
+    gap: var(--space-5, 1.25rem);
     align-items: start;
 }
 
@@ -182,8 +182,8 @@
     top: 1rem;
     display: flex;
     flex-direction: column;
-    gap: 1.1rem;
-    padding: 1rem;
+    gap: var(--space-11rem, 1.1rem);
+    padding: var(--space-4, 1rem);
     border: 1px solid var(--hub-line);
     border-radius: var(--hub-radius);
     background: var(--hub-surface);
@@ -193,7 +193,7 @@
 }
 
 .rpt-picker__group-label {
-    font-size: .68rem;
+    font-size: var(--fs-068, .68rem);
     font-weight: 800;
     letter-spacing: .08em;
     text-transform: uppercase;
@@ -204,9 +204,9 @@
 .rpt-picker__item {
     display: flex;
     align-items: flex-start;
-    gap: .65rem;
+    gap: var(--space-065rem, .65rem);
     padding: .55rem .6rem;
-    border-radius: .7rem;
+    border-radius: var(--radius-07rem, .7rem);
     text-decoration: none;
     color: var(--hub-ink);
     transition: background .12s ease, transform .12s ease;
@@ -229,28 +229,28 @@
     flex: 0 0 2.1rem;
     width: 2.1rem;
     height: 2.1rem;
-    border-radius: .6rem;
+    border-radius: var(--radius-06rem, .6rem);
     display: grid;
     place-items: center;
     background: var(--hub-surface-muted, #faf5ed);
     color: var(--rpt-primary);
-    font-size: .85rem;
+    font-size: var(--fs-sm, .85rem);
 }
 
 .rpt-picker__text {
     display: flex;
     flex-direction: column;
-    gap: .1rem;
+    gap: var(--space-01rem, .1rem);
     min-width: 0;
 }
 
 .rpt-picker__text strong {
-    font-size: .84rem;
+    font-size: var(--fs-084, .84rem);
     line-height: 1.2;
 }
 
 .rpt-picker__text small {
-    font-size: .72rem;
+    font-size: var(--fs-072, .72rem);
     color: var(--hub-muted);
     line-height: 1.3;
 }
@@ -258,7 +258,7 @@
 .rpt-main {
     display: flex;
     flex-direction: column;
-    gap: 1.1rem;
+    gap: var(--space-11rem, 1.1rem);
     min-width: 0;
 }
 
@@ -277,7 +277,7 @@
 .rpt-filter-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
-    gap: .75rem;
+    gap: var(--space-3, .75rem);
 }
 
 .rpt-field--search {
@@ -285,12 +285,12 @@
 }
 
 .rpt-field label {
-    font-size: .68rem;
+    font-size: var(--fs-068, .68rem);
     font-weight: 800;
     letter-spacing: .05em;
     text-transform: uppercase;
     color: var(--hub-muted);
-    margin-bottom: .25rem;
+    margin-bottom: var(--space-1, .25rem);
 }
 
 .rpt-search-input {
@@ -303,27 +303,27 @@
     position: absolute;
     left: .65rem;
     color: var(--hub-muted);
-    font-size: .8rem;
+    font-size: var(--fs-08, .8rem);
     pointer-events: none;
 }
 
 .rpt-search-input input {
-    padding-left: 2rem;
+    padding-left: var(--space-8, 2rem);
 }
 
 .rpt-filter-actions {
     display: flex;
     align-items: center;
     flex-wrap: wrap;
-    gap: .6rem;
-    margin-top: .9rem;
-    padding-top: .9rem;
+    gap: var(--space-06rem, 0.6rem);
+    margin-top: var(--space-9rem, .9rem);
+    padding-top: var(--space-9rem, .9rem);
     border-top: 1px dashed var(--hub-line);
 }
 
 .rpt-filter-actions__count {
     margin-left: auto;
-    font-size: .78rem;
+    font-size: var(--fs-078, .78rem);
     font-weight: 700;
     color: var(--hub-muted);
 }
@@ -350,11 +350,11 @@
 }
 
 .rpt-checkbox-dropdown__menu {
-    padding: .5rem;
+    padding: var(--space-2, .5rem);
     min-width: 14rem;
     max-height: 16rem;
     overflow-y: auto;
-    border-radius: .7rem;
+    border-radius: var(--radius-07rem, .7rem);
     border-color: var(--hub-line);
     box-shadow: var(--hub-shadow);
 }
@@ -362,10 +362,10 @@
 .rpt-checkbox-dropdown__item {
     display: flex;
     align-items: center;
-    gap: .55rem;
+    gap: var(--space-055rem, .55rem);
     padding: .4rem .5rem;
-    border-radius: .5rem;
-    font-size: .84rem;
+    border-radius: var(--radius-05rem, .5rem);
+    font-size: var(--fs-084, .84rem);
     font-weight: 600;
     cursor: pointer;
 }
@@ -381,7 +381,7 @@
 .rpt-checkbox-dropdown__empty {
     display: block;
     padding: .4rem .5rem;
-    font-size: .8rem;
+    font-size: var(--fs-08, .8rem);
     color: var(--hub-muted);
 }
 
@@ -392,7 +392,7 @@
 .rpt-insight-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
-    gap: 1rem;
+    gap: var(--space-4, 1rem);
 }
 
 .rpt-insight-card {
@@ -406,8 +406,8 @@
 .rpt-insight-card h3 {
     display: flex;
     align-items: center;
-    gap: .5rem;
-    font-size: .88rem;
+    gap: var(--space-2, .5rem);
+    font-size: var(--fs-088, .88rem);
     font-weight: 800;
     margin: 0 0 .85rem;
     color: var(--hub-ink);
@@ -423,15 +423,15 @@
     padding: 0;
     display: flex;
     flex-direction: column;
-    gap: .65rem;
+    gap: var(--space-065rem, .65rem);
 }
 
 .rpt-bar-list__label {
     display: flex;
     align-items: center;
-    gap: .5rem;
-    font-size: .8rem;
-    margin-bottom: .3rem;
+    gap: var(--space-2, .5rem);
+    font-size: var(--fs-08, .8rem);
+    margin-bottom: var(--space-03rem, .3rem);
 }
 
 .rpt-bar-list__label span:nth-child(2) {
@@ -449,14 +449,14 @@
 
 .rpt-bar-list__track {
     height: .45rem;
-    border-radius: 999px;
+    border-radius: var(--radius-pill, 999px);
     background: var(--hub-surface-muted, #faf5ed);
     overflow: hidden;
 }
 
 .rpt-bar-list__fill {
     height: 100%;
-    border-radius: 999px;
+    border-radius: var(--radius-pill, 999px);
     background: var(--rpt-primary);
 }
 
@@ -481,17 +481,17 @@
 }
 
 .rpt-empty-inline {
-    font-size: .82rem;
+    font-size: var(--fs-082, .82rem);
     color: var(--hub-muted);
 }
 
 .rpt-health-bar {
     display: flex;
     height: .85rem;
-    border-radius: 999px;
+    border-radius: var(--radius-pill, 999px);
     overflow: hidden;
     background: var(--hub-surface-muted, #faf5ed);
-    margin-bottom: 1rem;
+    margin-bottom: var(--space-4, 1rem);
 }
 
 .rpt-health-bar__segment--success {
@@ -508,15 +508,15 @@
     padding: 0;
     display: flex;
     flex-direction: column;
-    gap: .5rem;
+    gap: var(--space-2, .5rem);
 }
 
 .rpt-legend-list li {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: .75rem;
-    font-size: .84rem;
+    gap: var(--space-3, .75rem);
+    font-size: var(--fs-084, .84rem);
 }
 
 .rpt-legend-list strong {
@@ -530,11 +530,11 @@
 .rpt-chart-grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 1rem;
+    gap: var(--space-4, 1rem);
 }
 
 .rpt-chart-card h3 {
-    margin-bottom: .6rem;
+    margin-bottom: var(--space-06rem, 0.6rem);
 }
 
 .rpt-chart-wrap {
@@ -545,14 +545,14 @@
 .rpt-compare-grid {
     display: grid;
     grid-template-columns: minmax(0, 1.6fr) minmax(17rem, 1fr);
-    gap: 1rem;
+    gap: var(--space-4, 1rem);
     align-items: start;
 }
 
 .rpt-compare-side {
     display: flex;
     flex-direction: column;
-    gap: 1rem;
+    gap: var(--space-4, 1rem);
 }
 
 /* Top-aligned (not middle) so the metric label sits level with the top "value" line
@@ -566,7 +566,7 @@
 .rpt-compare-table__metric {
     display: flex;
     flex-direction: column;
-    gap: .15rem;
+    gap: var(--space-015rem, .15rem);
     font-weight: 700;
     white-space: nowrap;
 }
@@ -574,7 +574,7 @@
 .rpt-compare-table__metric-label {
     display: flex;
     align-items: center;
-    gap: .55rem;
+    gap: var(--space-055rem, .55rem);
 }
 
 .rpt-compare-table__metric i {
@@ -586,7 +586,7 @@
 .rpt-compare-table__cell {
     display: flex;
     flex-direction: column;
-    gap: .15rem;
+    gap: var(--space-015rem, .15rem);
 }
 
 /* Every data cell (metric label included) reserves the same two lines — value/label
@@ -594,7 +594,7 @@
    not that particular cell has a delta to show. */
 .rpt-compare-table__cell> :nth-child(2),
 .rpt-compare-table__metric .rpt-compare-table__spacer {
-    font-size: .72rem;
+    font-size: var(--fs-072, .72rem);
     line-height: 1.3;
 }
 
@@ -605,7 +605,7 @@
 .rpt-delta {
     display: inline-flex;
     align-items: center;
-    gap: .3rem;
+    gap: var(--space-03rem, .3rem);
     font-weight: 800;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
@@ -620,8 +620,8 @@
 }
 
 .rpt-bar-list--compact {
-    margin-top: 1rem;
-    padding-top: .85rem;
+    margin-top: var(--space-4, 1rem);
+    padding-top: var(--space-085rem, .85rem);
     border-top: 1px dashed var(--hub-line);
 }
 
@@ -644,14 +644,14 @@
 }
 
 .rpt-donut-center strong {
-    font-size: 1.3rem;
+    font-size: var(--fs-13, 1.3rem);
     font-weight: 800;
     color: var(--hub-ink);
     line-height: 1.1;
 }
 
 .rpt-donut-center span {
-    font-size: .68rem;
+    font-size: var(--fs-068, .68rem);
     color: var(--hub-muted);
     text-transform: uppercase;
     letter-spacing: .04em;
@@ -662,11 +662,11 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: .75rem;
-    margin-top: .75rem;
-    padding-top: .75rem;
+    gap: var(--space-3, .75rem);
+    margin-top: var(--space-3, .75rem);
+    padding-top: var(--space-3, .75rem);
     border-top: 1px dashed var(--hub-line);
-    font-size: .84rem;
+    font-size: var(--fs-084, .84rem);
     color: var(--hub-muted);
 }
 
@@ -680,7 +680,7 @@
 }
 
 .rpt-types-compare th {
-    font-size: .66rem;
+    font-size: var(--fs-066, .66rem);
     font-weight: 800;
     letter-spacing: .04em;
     text-transform: uppercase;
@@ -690,7 +690,7 @@
 }
 
 .rpt-types-compare td {
-    font-size: .82rem;
+    font-size: var(--fs-082, .82rem);
     padding: .45rem 0;
     border-bottom: 1px solid var(--hub-line);
 }
@@ -701,25 +701,25 @@
 
 .rpt-types-compare td:first-child i {
     color: var(--hub-muted);
-    margin-right: .3rem;
+    margin-right: var(--space-03rem, .3rem);
 }
 
 .rpt-compare-note {
     display: flex;
     align-items: flex-start;
-    gap: .5rem;
+    gap: var(--space-2, .5rem);
     margin: 0;
     padding: .75rem 1rem;
-    border-radius: .7rem;
+    border-radius: var(--radius-07rem, .7rem);
     background: var(--hub-surface-muted, #faf5ed);
     border: 1px solid var(--hub-line);
     color: var(--hub-muted);
-    font-size: .8rem;
+    font-size: var(--fs-08, .8rem);
 }
 
 .rpt-compare-note i {
     color: var(--rpt-primary);
-    margin-top: .15rem;
+    margin-top: var(--space-015rem, .15rem);
 }
 
 @media (max-width: 1199.98px) {
@@ -769,13 +769,13 @@
     flex-wrap: wrap;
     align-items: flex-start;
     justify-content: space-between;
-    gap: .75rem;
+    gap: var(--space-3, .75rem);
     padding: 1.1rem 1.2rem;
     border-bottom: 1px solid var(--hub-line);
 }
 
 .rpt-table-card__eyebrow {
-    font-size: .68rem;
+    font-size: var(--fs-068, .68rem);
     font-weight: 800;
     letter-spacing: .06em;
     text-transform: uppercase;
@@ -783,21 +783,21 @@
 }
 
 .rpt-table-card__header h2 {
-    font-size: 1.05rem;
+    font-size: var(--fs-105, 1.05rem);
     font-weight: 800;
     margin: .15rem 0 .2rem;
 }
 
 .rpt-table-card__header p {
     margin: 0;
-    font-size: .82rem;
+    font-size: var(--fs-082, .82rem);
     color: var(--hub-muted);
     max-width: 40rem;
 }
 
 .rpt-table-card__actions {
     display: flex;
-    gap: .5rem;
+    gap: var(--space-2, .5rem);
     flex-wrap: wrap;
     align-items: center;
 }
@@ -812,7 +812,7 @@
     z-index: 1;
     background: var(--hub-surface-muted, #faf5ed);
     color: var(--hub-ink);
-    font-size: .68rem;
+    font-size: var(--fs-068, .68rem);
     font-weight: 800;
     letter-spacing: .05em;
     text-transform: uppercase;
@@ -826,8 +826,8 @@
 }
 
 .rpt-sort-icon {
-    margin-left: .35rem;
-    font-size: .65rem;
+    margin-left: var(--space-035rem, .35rem);
+    font-size: var(--fs-065, .65rem);
     opacity: .35;
 }
 
@@ -837,7 +837,7 @@
 }
 
 .rpt-table tbody td {
-    font-size: .85rem;
+    font-size: var(--fs-sm, .85rem);
     vertical-align: middle;
 }
 
@@ -861,10 +861,10 @@
 .rpt-pill {
     display: inline-flex;
     align-items: center;
-    gap: .3rem;
+    gap: var(--space-03rem, .3rem);
     padding: .24rem .6rem;
-    border-radius: 999px;
-    font-size: .72rem;
+    border-radius: var(--radius-pill, 999px);
+    font-size: var(--fs-072, .72rem);
     font-weight: 800;
     white-space: nowrap;
 }
@@ -902,10 +902,10 @@
 .rpt-tag {
     display: inline-flex;
     align-items: center;
-    gap: .35rem;
+    gap: var(--space-035rem, .35rem);
     padding: .24rem .6rem;
-    border-radius: .5rem;
-    font-size: .72rem;
+    border-radius: var(--radius-05rem, .5rem);
+    font-size: var(--fs-072, .72rem);
     font-weight: 800;
     white-space: nowrap;
     border: 1px solid transparent;
@@ -949,14 +949,14 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: .5rem;
+    gap: var(--space-2, .5rem);
     padding: 3rem 1rem;
     color: var(--hub-muted);
     text-align: center;
 }
 
 .rpt-empty i {
-    font-size: 1.6rem;
+    font-size: var(--fs-16, 1.6rem);
     opacity: .5;
 }
 
@@ -975,7 +975,7 @@
         flex-direction: row;
         flex-wrap: nowrap;
         overflow-x: auto;
-        gap: 1.5rem;
+        gap: var(--space-6, 1.5rem);
         -webkit-overflow-scrolling: touch;
     }
 
@@ -1027,7 +1027,7 @@
         margin-left: 0;
         text-align: center;
         order: -1;
-        margin-bottom: .2rem;
+        margin-bottom: var(--space-2rem, .2rem);
     }
 
     .rpt-table-card__header {
@@ -1071,7 +1071,7 @@
 .rpt-showcase-list {
     display: flex;
     flex-direction: column;
-    gap: 1rem;
+    gap: var(--space-4, 1rem);
 }
 
 .rpt-showcase-card {
@@ -1086,10 +1086,10 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: .5rem;
+    gap: var(--space-2, .5rem);
     padding: .7rem .9rem;
     font-weight: 800;
-    font-size: 1rem;
+    font-size: var(--fs-base, 1rem);
     background: var(--rpt-club-tint);
     color: var(--rpt-club);
 }
@@ -1102,16 +1102,16 @@
 
 .rpt-showcase-card__count {
     background: rgba(255, 255, 255, .55);
-    border-radius: 999px;
+    border-radius: var(--radius-pill, 999px);
     padding: .1rem .6rem;
-    font-size: .8rem;
+    font-size: var(--fs-08, .8rem);
 }
 
 .rpt-showcase-card__body {
     padding: .9rem 1.1rem 1.1rem;
     display: flex;
     flex-direction: column;
-    gap: 1.1rem;
+    gap: var(--space-11rem, 1.1rem);
 }
 
 .rpt-showcase-row {
@@ -1123,12 +1123,12 @@
 
 .rpt-showcase-package__title {
     margin: 0 0 .5rem;
-    font-size: .82rem;
+    font-size: var(--fs-082, .82rem);
     font-weight: 800;
     text-transform: uppercase;
     letter-spacing: .03em;
     color: var(--rpt-primary);
-    padding-bottom: .35rem;
+    padding-bottom: var(--space-035rem, .35rem);
     border-bottom: 1px solid var(--hub-line);
 }
 
@@ -1138,7 +1138,7 @@
     padding: 0;
     display: flex;
     flex-direction: column;
-    gap: .5rem;
+    gap: var(--space-2, .5rem);
 }
 
 .rpt-showcase-package__list li {
@@ -1152,7 +1152,7 @@
 }
 
 .rpt-showcase-package__empty {
-    font-size: .85rem;
+    font-size: var(--fs-sm, .85rem);
     font-style: italic;
     color: var(--hub-muted, #6b6461);
 }

@@ -206,7 +206,7 @@ function hub_pack_ui_preview_text(string $actionKey, string $elementKey): string
         'substitution' => 'SUBSTITUTION',
         'yellow_card' => 'YELLOW CARD',
         'red_card' => 'RED CARD',
-        'player_of_match' => 'MAN OF THE MATCH',
+        'player_of_match' => 'PLAYER OF THE MATCH',
         'player_sponsorship' => 'PLAYER SPONSORSHIP',
         'postponed' => 'MATCH POSTPONED',
         'abandoned' => 'MATCH ABANDONED',
@@ -296,7 +296,7 @@ function hub_pack_ui_fallback_actions(): array
         'substitution' => ['key' => 'substitution', 'label' => 'Substitution', 'icon' => 'fa-right-left', 'description' => 'Player on and off update.'],
         'yellow_card' => ['key' => 'yellow_card', 'label' => 'Yellow Card', 'icon' => 'fa-square', 'description' => 'Booking announcement.'],
         'red_card' => ['key' => 'red_card', 'label' => 'Red Card', 'icon' => 'fa-square', 'description' => 'Dismissal announcement.'],
-        'player_of_match' => ['key' => 'player_of_match', 'label' => 'Man of the Match', 'icon' => 'fa-star', 'description' => 'Post-match player recognition.'],
+        'player_of_match' => ['key' => 'player_of_match', 'label' => 'Player of the Match', 'icon' => 'fa-star', 'description' => 'Post-match player recognition.'],
         'player_sponsorship' => ['key' => 'player_sponsorship', 'label' => 'Player Sponsorship', 'icon' => 'fa-shirt', 'description' => 'Player sponsorship announcement.'],
         'postponed' => ['key' => 'postponed', 'label' => 'Match Postponed', 'icon' => 'fa-calendar-xmark', 'description' => 'Fixture postponement notice.'],
         'abandoned' => ['key' => 'abandoned', 'label' => 'Match Abandoned', 'icon' => 'fa-triangle-exclamation', 'description' => 'Abandoned fixture notice.'],
@@ -332,7 +332,7 @@ function hub_pack_ui_default_elements(string $actionKey): array
         $elements['player_name'] = ['label' => 'Player name', 'x' => 120, 'y' => 710, 'width' => 840, 'height' => 120, 'font_size' => 62, 'text_align' => 'center', 'color' => '#ffffff', 'visible' => true];
         $elements['player_image'] = ['label' => 'Player image', 'x' => 290, 'y' => 190, 'width' => 500, 'height' => 500, 'font_size' => 0, 'text_align' => 'center', 'color' => '#ffffff', 'visible' => $actionKey !== 'player_of_match'];
         if ($actionKey === 'player_of_match') {
-            $elements['headline'] = ['label' => 'Man of the Match heading', 'x' => 90, 'y' => 170, 'width' => 900, 'height' => 480, 'font_size' => 276, 'text_align' => 'center', 'color' => '#ffffff', 'visible' => true];
+            $elements['headline'] = ['label' => 'Player of the Match heading', 'x' => 90, 'y' => 170, 'width' => 900, 'height' => 480, 'font_size' => 276, 'text_align' => 'center', 'color' => '#ffffff', 'visible' => true];
             $elements['player_name'] = ['label' => 'Player name', 'x' => 100, 'y' => 675, 'width' => 880, 'height' => 245, 'font_size' => 122, 'text_align' => 'center', 'color' => '#f8f6f1', 'visible' => true];
             $elements['player_sponsors'] = ['label' => 'Player sponsors', 'x' => 120, 'y' => 955, 'width' => 760, 'height' => 250, 'font_size' => 21, 'text_align' => 'center', 'color' => '#ffffff', 'visible' => true];
         }
@@ -455,7 +455,7 @@ function hub_pack_ui_editorial_elements(string $actionKey): array
         $elements['venue'] = ['label' => 'Venue', 'x' => 650, 'y' => 1260, 'width' => 395, 'height' => 45, 'font_size' => 22, 'text_align' => 'right', 'color' => '#ffffff', 'visible' => true];
         unset($elements['player_image']);
     } elseif ($actionKey === 'player_of_match') {
-        $elements['headline'] = ['label' => 'Man of the Match heading', 'x' => 90, 'y' => 170, 'width' => 900, 'height' => 480, 'font_size' => 276, 'text_align' => 'center', 'color' => '#ffffff', 'visible' => true];
+        $elements['headline'] = ['label' => 'Player of the Match heading', 'x' => 90, 'y' => 170, 'width' => 900, 'height' => 480, 'font_size' => 276, 'text_align' => 'center', 'color' => '#ffffff', 'visible' => true];
         $elements['player_image'] = ['label' => 'Player image', 'x' => 265, 'y' => 390, 'width' => 550, 'height' => 500, 'font_size' => 0, 'text_align' => 'center', 'color' => '#ffffff', 'visible' => false];
         $elements['player_name'] = ['label' => 'Player name', 'x' => 100, 'y' => 675, 'width' => 880, 'height' => 245, 'font_size' => 122, 'text_align' => 'center', 'color' => '#f8f6f1', 'visible' => true];
         $elements['player_sponsors'] = ['label' => 'Player sponsors', 'x' => 120, 'y' => 955, 'width' => 760, 'height' => 250, 'font_size' => 21, 'text_align' => 'center', 'color' => '#ffffff', 'visible' => true];
@@ -1091,7 +1091,7 @@ require_once __DIR__ . '/header.php';
             </aside>
 
             <div class="pack-editor-content">
-                <form class="editor-panel hub-form-card" id="pack-details" method="post">
+                <form class="editor-panel hub-form-card" id="pack-details" method="post" data-warn-unsaved>
                     <input type="hidden" name="csrf_token" value="<?= hub_pack_ui_text(hub_auth_csrf_token()) ?>">
                     <input type="hidden" name="action" value="save_pack">
                     <input type="hidden" name="pack_id" value="<?= $packId ?>">
@@ -1105,7 +1105,7 @@ require_once __DIR__ . '/header.php';
                     </div>
                 </form>
 
-                <form class="editor-panel hub-form-card" id="brand-system" method="post" enctype="multipart/form-data" data-brand-form>
+                <form class="editor-panel hub-form-card" id="brand-system" method="post" enctype="multipart/form-data" data-brand-form data-warn-unsaved>
                     <input type="hidden" name="csrf_token" value="<?= hub_pack_ui_text(hub_auth_csrf_token()) ?>">
                     <input type="hidden" name="action" value="save_brand">
                     <input type="hidden" name="pack_id" value="<?= $packId ?>">

@@ -2,7 +2,7 @@
 declare(strict_types=1);
 require_once __DIR__ . '/auth.php';
 if (!hub_auth_is_authenticated()) { header('Location: /admin/login.php'); exit; }
-if (!hub_auth_has_capability('football_ops')) { http_response_code(403); exit('Access denied.'); }
+if (!hub_auth_has_capability('matchday')) { http_response_code(403); exit('Access denied.'); }
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/lib/functions.php';
 require_once __DIR__ . '/lib/pdf_importer.php';
@@ -316,7 +316,7 @@ tr.wiz-diff td{background:var(--w-warn-soft)}
 <form method="post"><?=csrf_field()?><input type="hidden" name="action" value="scan"><button class="btn btn-brand btn-sm">Check the folder for new PDFs</button></form>
 <button type="button" class="btn btn-outline-primary btn-sm" id="processQueue">Read the queued PDFs (<?= (int)($counts['queued']??0) ?>)</button>
 <label class="btn btn-outline-secondary btn-sm mb-0">Upload PDFs<input id="pdfUploads" type="file" accept="application/pdf,.pdf" multiple hidden></label>
-<form method="post" class="d-inline" onsubmit="return confirm('Re-read every report that has not been imported yet? Nothing you have not already imported is lost.')"><?=csrf_field()?><input type="hidden" name="action" value="requeue_all"><button class="btn btn-outline-secondary btn-sm">Re-read all reports</button></form>
+<form method="post" class="d-inline" data-confirm="Re-read every report that has not been imported yet? Nothing you have not already imported is lost." data-confirm-action="Re-read all" data-confirm-class="btn-primary"><?=csrf_field()?><input type="hidden" name="action" value="requeue_all"><button class="btn btn-outline-secondary btn-sm">Re-read all reports</button></form>
 <a href="/admin/pdf_importer.php" class="btn btn-outline-secondary btn-sm">See all reports</a>
 </div>
 <p class="pdfw-bar__note">Drop COMET match-report PDFs into the <code>PDF_imports</code> folder, or upload them here (20&nbsp;MB per file). They are read automatically in the background. <strong>Nothing on the website changes until the last step of the wizard.</strong></p>

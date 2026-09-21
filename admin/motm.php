@@ -1,7 +1,7 @@
 <?php
 $pageHero = [
     'eyebrow' => 'Members',
-    'title' => 'Man of the Match Voting',
+    'title' => 'Player of the Match Voting',
     'subtitle' => 'How season ticket holders voted, match by match.',
     'actions' => [],
 ];
@@ -32,7 +32,7 @@ $expandedVotes = $expandedFixtureId ? getMotmVotesForFixture($pdo, $expandedFixt
 </form>
 
 <?php if (!$fixtures): ?>
-  <div class="card shadow-sm border-0"><div class="card-body text-center text-muted py-4">No Man of the Match votes recorded for this season yet.</div></div>
+  <div class="card shadow-sm border-0"><div class="card-body text-center text-muted py-4">No Player of the Match votes recorded for this season yet.</div></div>
 <?php endif; ?>
 
 <?php foreach ($fixtures as $fixture): ?>

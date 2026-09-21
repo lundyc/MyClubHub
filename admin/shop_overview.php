@@ -8,6 +8,7 @@ require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/lib/functions.php';
 require_once __DIR__ . '/lib/shop.php';
 require_once __DIR__ . '/account_auth.php';
+hub_auth_require_capability('shop');
 
 shop_ensure_schema($pdo);
 
@@ -63,12 +64,6 @@ $pageHero = [
 
 require_once __DIR__ . '/header.php';
 
-if ((string) ($currentRole ?? 'guest') !== 'admin') {
-    http_response_code(403);
-    echo '<div><div class="alert alert-danger">You do not have permission to manage the shop.</div></div>';
-    require __DIR__ . '/footer.php';
-    exit;
-}
 
 $settings = shop_get_settings($pdo);
 $stripeReady = stripe_is_configured();
@@ -169,7 +164,7 @@ function shop_status_badge(string $status): string
                     <a class="btn btn-sm btn-outline-secondary" href="/admin/shop_orders.php">All orders</a>
                 </div>
                 <div class="table-responsive">
-                    <table class="table align-middle mb-0">
+                    <table class="table align-middle mb-0 hub-data-table">
                         <thead><tr><th>Ref</th><th>Customer</th><th>Placed</th><th class="text-end">Total</th><th>Status</th></tr></thead>
                         <tbody>
                         <?php if (!$recent): ?>
@@ -193,7 +188,7 @@ function shop_status_badge(string $status): string
             <section class="card hub-panel">
                 <div class="card-header bg-transparent"><strong>Units sold by size</strong> <span class="text-muted small">(paid orders)</span></div>
                 <div class="table-responsive">
-                    <table class="table table-sm align-middle mb-0">
+                    <table class="table table-sm align-middle mb-0 hub-data-table">
                         <thead><tr><th>Item</th><th class="text-end">Qty</th><th class="text-end">Value</th></tr></thead>
                         <tbody>
                         <?php if (!$breakdown): ?>

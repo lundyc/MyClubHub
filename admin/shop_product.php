@@ -8,6 +8,7 @@ require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/lib/functions.php';
 require_once __DIR__ . '/lib/shop.php';
 require_once __DIR__ . '/account_auth.php';
+hub_auth_require_capability('shop');
 require_once __DIR__ . '/lib/audit.php';
 
 shop_ensure_schema($pdo);
@@ -97,12 +98,6 @@ $pageHero = [
 ];
 require_once __DIR__ . '/header.php';
 
-if ((string) ($currentRole ?? 'guest') !== 'admin') {
-    http_response_code(403);
-    echo '<div><div class="alert alert-danger">You do not have permission to manage the shop.</div></div>';
-    require __DIR__ . '/footer.php';
-    exit;
-}
 
 $product = $editId > 0 ? shop_get_product($pdo, $editId) : null;
 if ($editId > 0 && !$product) {
@@ -258,7 +253,7 @@ if ($product && !empty($product['preorder_close_at'])) {
                         <?php foreach ($gallery as $img): ?>
                             <div class="text-center">
                                 <img src="<?= h((string) $img['image_path']) ?>" alt="" style="height:90px;border-radius:8px;object-fit:cover;">
-                                <form method="post" onsubmit="return confirm('Remove this image?');">
+                                <form method="post" data-confirm="Remove this image?" data-confirm-action="Remove">
                                     <?= csrf_field() ?>
                                     <input type="hidden" name="action" value="delete_image">
                                     <input type="hidden" name="id" value="<?= (int) $product['id'] ?>">
@@ -282,7 +277,7 @@ if ($product && !empty($product['preorder_close_at'])) {
             <div class="col-lg-4">
                 <section class="card hub-panel p-3 border-danger-subtle">
                     <h2 class="h6 fw-bold text-uppercase text-danger">Danger zone</h2>
-                    <form method="post" onsubmit="return confirm('Delete this product? Paid orders keep their history and the product is hidden instead.');">
+                    <form method="post" data-confirm="Delete this product? Paid orders keep their history and the product is hidden instead." data-confirm-action="Delete">
                         <?= csrf_field() ?>
                         <input type="hidden" name="action" value="delete">
                         <input type="hidden" name="id" value="<?= (int) $product['id'] ?>">

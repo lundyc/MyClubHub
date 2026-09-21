@@ -108,6 +108,15 @@ if (!$player) {
 }
 
 $season = getSeasonById($pdo, $seasonId);
+
+$allowedSlots = getAllowedSponsorshipSlots($pdo, $seasonId);
+$playerEditSlots = array_values(array_intersect($allowedSlots, ['home', 'away']));
+$sponsorCatalog = getActiveSponsorsForSeason($pdo, $seasonId);
+$activeSlotStmt = $pdo->prepare("SELECT slot FROM sponsorships WHERE player_id = :pid AND season_id = :season_id AND ended_at IS NULL AND slot IN ('home','away')");
+$activeSlotStmt->execute([':pid' => $id, ':season_id' => $seasonId]);
+$playerActiveSlots = $activeSlotStmt->fetchAll(PDO::FETCH_COLUMN);
+$freeSponsorshipSlots = array_diff($playerEditSlots, $playerActiveSlots);
+
 $matchStats = hub_player_match_stats(
     $pdo,
     $seasonId,
@@ -136,7 +145,8 @@ $stmt = $pdo->prepare("
     sp.id AS sponsor_id,
     sp.name AS sponsor_name,
     COALESCE(SUM(p.total_paid), 0) AS total_paid,
-    COALESCE(SUM(s.amount), 0) AS required_amount
+    COALESCE(SUM(s.amount), 0) AS required_amount,
+    MAX(s.complimentary) AS complimentary
   FROM sponsorships s
   JOIN sponsors sp ON sp.id = s.sponsor_id
   LEFT JOIN (
@@ -347,6 +357,8 @@ $paymentProgress = $totalRequired > 0
       <div class="player-profile-meta">
         <div><span>Season</span><strong><?= htmlspecialchars((string)($season['name'] ?? '—'), ENT_QUOTES, 'UTF-8') ?></strong></div>
         <div><span>Date of birth</span><strong><?= h(players_format_date_of_birth((string) ($player['date_of_birth'] ?? ''))) ?></strong></div>
+        <?php $playerAge = players_calculate_age((string) ($player['date_of_birth'] ?? '')); ?>
+        <div><span>Current age</span><strong><?= $playerAge !== null ? (int) $playerAge : '—' ?></strong></div>
         <div><span>Joined</span><strong><?= !empty($player['joined_at']) ? date('d M Y', strtotime((string)$player['joined_at'])) : 'Not recorded' ?></strong></div>
         <div><span>Left</span><strong><?= !empty($player['left_at']) ? date('d M Y', strtotime((string)$player['left_at'])) : '—' ?></strong></div>
       </div>
@@ -363,7 +375,7 @@ $paymentProgress = $totalRequired > 0
         <a href="/admin/player_edit.php?id=<?= $id ?>" class="btn btn-outline-primary btn-sm"><i class="fa-solid fa-cloud-arrow-up me-1" aria-hidden="true"></i>Manage photos</a>
       </div>
       <?php if ($actionAndTaggedShots): ?>
-        <p class="text-muted small mb-3">Includes photos tagged of this player in match galleries. Only dedicated action shots (not tagged photos) can be used in Man of the Match, Goal and Player Sponsor graphics.</p>
+        <p class="text-muted small mb-3">Includes photos tagged of this player in match galleries. Only dedicated action shots (not tagged photos) can be used in Player of the Match, Goal and Player Sponsor graphics.</p>
         <div class="player-profile-actionshots-grid" data-lightbox>
           <?php foreach ($actionAndTaggedShots as $shot): ?>
             <a href="<?= h((string) $shot['url']) ?>" class="player-profile-actionshot" data-full="<?= h((string) $shot['url']) ?>" data-caption="<?= h((string) $shot['label']) ?>">
@@ -385,7 +397,7 @@ $paymentProgress = $totalRequired > 0
           <div class="lightbox__thumbs"></div>
         </div>
       <?php else: ?>
-        <p class="text-muted mb-0">No action shots or tagged match photos yet. Add some from the edit page to use in Man of the Match, Goal and Player Sponsor graphics.</p>
+        <p class="text-muted mb-0">No action shots or tagged match photos yet. Add some from the edit page to use in Player of the Match, Goal and Player Sponsor graphics.</p>
       <?php endif; ?>
     </div>
   </section>
@@ -422,7 +434,12 @@ $paymentProgress = $totalRequired > 0
           <div class="player-profile-section-kicker">Commercial</div>
           <h2 class="player-profile-section-title">Sponsors &amp; payments</h2>
         </div>
-        <span class="text-muted small"><?= htmlspecialchars((string)($season['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?></span>
+        <div class="d-flex align-items-center gap-2">
+          <span class="text-muted small"><?= htmlspecialchars((string)($season['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?></span>
+          <button type="button" class="btn btn-sm btn-brand" data-bs-toggle="modal" data-bs-target="#addSponsorshipModal" <?= $freeSponsorshipSlots ? '' : 'disabled title="No free home/away slot for this player this season"' ?>>
+            <i class="fa-solid fa-plus me-1" aria-hidden="true"></i>Add sponsorship
+          </button>
+        </div>
       </div>
       <?php if ($sponsorships): ?>
         <div>
@@ -433,7 +450,9 @@ $paymentProgress = $totalRequired > 0
                   <strong><?= htmlspecialchars((string) $s['sponsor_name']) ?></strong>
                 </div>
                 <div>
-                  <?php if ((float) $s['total_paid'] >= (float) $s['required_amount']): ?>
+                  <?php if ((bool) $s['complimentary']): ?>
+                    <span class="badge hub-status bg-info text-dark">Complimentary</span>
+                  <?php elseif ((float) $s['total_paid'] >= (float) $s['required_amount']): ?>
                     <span class="badge hub-status bg-success">Fully paid</span>
                   <?php elseif ((float) $s['total_paid'] > 0): ?>
                     <span class="badge hub-status bg-warning text-dark">Part paid</span>
@@ -514,6 +533,57 @@ $paymentProgress = $totalRequired > 0
       <?php endif; ?>
     </div>
   </section>
+</div>
+
+<div class="modal fade" id="addSponsorshipModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form class="modal-content hub-form-card" id="addSponsorshipForm">
+      <div class="modal-header">
+        <h5 class="modal-title">Add Sponsorship</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" name="player_id" value="<?= (int) $id ?>">
+        <input type="hidden" name="season_id" value="<?= (int) $seasonId ?>">
+        <div class="mb-3">
+          <label class="form-label">Sponsor</label>
+          <select name="sponsor_id" class="form-select" required>
+            <option value="">Select sponsor</option>
+            <?php foreach ($sponsorCatalog as $sp): ?>
+              <option value="<?= (int) $sp['id'] ?>"><?= htmlspecialchars((string) $sp['name']) ?></option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Kit slot</label>
+          <select name="slot" class="form-select" required>
+            <?php if ($freeSponsorshipSlots): ?>
+              <?php foreach ($freeSponsorshipSlots as $slot): ?>
+                <option value="<?= h($slot) ?>"><?= h(ucfirst($slot)) ?></option>
+              <?php endforeach; ?>
+            <?php else: ?>
+              <option value="">Player already has a sponsorship</option>
+            <?php endif; ?>
+          </select>
+        </div>
+        <div class="mb-3 form-check form-switch">
+          <input type="checkbox" name="complimentary" value="1" class="form-check-input" id="modalSponsorshipComplimentary" role="switch">
+          <label class="form-check-label" for="modalSponsorshipComplimentary">Complimentary (free) sponsorship</label>
+        </div>
+        <div class="mb-3" id="modalSponsorshipAmountField">
+          <label class="form-label">Amount</label>
+          <input type="number" step="0.01" min="0" name="amount" class="form-control" placeholder="£0.00">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Notes</label>
+          <input type="text" name="notes" class="form-control" placeholder="Optional notes">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="submit" class="btn btn-success" <?= $freeSponsorshipSlots ? '' : 'disabled' ?>>Save Sponsorship</button>
+      </div>
+    </form>
+  </div>
 </div>
 
 <div class="modal fade" id="addPaymentModal" tabindex="-1">

@@ -548,7 +548,7 @@ if($id===0&&$scopeForNew==='match'){
       const confirmMsg=btn.dataset.bundleLink==='1'
         ?'This link was generated for a bundle covering several agreements. Cancelling it cancels payment for ALL of them, not just this one — continue?'
         :'Cancel this payment link? It will no longer be payable and you can generate a new one.';
-      if(!confirm(confirmMsg))return;
+      if(!(await window.hubConfirm(confirmMsg,{actionLabel:'Cancel link'})))return;
       btn.disabled=true;
       const original=btn.textContent;
       btn.textContent='Cancelling…';

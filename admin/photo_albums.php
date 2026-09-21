@@ -127,7 +127,7 @@ $statusMessages = [
 
             <div class="card hub-table-card">
                 <div class="table-responsive">
-                    <table class="table align-middle mb-0">
+                    <table class="table align-middle mb-0 hub-data-table">
                         <thead>
                             <tr>
                                 <th style="width:64px;">Cover</th>

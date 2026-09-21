@@ -7,11 +7,11 @@ body {
     color: #1f1a1d;
     font-size: 9px;
     margin: 0;
-    padding: 18px;
+    padding: var(--space-18px, 18px);
 }
 
 .pdf-heading {
-    margin-bottom: 12px;
+    margin-bottom: var(--space-12px, 12px);
 }
 
 .pdf-heading h1 {
@@ -65,7 +65,7 @@ tr:nth-child(even) td {
 .tag {
     display: inline-block;
     padding: 2px 7px;
-    border-radius: 8px;
+    border-radius: var(--radius-8px, 8px);
     font-size: 8px;
     font-weight: bold;
 }
@@ -88,7 +88,7 @@ tr:nth-child(even) td {
    per row), instead of the CSS grid the live page uses for the same structure. */
 
 .showcase-category {
-    margin-bottom: 14px;
+    margin-bottom: var(--space-14px, 14px);
 }
 
 .showcase-category--isolated {
@@ -117,7 +117,7 @@ tr:nth-child(even) td {
 table.showcase-row {
     width: 100%;
     border-collapse: collapse;
-    margin-bottom: 6px;
+    margin-bottom: var(--space-6px, 6px);
 }
 
 .showcase-row td {
@@ -133,8 +133,8 @@ table.showcase-row {
     letter-spacing: .03em;
     color: #6a2036;
     border-bottom: 1px solid #e3d9cc;
-    padding-bottom: 3px;
-    margin-bottom: 4px;
+    padding-bottom: var(--space-3px, 3px);
+    margin-bottom: var(--space-4px, 4px);
 }
 
 .showcase-package__list {

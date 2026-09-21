@@ -62,6 +62,7 @@ function recalculateSponsorAmounts(PDO $pdo, int $playerId, int $sponsorId, ?int
         FROM sponsorships
         WHERE player_id = :pid
           AND sponsor_id = :sid
+          AND complimentary = 0
     ";
        if ($seasonId !== null && $seasonId > 0) {
               $sql .= " AND season_id = :season_id";

@@ -291,7 +291,7 @@ require_once __DIR__ . '/header.php';
                     </select>
                 </div>
                 <a class="btn btn-sm btn-outline-secondary w-100 mb-3" href="/pos/tills.php"><i class="fa-solid fa-cash-register" aria-hidden="true"></i>Manage till sessions</a>
-                <form method="post" class="pos-day-form" onsubmit="return confirm('Close the POS day and lock tills?');">
+                <form method="post" class="pos-day-form" data-confirm="Close the POS day and lock tills?" data-confirm-action="Close day" data-confirm-class="btn-primary">
                     <?= csrf_field() ?>
                     <input type="hidden" name="action" value="close_pos_day">
                     <input type="hidden" name="trading_day_id" value="<?= (int) $activeTradingDay['id'] ?>">

@@ -27,6 +27,13 @@ if (!defined('APP_NAME')) {
 if (!defined('BASE_URL')) {
     define('BASE_URL', '/');
 }
+if (!defined('APP_ORIGIN')) {
+    // Trusted scheme+host for links sent in emails (password resets, setup
+    // links). Deliberately not derived from $_SERVER['HTTP_HOST'], which is
+    // attacker-controlled on a server that doesn't reject unknown Host
+    // headers at the vhost boundary.
+    define('APP_ORIGIN', rtrim(hub_config_value($hubFileEnv, 'HUB_APP_ORIGIN', 'https://myclubhub.co.uk'), '/'));
+}
 if (!defined('ERROR_LOG_PATH')) {
     define('ERROR_LOG_PATH', '/var/www/vhosts/lundy.me.uk/logs/error_log');
 }
@@ -56,11 +63,27 @@ if (!defined('DEVELOPER_EMAIL')) {
     // an assumption about row order. Empty = feature disabled.
     define('DEVELOPER_EMAIL', hub_config_value($hubFileEnv, 'HUB_DEVELOPER_EMAIL', ''));
 }
+if (!defined('SPONSORSHIP_EDITOR_EMAIL')) {
+    // The one account allowed to change player sponsorships (assign/remove a
+    // home/away/third sponsor, transfer a sponsorship to another player).
+    // Deliberately not a capability — hub_auth_has_capability() always
+    // returns true for admin accounts, and this needs to hold even against
+    // another admin. Empty = nobody is specially allowed (falls through to
+    // "no one but this email may edit").
+    define('SPONSORSHIP_EDITOR_EMAIL', hub_config_value($hubFileEnv, 'HUB_SPONSORSHIP_EDITOR_EMAIL', ''));
+}
 if (!defined('APP_DEBUG')) {
     // Fail safe: an environment with no HUB_APP_DEBUG set does not leak
     // stack traces. Set HUB_APP_DEBUG=1 in .env to turn display_errors on.
     define('APP_DEBUG', filter_var(hub_config_value($hubFileEnv, 'HUB_APP_DEBUG', '0'), FILTER_VALIDATE_BOOL));
 }
+
+// PHP has no date.timezone set in this vhost's php.ini and does not infer
+// it from the OS, so it silently defaults to UTC. MySQL's NOW() follows the
+// server's SYSTEM timezone (Europe/London), so without this, any code that
+// mixes a MySQL-generated timestamp with a PHP-generated one (time(),
+// date(), strtotime()) is off by an hour during BST.
+date_default_timezone_set('Europe/London');
 
 error_reporting(E_ALL);
 ini_set('log_errors', '1');
@@ -71,6 +94,10 @@ if (APP_DEBUG) {
 }
 
 if (session_status() !== PHP_SESSION_ACTIVE) {
+    // Reject client-supplied session IDs that the server never generated,
+    // closing the session-fixation gap left by PHP-FPM's default
+    // session.use_strict_mode=0. Must be set before session_start().
+    ini_set('session.use_strict_mode', '1');
     session_start();
 }
 
@@ -85,4 +112,17 @@ if (isset($_SESSION['user_id']) && !isset($_SESSION['hub_user_id'])) {
 
 if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+
+// Baseline response headers for every request that reaches PHP (admin and
+// public alike, since both funnel through this file — see bootstrap.php).
+// HSTS and CSP are deliberately left out here: HSTS is effectively
+// irreversible for visitors once cached, and even a report-only CSP needs a
+// real report-uri/report-to collector and a pass over every inline
+// script/style and third-party embed to be worth shipping, so both need a
+// deliberate rollout rather than a default in shared bootstrap code.
+if (!headers_sent() && PHP_SAPI !== 'cli') {
+    header('X-Content-Type-Options: nosniff');
+    header('X-Frame-Options: SAMEORIGIN');
+    header('Referrer-Policy: strict-origin-when-cross-origin');
 }

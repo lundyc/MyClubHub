@@ -317,7 +317,7 @@ function pos_require_actor(PDO $pdo): array
 {
     $actor = pos_current_actor($pdo);
     if ($actor !== null) {
-        if ((string) $actor['type'] === 'hub_user' && !hub_auth_has_permission('pos.use')) {
+        if ((string) $actor['type'] === 'hub_user' && !hub_auth_has_capability('tickets_ops')) {
             http_response_code(403);
             exit('You do not have permission to use POS.');
         }
@@ -330,7 +330,7 @@ function pos_require_actor(PDO $pdo): array
 function pos_actor_is_manager(PDO $pdo): bool
 {
     $hubUser = hub_auth_current_user();
-    if ($hubUser !== null && hub_auth_has_permission('pos.manage')) {
+    if ($hubUser !== null && hub_auth_has_capability('tickets_ops')) {
         return true;
     }
     $operator = pos_current_operator($pdo);

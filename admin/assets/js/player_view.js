@@ -27,6 +27,33 @@ $(function () {
     });
   }
 
+  const modalSponsorshipComplimentary = $("#modalSponsorshipComplimentary");
+  const modalSponsorshipAmountField = $("#modalSponsorshipAmountField");
+
+  function toggleModalSponsorshipAmount() {
+    const isComplimentary = modalSponsorshipComplimentary.is(":checked");
+    modalSponsorshipAmountField.toggle(!isComplimentary);
+    if (isComplimentary) {
+      modalSponsorshipAmountField.find("input").val("");
+    }
+  }
+
+  modalSponsorshipComplimentary.on("change", toggleModalSponsorshipAmount);
+  toggleModalSponsorshipAmount();
+
+  $("#addSponsorshipForm").on("submit", function (e) {
+    e.preventDefault();
+    $.post("player_edit_ajax.php", $(this).serialize() + "&action=add_sponsorship", function (resp) {
+      if (resp.success) {
+        location.reload();
+      } else {
+        alert(resp.error || "Error adding sponsorship");
+      }
+    }, "json").fail(function () {
+      alert("Error adding sponsorship");
+    });
+  });
+
   $("#addPaymentForm").on("submit", function (e) {
     e.preventDefault();
     $.post(playerViewUrl, $(this).serialize() + "&ajax_add_payment=1", function (resp) {

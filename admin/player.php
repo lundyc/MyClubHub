@@ -147,9 +147,9 @@ $slotLabels = [
           btn.attr('data-bs-title', 'Saved!').tooltip('show');
           setTimeout(() => btn.tooltip('hide'), 1500);
         } else {
-          alert('Error: ' + resp.error);
+          window.hubToast('Error: ' + resp.error, 'danger');
         }
-      }, 'json').fail(() => alert('Request failed.'));
+      }, 'json').fail(() => window.hubToast('Request failed.', 'danger'));
     });
   });
 </script>

@@ -11,7 +11,7 @@ require_once __DIR__ . '/header.php';
 require_once __DIR__ . '/lib/season.php';
 require_once __DIR__ . '/lib/ticketing_reporting.php';
 
-hub_auth_require_permission('reports.view');
+hub_auth_require_capability('tickets_ops');
 
 $seasonContext = getSeasonContext($pdo);
 $seasonId = (int) ($_GET['season_id'] ?? ($seasonContext['season_id'] ?? 0));

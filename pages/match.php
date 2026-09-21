@@ -34,6 +34,8 @@ foreach ($legacyEvents as $ev) {
     }
 }
 
+$motmSponsor = ($played && $fixture['is_home']) ? pub_motm_sponsor((int) $fixture['id']) : null;
+
 $legacyLineup = pub_match_lineup((int) $fixture['id']);
 $mkPlayers = static function (array $names, string $captain): array {
     $out = [];
@@ -474,6 +476,7 @@ pub_jsonld([
         </div>
         <div class="mc-motm__body">
           <span class="mc-motm__label">&#9733; Player of the Match</span>
+          <?php if ($motmSponsor): ?><span class="mc-motm__sponsor">Sponsored by <?= e($motmSponsor['name']) ?></span><?php endif; ?>
           <span class="mc-motm__name">
             <?php if ($pp): ?>
               <a href="<?= e(url('team/' . $pp['slug'])) ?>"><?= e($potm['player']) ?></a>
@@ -635,7 +638,7 @@ pub_jsonld([
         <h2>Match report</h2>
         <a class="mc-report__card" href="<?= e(url('news/' . $report['slug'])) ?>">
           <?php if ($rHero !== ''): ?>
-            <span class="mc-report__media"><img src="<?= e(uploads($rHero)) ?>" alt="" loading="lazy"></span>
+            <span class="mc-report__media"><img src="<?= e(news_image_url($rHero)) ?>" alt="" loading="lazy"></span>
           <?php endif; ?>
           <span class="mc-report__text">
             <span class="mc-report__title"><?= e($report['title']) ?></span>

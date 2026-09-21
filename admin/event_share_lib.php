@@ -146,7 +146,7 @@ function event_share_title(array $match, array $event): string
     }
 
     if ($type === 'player_of_match') {
-        return 'Man of the Match' . ($player !== '' ? ': ' . $player : '');
+        return 'Player of the Match' . ($player !== '' ? ': ' . $player : '');
     }
 
     if ($type === 'note' && $note !== '') {

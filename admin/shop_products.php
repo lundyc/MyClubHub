@@ -8,6 +8,7 @@ require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/lib/functions.php';
 require_once __DIR__ . '/lib/shop.php';
 require_once __DIR__ . '/account_auth.php';
+hub_auth_require_capability('shop');
 require_once __DIR__ . '/lib/audit.php';
 
 shop_ensure_schema($pdo);
@@ -51,12 +52,6 @@ $pageHero = [
 ];
 require_once __DIR__ . '/header.php';
 
-if ((string) ($currentRole ?? 'guest') !== 'admin') {
-    http_response_code(403);
-    echo '<div><div class="alert alert-danger">You do not have permission to manage the shop.</div></div>';
-    require __DIR__ . '/footer.php';
-    exit;
-}
 
 $products = shop_get_products($pdo, []);
 $now = new DateTimeImmutable('now');
@@ -106,7 +101,7 @@ $now = new DateTimeImmutable('now');
                     </td>
                     <td data-label="Actions" class="text-end text-nowrap">
                         <a class="btn btn-sm btn-outline-secondary" href="/admin/shop_product.php?id=<?= (int) $p['id'] ?>">Edit</a>
-                        <form method="post" class="d-inline" onsubmit="return confirm('Delete this product? Orders keep their history.');">
+                        <form method="post" class="d-inline" data-confirm="Delete this product? Orders keep their history." data-confirm-action="Delete">
                             <?= csrf_field() ?><input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="<?= (int) $p['id'] ?>">
                             <button class="btn btn-sm btn-outline-danger" type="submit">Delete</button>
                         </form>

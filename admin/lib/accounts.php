@@ -245,28 +245,47 @@ function updateAccountLogin(PDO $pdo, int $accountId, string $email, bool $isAct
     if ($existing && (int) $existing['id'] !== $accountId) {
         throw new RuntimeException('That login email is already used by another account.');
     }
-    $oldEmail = (string) ($account['email'] ?? '');
-    $pdo->prepare('UPDATE accounts SET email = :email, email_normalized = :email_normalized, is_active = :is_active WHERE id = :id')
-        ->execute([
-            ':email' => trim($email),
-            ':email_normalized' => $normalized,
-            ':is_active' => $isActive ? 1 : 0,
-            ':id' => $accountId,
-        ]);
-    setAccountRole($pdo, $accountId, $roleCode);
-
-    $holderId = (int) ($account['old_holder_id'] ?? 0);
-    if ($holderId > 0) {
-        $pdo->prepare('UPDATE season_ticket_holders SET role = :role WHERE id = :id')
+    $ownsTransaction = !$pdo->inTransaction();
+    if ($ownsTransaction) {
+        $pdo->beginTransaction();
+    }
+    try {
+        $oldEmail = (string) ($account['email'] ?? '');
+        $pdo->prepare('UPDATE accounts SET email = :email, email_normalized = :email_normalized, is_active = :is_active WHERE id = :id')
             ->execute([
-                ':role' => $roleCode,
-                ':id' => $holderId,
+                ':email' => trim($email),
+                ':email_normalized' => $normalized,
+                ':is_active' => $isActive ? 1 : 0,
+                ':id' => $accountId,
             ]);
+        $pdo->prepare('UPDATE people SET email = ?, email_normalized = ? WHERE id = ?')
+            ->execute([trim($email), $normalized, (int) $account['person_id']]);
+        setAccountRole($pdo, $accountId, $roleCode);
+
+        $holderId = (int) ($account['old_holder_id'] ?? 0);
+        if ($holderId > 0) {
+            $pdo->prepare('UPDATE season_ticket_holders SET role = :role, email = :email, email_normalized = :email_normalized WHERE id = :id')
+                ->execute([
+                    ':role' => $roleCode,
+                    ':email' => trim($email),
+                    ':email_normalized' => $normalized,
+                    ':id' => $holderId,
+                ]);
+        }
+        if ($oldEmail !== trim($email)) {
+            identityAuditLog($pdo, 'account_login_email_changed', 'Changed login email for account #' . $accountId);
+        }
+        identityAuditLog($pdo, $isActive ? 'account_activated' : 'account_disabled', 'Updated account #' . $accountId);
+        if ($ownsTransaction) {
+            $pdo->commit();
+        }
+    } catch (Throwable $e) {
+        if ($ownsTransaction && $pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        throw $e;
     }
-    if ($oldEmail !== trim($email)) {
-        identityAuditLog($pdo, 'account_login_email_changed', 'Changed login email for account #' . $accountId);
-    }
-    identityAuditLog($pdo, $isActive ? 'account_activated' : 'account_disabled', 'Updated account #' . $accountId);
+
 }
 
 function setAccountActive(PDO $pdo, int $accountId, bool $isActive): void
@@ -478,13 +497,23 @@ function registerPublicAccount(PDO $pdo, array $data): array
 }
 
 /**
- * @return array{ok: bool, message: string}
+ * @return array{ok: bool, message: string, reset_url?: string}
  */
 function issueAccountPasswordReset(PDO $pdo, string $email, string $resetPath): array
 {
+    $genericMessage = 'If that email is on file, a link has been sent.';
+    $ip = (string) ($_SERVER['REMOTE_ADDR'] ?? 'unknown');
+    if (!hub_auth_rate_limit('pwreset-ip:' . $ip, 20, 3600)) {
+        return ['ok' => true, 'message' => $genericMessage];
+    }
+
     $account = findAccountByEmail($pdo, $email);
     if (!$account || (int) ($account['is_active'] ?? 0) !== 1) {
-        return ['ok' => true, 'message' => 'If that email is on file, a link has been sent.'];
+        return ['ok' => true, 'message' => $genericMessage];
+    }
+
+    if (!hub_auth_rate_limit('pwreset-account:' . $account['id'], 5, 3600)) {
+        return ['ok' => true, 'message' => $genericMessage];
     }
 
     $token = bin2hex(random_bytes(24));
@@ -503,9 +532,7 @@ function issueAccountPasswordReset(PDO $pdo, string $email, string $resetPath): 
             ]);
     }
 
-    $scheme = (!empty($_SERVER['HTTPS']) && strtolower((string) $_SERVER['HTTPS']) !== 'off') ? 'https' : 'http';
-    $host = (string) ($_SERVER['HTTP_HOST'] ?? 'lundy.me.uk');
-    $resetUrl = $scheme . '://' . $host . $resetPath . '?token=' . rawurlencode($token);
+    $resetUrl = APP_ORIGIN . $resetPath . '?token=' . rawurlencode($token);
     $message = implode("\n", [
         'Hi ' . (string) $account['display_name'] . ',',
         '',
@@ -519,9 +546,18 @@ function issueAccountPasswordReset(PDO $pdo, string $email, string $resetPath): 
 
     $sent = hub_send_mail((string) $account['email'], 'Set your Hub account password', $message, false);
     if (!$sent) {
-        return ['ok' => true, 'message' => 'Link generated. Email delivery is not configured, so use this link: ' . $resetUrl];
+        // Never surface the reset link/message text to an unauthenticated
+        // caller: this function is reached from the public forgot-password
+        // form, and doing so would let anyone with an active account's
+        // email obtain its reset credential whenever mail delivery fails.
+        // The link is still returned in `reset_url` for authenticated,
+        // admin-initiated callers (club_person.php's "email setup link"
+        // action) to hand to the member directly; only the generic
+        // `message` is safe to echo back to an anonymous requester.
+        identityAuditLog($pdo, 'password_reset_mail_failed', 'Reset email delivery failed for account #' . $account['id']);
+        return ['ok' => true, 'message' => $genericMessage, 'reset_url' => $resetUrl];
     }
-    return ['ok' => true, 'message' => 'If that email is on file, a link has been sent.'];
+    return ['ok' => true, 'message' => $genericMessage];
 }
 
 function createAccountPasswordSetupLink(PDO $pdo, int $accountId, string $resetPath): string
@@ -539,10 +575,8 @@ function createAccountPasswordSetupLink(PDO $pdo, int $accountId, string $resetP
         $pdo->prepare('UPDATE season_ticket_holders SET reset_token_hash = :hash, reset_token_expires_at = :expires WHERE id = :id')
             ->execute([':hash' => $hash, ':expires' => $expires, ':id' => (int) $account['old_holder_id']]);
     }
-    $scheme = (!empty($_SERVER['HTTPS']) && strtolower((string) $_SERVER['HTTPS']) !== 'off') ? 'https' : 'http';
-    $host = (string) ($_SERVER['HTTP_HOST'] ?? 'lundy.me.uk');
     identityAuditLog($pdo, 'password_reset_initiated', 'Created setup link for account #' . $accountId);
-    return $scheme . '://' . $host . $resetPath . '?token=' . rawurlencode($token);
+    return APP_ORIGIN . $resetPath . '?token=' . rawurlencode($token);
 }
 
 /**

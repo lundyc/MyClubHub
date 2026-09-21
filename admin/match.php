@@ -191,7 +191,7 @@ $staffingStatuses = matchday_staffing_statuses();
                               <?php if (!$isNew): ?>
                                         <a href="match_lineups.php?fixture_id=<?= (int)$fixture['id'] ?>&season_id=<?= (int)$seasonId ?>" class="btn btn-outline-secondary">Line-ups</a>
                                         <a href="match_graphics.php?fixture_id=<?= (int)$fixture['id'] ?>&season_id=<?= (int)$seasonId ?>" class="btn btn-brand">Match Graphics</a>
-                                        <form method="post" action="match_delete.php" onsubmit="return confirm('Delete this fixture? This will remove the fixture and its linked sponsorships.');" class="d-inline">
+                                        <form method="post" action="match_delete.php" data-confirm="Delete this fixture? This will remove the fixture and its linked sponsorships." data-confirm-action="Delete" class="d-inline">
                                                   <?= csrf_field() ?>
                                                   <input type="hidden" name="fixture_id" value="<?= (int)$fixture['id'] ?>">
                                                   <input type="hidden" name="season_id" value="<?= (int)$seasonId ?>">
@@ -399,7 +399,7 @@ $staffingStatuses = matchday_staffing_statuses();
                                         <div class="mt-3 d-flex justify-content-between align-items-center gap-2 flex-wrap">
                                                   <div>
                                                             <?php if (!$isNew): ?>
-                                                                      <form method="post" action="match_delete.php" onsubmit="return confirm('Delete this fixture? This will remove the fixture and its linked sponsorships.');" class="m-0">
+                                                                      <form method="post" action="match_delete.php" data-confirm="Delete this fixture? This will remove the fixture and its linked sponsorships." data-confirm-action="Delete" class="m-0">
                                                                                 <?= csrf_field() ?>
                                                                                 <input type="hidden" name="fixture_id" value="<?= (int)$fixture['id'] ?>">
                                                                                 <input type="hidden" name="season_id" value="<?= (int)$seasonId ?>">
@@ -442,7 +442,7 @@ $staffingStatuses = matchday_staffing_statuses();
                                                   <p class="text-muted mb-0">Save the fixture first to assign sponsors.</p>
                                         <?php else: ?>
                                                   <div class="table-responsive">
-                                                            <table class="fixture-sponsorship-table table table-sm align-middle">
+                                                            <table class="fixture-sponsorship-table table table-sm align-middle hub-data-table">
                                                                       <thead>
                                                                                 <tr>
                                                                                           <th>Role</th>
@@ -647,61 +647,36 @@ $staffingStatuses = matchday_staffing_statuses();
           </div>
 </div>
 
-<div class="modal fade" id="addCompetitionModal" tabindex="-1" aria-labelledby="addCompetitionModalLabel" aria-hidden="true">
-          <div class="modal-dialog">
-                    <div class="modal-content">
-                              <form method="post" action="competition_quick_add.php">
-                                        <div class="modal-header">
-                                                  <h5 class="modal-title" id="addCompetitionModalLabel">Add Competition</h5>
-                                                  <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                        </div>
-                                        <div class="modal-body">
-                                                  <?= csrf_field() ?>
-                                                  <input type="hidden" name="return_to_fixture_id" value="<?= (int)($fixture['id'] ?? 0) ?>">
-                                                  <input type="hidden" name="return_to_season_id" value="<?= (int)$seasonId ?>">
-                                                  <input type="hidden" name="return_action" value="<?= h($action) ?>">
-
-                                                  <div class="mb-0">
-                                                            <label for="quickCompetitionName" class="form-label">Competition Name</label>
-                                                            <input type="text" class="form-control" id="quickCompetitionName" name="name" required>
-                                                  </div>
-                                        </div>
-                                        <div class="modal-footer">
-                                                  <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-                                                  <button type="submit" class="btn btn-brand">Save Competition</button>
-                                        </div>
-                              </form>
-                    </div>
-          </div>
-</div>
-
-<div class="modal fade" id="addVenueModal" tabindex="-1" aria-labelledby="addVenueModalLabel" aria-hidden="true">
-          <div class="modal-dialog">
-                    <div class="modal-content">
-                              <form method="post" action="venue_quick_add.php">
-                                        <div class="modal-header">
-                                                  <h5 class="modal-title" id="addVenueModalLabel">Add Venue</h5>
-                                                  <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                        </div>
-                                        <div class="modal-body">
-                                                  <?= csrf_field() ?>
-                                                  <input type="hidden" name="return_to_fixture_id" value="<?= (int)($fixture['id'] ?? 0) ?>">
-                                                  <input type="hidden" name="return_to_season_id" value="<?= (int)$seasonId ?>">
-                                                  <input type="hidden" name="return_action" value="<?= h($action) ?>">
-
-                                                  <div class="mb-0">
-                                                            <label for="quickVenueName" class="form-label">Venue Name</label>
-                                                            <input type="text" class="form-control" id="quickVenueName" name="name" required>
-                                                  </div>
-                                        </div>
-                                        <div class="modal-footer">
-                                                  <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-                                                  <button type="submit" class="btn btn-brand">Save Venue</button>
-                                        </div>
-                              </form>
-                    </div>
-          </div>
-</div>
+<?php
+hub_render_quick_add_modal(
+    'addCompetitionModal',
+    'Add Competition',
+    'competition_quick_add.php',
+    'quickCompetitionName',
+    'name',
+    'Competition Name',
+    [
+        'return_to_fixture_id' => (int) ($fixture['id'] ?? 0),
+        'return_to_season_id' => (int) $seasonId,
+        'return_action' => $action,
+    ],
+    'Save Competition'
+);
+hub_render_quick_add_modal(
+    'addVenueModal',
+    'Add Venue',
+    'venue_quick_add.php',
+    'quickVenueName',
+    'name',
+    'Venue Name',
+    [
+        'return_to_fixture_id' => (int) ($fixture['id'] ?? 0),
+        'return_to_season_id' => (int) $seasonId,
+        'return_action' => $action,
+    ],
+    'Save Venue'
+);
+?>
 
 <?php if (!$useSharedHubLayout): ?>
 <div class="card shadow-sm">
@@ -724,7 +699,7 @@ $staffingStatuses = matchday_staffing_statuses();
                               <p class="text-muted mb-0">Save the fixture first to assign sponsors.</p>
                     <?php else: ?>
                               <div class="table-responsive">
-                                        <table class="fixture-sponsorship-table table table-sm align-middle">
+                                        <table class="fixture-sponsorship-table table table-sm align-middle hub-data-table">
                                                   <thead>
                                                             <tr>
                                                                       <th>Role</th>
@@ -1942,7 +1917,7 @@ document.addEventListener('DOMContentLoaded', () => {
       setStatus('Wait for the graphic to finish generating first.', 'warning');
       return;
     }
-    if (confirmBeforeLivePost && !window.confirm(`Publish the match sponsors shoutout to ${platform} now?`)) return;
+    if (confirmBeforeLivePost && !(await window.hubConfirm(`Publish the match sponsors shoutout to ${platform} now?`, { actionLabel: 'Post', actionClass: 'btn-primary' }))) return;
 
     const original = button.innerHTML;
     button.disabled = true;

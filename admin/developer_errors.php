@@ -65,12 +65,12 @@ if ($logPath) {
 
 <div>
           <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3 mb-4">
-                    <h1 class="mb-0"><i class="fas fa-bug"></i> Error Log Viewer</h1>
+                    <h1 class="mb-0"><i class="fa-solid fa-bug"></i> Error Log Viewer</h1>
                     <?php if ($canClear): ?>
                               <!-- Clear log button -->
-                              <form method="post" onsubmit="return confirm('Are you sure you want to clear the log? This cannot be undone.');">
+                              <form method="post" data-confirm="Are you sure you want to clear the log? This cannot be undone." data-confirm-action="Clear log">
                                         <button type="submit" name="clear_log" value="1" class="btn btn-danger">
-                                                  <i class="fas fa-trash-alt"></i> Clear Log
+                                                  <i class="fa-solid fa-trash-alt"></i> Clear Log
                                         </button>
                               </form>
 
@@ -93,7 +93,7 @@ if ($logPath) {
 
 
                     <div class="table-responsive w-100">
-                              <table class="table table-sm table-bordered table-striped align-middle w-100">
+                              <table class="table table-sm table-bordered table-striped align-middle w-100 mb-0 hub-data-table">
                                         <thead class="table-dark">
                                                   <tr>
                                                             <th style="width: 200px;">Timestamp</th>

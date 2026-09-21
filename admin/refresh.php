@@ -11,6 +11,7 @@ if (!$isCli && !hub_auth_has_capability('content_social')) {
     exit('Access denied.');
 }
 require_once __DIR__ . '/social_auth.php';
+require_once __DIR__ . '/lib/functions.php';
 
 $cacheFile = __DIR__ . '/cache/wosfl_table.json';
 $exportFile = __DIR__ . '/export/latest_wosfl.png';
@@ -132,6 +133,9 @@ if (!$isCli && ($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
 
 if (!$isCli) {
     auth_require_json();
+    if (!csrf_check()) {
+        respond(false, false, 'Your session expired. Please refresh the page and try again.', [], loadRefreshHistory($historyFile), 400);
+    }
 }
 
 include __DIR__ . '/wosfl-table.php';

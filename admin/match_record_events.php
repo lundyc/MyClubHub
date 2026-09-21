@@ -33,7 +33,7 @@ require_once __DIR__ . '/lib/fixture_tabs.php';
 require_once __DIR__ . '/lib/matchday_record.php';
 require_once __DIR__ . '/lib/functions.php';
 
-if (!hub_auth_has_capability('football_ops')) {
+if (!hub_auth_has_capability('matchday')) {
     http_response_code(403);
     echo '<div class="container-fluid"><div class="alert alert-danger">Access denied.</div></div>';
     require __DIR__ . '/footer.php';
@@ -173,7 +173,7 @@ $scoreRightName = $isHome ? $opponentName : $clubName;
             <strong><?= $fixture['full_time_home_score'] === null ? '—' : ((int) $fixture['full_time_home_score'] . '–' . (int) $fixture['full_time_away_score']) ?></strong>
         </div>
         <?php if (!$seasonLocked): ?>
-        <form method="post" action="match_record_event_save.php" onsubmit="return confirm('Set the fixture full-time score to <?= (int) $summary['home_score'] ?>–<?= (int) $summary['away_score'] ?>?');">
+        <form method="post" action="match_record_event_save.php" data-confirm="Set the fixture full-time score to <?= (int) $summary['home_score'] ?>–<?= (int) $summary['away_score'] ?>?" data-confirm-action="Set score" data-confirm-class="btn-primary">
             <?= csrf_field() ?>
             <input type="hidden" name="fixture_id" value="<?= $fixtureId ?>">
             <input type="hidden" name="season_id" value="<?= $seasonId ?>">
@@ -324,7 +324,7 @@ $scoreRightName = $isHome ? $opponentName : $clubName;
                                                 <i class="fa-solid fa-pen"></i>
                                             </a>
                                         <?php endif; ?>
-                                        <form method="post" action="match_record_event_delete.php" onsubmit="return confirm('Delete this event?');">
+                                        <form method="post" action="match_record_event_delete.php" data-confirm="Delete this event?" data-confirm-action="Delete">
                                             <?= csrf_field() ?>
                                             <input type="hidden" name="fixture_id" value="<?= $fixtureId ?>">
                                             <input type="hidden" name="season_id" value="<?= $seasonId ?>">

@@ -754,7 +754,7 @@ foreach ($venueOptions as $venueOption) {
                                         });
                                         modal.hide();
                               }).catch(function(error) {
-                                        window.alert(error && error.message ? error.message : 'Unable to save venue.');
+                                        window.hubToast(error && error.message ? error.message : 'Unable to save venue.', 'danger');
                               }).finally(function() {
                                         if (saveBtn) {
                                                   saveBtn.disabled = false;

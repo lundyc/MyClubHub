@@ -2,7 +2,7 @@
 
 // PHASE3B_GUARD_MARKER
 require_once __DIR__ . '/auth.php';
-if (!hub_auth_has_capability('football_ops')) {
+if (!hub_auth_has_capability('club_setup')) {
     http_response_code(403);
     exit('Access denied.');
 }

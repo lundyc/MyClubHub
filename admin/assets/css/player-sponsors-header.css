@@ -1,7 +1,7 @@
 .navbar-brand {
                               display: flex;
                               align-items: center;
-                              gap: 0.7rem;
+                              gap: var(--space-07rem, 0.7rem);
                     }
 
                     .navbar-brand__logo {

@@ -73,7 +73,7 @@ main .lead {
 
 main .card {
       border: 1px solid rgba(18, 78, 102, 0.08);
-      border-radius: 1rem;
+      border-radius: var(--radius-1rem, 1rem);
       box-shadow: 0 8px 20px rgba(0, 0, 0, 0.05);
       overflow: hidden;
       background: rgba(255, 255, 255, 0.92);
@@ -144,12 +144,12 @@ main .card-body.p-0 {
 
 main .card-title {
       font-weight: 700;
-      margin-bottom: 0.75rem;
+      margin-bottom: var(--space-3, 0.75rem);
 }
 
 main .form-control,
 main .form-select {
-      border-radius: 0.8rem;
+      border-radius: var(--radius-08rem, 0.8rem);
       border-color: rgba(18, 78, 102, 0.14);
       background-color: rgba(255, 255, 255, 0.95);
       box-shadow: none;
@@ -164,7 +164,7 @@ main .form-select:focus {
 main .form-label {
       font-weight: 600;
       color: var(--brand-darkest);
-      margin-bottom: 0.35rem;
+      margin-bottom: var(--space-035rem, 0.35rem);
 }
 
 main .form-text {
@@ -180,7 +180,7 @@ main .form-check-input:focus {
 }
 
 main .table-responsive {
-      border-radius: 0.95rem;
+      border-radius: var(--radius-095rem, 0.95rem);
       overflow: auto;
       border: 1px solid rgba(18, 78, 102, 0.08);
       background: rgba(255, 255, 255, 0.88);
@@ -192,7 +192,7 @@ main table.table {
 }
 
 main table.table thead th {
-      font-size: 0.78rem;
+      font-size: var(--fs-078, 0.78rem);
       letter-spacing: 0.06em;
       text-transform: uppercase;
       border-bottom: 1px solid rgba(18, 78, 102, 0.1);
@@ -200,14 +200,14 @@ main table.table thead th {
 }
 
 main table.table> :not(caption)>*>* {
-      padding-top: 0.8rem;
-      padding-bottom: 0.8rem;
+      padding-top: var(--space-08rem, 0.8rem);
+      padding-bottom: var(--space-08rem, 0.8rem);
       vertical-align: middle;
 }
 
 main .table-sm> :not(caption)>*>* {
-      padding-top: 0.55rem;
-      padding-bottom: 0.55rem;
+      padding-top: var(--space-055rem, 0.55rem);
+      padding-bottom: var(--space-055rem, 0.55rem);
 }
 
 main table.table-striped>tbody>tr:nth-of-type(odd)>* {
@@ -218,24 +218,29 @@ main table.table-hover>tbody>tr:hover>* {
       background-color: rgba(18, 78, 102, 0.05);
 }
 
-main table.table-modern {
+/* Optional hub-data-table modifier: rounded outer corners + hover row (see
+   below) + sponsor-page left-column highlight. Renamed 2026-09-19 from the
+   old standalone "table-modern" class (admin/DESIGN_SYSTEM.md Phase 2) —
+   same rules, now namespaced under the shared hub-data-table system instead
+   of being its own orphaned class. */
+main table.hub-data-table--rounded {
       border-collapse: separate;
       border-spacing: 0;
 }
 
-main table.table-modern thead th:first-child {
+main table.hub-data-table--rounded thead th:first-child {
       border-top-left-radius: 0.95rem;
 }
 
-main table.table-modern thead th:last-child {
+main table.hub-data-table--rounded thead th:last-child {
       border-top-right-radius: 0.95rem;
 }
 
-main table.table-modern tbody tr:last-child td:first-child {
+main table.hub-data-table--rounded tbody tr:last-child td:first-child {
       border-bottom-left-radius: 0.95rem;
 }
 
-main table.table-modern tbody tr:last-child td:last-child {
+main table.hub-data-table--rounded tbody tr:last-child td:last-child {
       border-bottom-right-radius: 0.95rem;
 }
 
@@ -244,8 +249,8 @@ main table.table-modern tbody tr:last-child td:last-child {
       max-width: 1680px;
       margin-left: auto;
       margin-right: auto;
-      padding-left: 0.75rem;
-      padding-right: 0.75rem;
+      padding-left: var(--space-3, 0.75rem);
+      padding-right: var(--space-3, 0.75rem);
       box-sizing: border-box;
 }
 
@@ -272,9 +277,9 @@ a {
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 0.75rem;
+      gap: var(--space-3, 0.75rem);
       padding: 0.9rem 1.1rem;
-      border-radius: 1rem;
+      border-radius: var(--radius-1rem, 1rem);
       background: linear-gradient(135deg, rgba(18, 78, 102, 0.96), rgba(33, 42, 49, 0.96));
       border: 1px solid rgba(255, 255, 255, 0.12);
       color: rgba(255, 255, 255, 0.95);
@@ -285,7 +290,7 @@ a {
 .page-hero {
       position: relative;
       overflow: hidden;
-      border-radius: 1.15rem;
+      border-radius: var(--radius-115rem, 1.15rem);
       background: linear-gradient(135deg, rgba(18, 78, 102, 0.98), rgba(33, 42, 49, 0.96));
       color: #fff;
       border: 1px solid rgba(255, 255, 255, 0.08);
@@ -312,10 +317,10 @@ a {
 .page-hero-eyebrow {
       text-transform: uppercase;
       letter-spacing: 0.12em;
-      font-size: 0.7rem;
+      font-size: var(--fs-07, 0.7rem);
       font-weight: 700;
       color: rgba(255, 255, 255, 0.68);
-      margin-bottom: 0.25rem;
+      margin-bottom: var(--space-1, 0.25rem);
 }
 
 .page-hero-title {
@@ -330,13 +335,13 @@ a {
       margin: 0.45rem 0 0;
       color: rgba(255, 255, 255, 0.82);
       max-width: 70ch;
-      font-size: 0.98rem;
+      font-size: var(--fs-098, 0.98rem);
 }
 
 .page-hero-actions {
       display: flex;
       flex-wrap: wrap;
-      gap: 0.5rem;
+      gap: var(--space-2, 0.5rem);
 }
 
 .page-hero-actions .btn {
@@ -371,7 +376,7 @@ a {
 
 .navbar-brand {
       font-weight: 700;
-      font-size: 1.25rem;
+      font-size: var(--fs-lg, 1.25rem);
       color: var(--brand-light) !important;
       letter-spacing: 0.5px;
       text-decoration: none;
@@ -385,7 +390,7 @@ a {
       position: relative;
       transition: color 0.2s ease, background-color 0.2s ease, transform 0.15s ease;
       text-decoration: none;
-      border-radius: 0.85rem;
+      border-radius: var(--radius-085rem, 0.85rem);
       background-color: var(--brand-light);
       box-shadow: 0 1px 0 rgba(0, 0, 0, 0.04);
 }
@@ -423,7 +428,7 @@ a {
 }
 
 .nav-main .dropdown-toggle {
-      padding-right: 2.1rem;
+      padding-right: var(--space-21rem, 2.1rem);
 }
 
 .nav-main .dropdown-toggle::after {
@@ -436,15 +441,15 @@ a {
 .nav-main .dropdown-menu {
       border: 1px solid rgba(18, 78, 102, 0.12);
       background: var(--brand-light);
-      border-radius: 1rem;
+      border-radius: var(--radius-1rem, 1rem);
       box-shadow: 0 20px 40px rgba(0, 0, 0, 0.18);
-      padding: 0.5rem;
+      padding: var(--space-2, 0.5rem);
       min-width: 15rem;
 }
 
 .nav-main .dropdown-header {
       color: var(--brand-darkest);
-      font-size: 0.72rem;
+      font-size: var(--fs-072, 0.72rem);
       letter-spacing: 0.12em;
       text-transform: uppercase;
       padding: 0.5rem 0.75rem 0.25rem;
@@ -452,7 +457,7 @@ a {
 
 .nav-main .dropdown-item {
       color: var(--brand-darkest);
-      border-radius: 0.7rem;
+      border-radius: var(--radius-07rem, 0.7rem);
       padding: 0.65rem 0.8rem;
       background: rgba(255, 255, 255, 0.72);
       transition: background-color 0.2s ease, transform 0.15s ease, color 0.2s ease;
@@ -485,7 +490,7 @@ a {
 }
 
 .nav-sections {
-      gap: 0.65rem;
+      gap: var(--space-065rem, 0.65rem);
       width: 100%;
       min-width: 0;
 }
@@ -493,7 +498,7 @@ a {
 .nav-section {
       display: flex;
       flex-direction: column;
-      gap: 0.35rem;
+      gap: var(--space-035rem, 0.35rem);
       width: 100%;
       min-width: 0;
 }
@@ -501,8 +506,8 @@ a {
 .nav-section-label {
       display: flex;
       align-items: center;
-      gap: 0.4rem;
-      font-size: 0.7rem;
+      gap: var(--space-4rem, 0.4rem);
+      font-size: var(--fs-07, 0.7rem);
       font-weight: 700;
       letter-spacing: 0.12em;
       text-transform: uppercase;
@@ -515,17 +520,17 @@ a {
       flex: 1 1 auto;
       height: 1px;
       background: rgba(255, 255, 255, 0.08);
-      margin-top: 0.02rem;
+      margin-top: var(--space-002rem, 0.02rem);
 }
 
 .nav-account {
       align-items: stretch;
-      gap: 0.55rem;
+      gap: var(--space-055rem, 0.55rem);
       width: 100%;
       max-width: 100%;
       min-width: 0;
       padding: 0.8rem 0.85rem;
-      border-radius: 0.95rem;
+      border-radius: var(--radius-095rem, 0.95rem);
       background: rgba(255, 255, 255, 0.05);
       border: 1px solid rgba(255, 255, 255, 0.08);
       overflow: hidden;
@@ -542,7 +547,7 @@ main .small {
 
 /* User info */
 .navbar-text {
-      font-size: 0.85rem;
+      font-size: var(--fs-sm, 0.85rem);
       color: var(--brand-light) !important;
       white-space: normal;
       overflow-wrap: anywhere;
@@ -551,9 +556,9 @@ main .small {
 
 /* Navbar buttons */
 .navbar .btn-outline-secondary {
-      font-size: 0.8rem;
+      font-size: var(--fs-08, 0.8rem);
       padding: 0.25rem 0.75rem;
-      border-radius: 0.5rem;
+      border-radius: var(--radius-05rem, 0.5rem);
       transition: all 0.2s ease;
       color: var(--brand-light);
       border: 1px solid rgba(211, 217, 212, 0.15);
@@ -569,7 +574,7 @@ main .small {
 .navbar .btn.btn-outline-secondary {
       display: inline-flex;
       align-items: center;
-      gap: 0.5rem;
+      gap: var(--space-2, 0.5rem);
       background: transparent !important;
       color: var(--brand-light) !important;
       border: 1px solid rgba(211, 217, 212, 0.15) !important;
@@ -580,7 +585,7 @@ main .small {
       background-color: rgba(255, 255, 255, 0.08);
       color: var(--brand-light);
       border-color: rgba(211, 217, 212, 0.2);
-      border-radius: 0.75rem;
+      border-radius: var(--radius-075rem, 0.75rem);
 }
 
 .navbar .form-select-sm:focus {
@@ -593,14 +598,14 @@ main .small {
 }
 
 .navbar .collapse.show {
-      padding-top: 0.75rem;
+      padding-top: var(--space-3, 0.75rem);
 }
 
 @media (max-width: 991.98px) {
       .navbar .navbar-collapse {
-            margin-top: 0.75rem;
-            padding: 1rem;
-            border-radius: 1rem;
+            margin-top: var(--space-3, 0.75rem);
+            padding: var(--space-4, 1rem);
+            border-radius: var(--radius-1rem, 1rem);
             background: rgba(33, 42, 49, 0.96);
             backdrop-filter: blur(12px);
       }
@@ -618,8 +623,8 @@ main .small {
       .nav-main .dropdown-menu {
             position: static;
             float: none;
-            margin-top: 0.35rem;
-            margin-bottom: 0.35rem;
+            margin-top: var(--space-035rem, 0.35rem);
+            margin-bottom: var(--space-035rem, 0.35rem);
             box-shadow: none;
       }
 
@@ -651,7 +656,7 @@ main .small {
       }
 
       table.table,
-      table.table-modern,
+      table.hub-data-table--rounded,
       table.table-bordered,
       table.table-striped {
             width: 100% !important;
@@ -660,8 +665,8 @@ main .small {
 
       table.table th,
       table.table td,
-      table.table-modern th,
-      table.table-modern td,
+      table.hub-data-table--rounded th,
+      table.hub-data-table--rounded td,
       table.table-bordered th,
       table.table-bordered td,
       table.table-striped th,
@@ -685,7 +690,7 @@ main .small {
 ================================ */
 .nav-tabs {
       border-bottom: 2px solid var(--brand-accent);
-      margin-bottom: 1rem;
+      margin-bottom: var(--space-4, 1rem);
 }
 
 .reports-tabs {
@@ -706,7 +711,7 @@ main .small {
       border: none;
       border-bottom: 3px solid transparent;
       border-radius: 0;
-      margin-right: 0.25rem;
+      margin-right: var(--space-1, 0.25rem);
       padding: 0.5rem 1rem;
       transition: all 0.2s ease;
 }
@@ -738,7 +743,7 @@ main .small {
       font-weight: 500;
       text-align: center;
       text-decoration: none;
-      border-radius: 0.5rem;
+      border-radius: var(--radius-05rem, 0.5rem);
       padding: 0.5rem 1rem;
       cursor: pointer;
       transition: background-color 0.2s ease, transform 0.1s ease;
@@ -796,7 +801,7 @@ main .small {
       background-color: var(--brand-primary);
       color: var(--brand-light);
       border: none;
-      border-radius: 0.375rem;
+      border-radius: var(--radius-0375rem, 0.375rem);
       padding: 0.5rem 1.25rem;
       font-weight: 500;
       transition: all 0.2s ease-in-out;
@@ -822,12 +827,12 @@ main .small {
 
 /* Match fixture toggle */
 .fixture-toggle-group {
-      gap: 0.5rem;
+      gap: var(--space-2, 0.5rem);
 }
 
 .fixture-toggle-group .fixture-toggle-btn {
       flex: 1 1 0;
-      border-radius: 0.85rem !important;
+      border-radius: var(--radius-085rem, 0.85rem) !important;
       font-weight: 700;
       padding: 0.7rem 1rem;
       border-width: 1px;
@@ -869,12 +874,12 @@ main .small {
 
 /* Match sponsorship role toggle */
 .fixture-role-group {
-      gap: 0.5rem;
+      gap: var(--space-2, 0.5rem);
 }
 
 .fixture-role-group .fixture-role-btn {
       flex: 1 1 0;
-      border-radius: 0.85rem !important;
+      border-radius: var(--radius-085rem, 0.85rem) !important;
       font-weight: 700;
       padding: 0.7rem 1rem;
       border-width: 1px;
@@ -924,7 +929,7 @@ main .small {
 
 .paid-toggle-wrap {
       min-height: 2.75rem;
-      padding-left: 3rem;
+      padding-left: var(--space-3rem, 3rem);
       transform: scale(1.15);
       transform-origin: left center;
 }
@@ -937,7 +942,7 @@ main .small {
 
 .paid-toggle-wrap .form-check-label {
       font-weight: 700;
-      padding-left: 0.5rem;
+      padding-left: var(--space-2, 0.5rem);
 }
 
 .paid-toggle-wrap.is-paid .form-check-label {
@@ -946,12 +951,12 @@ main .small {
 
 /* Sponsor season status toggle */
 .sponsor-season-toggle {
-      gap: 0.5rem;
+      gap: var(--space-2, 0.5rem);
 }
 
 .sponsor-season-toggle .sponsor-season-btn {
       flex: 1 1 0;
-      border-radius: 0.85rem !important;
+      border-radius: var(--radius-085rem, 0.85rem) !important;
       font-weight: 700;
       padding: 0.7rem 1rem;
       border-width: 1px;
@@ -993,10 +998,10 @@ main .small {
 
 /* Logout */
 .btn-logout {
-      font-size: 0.85rem;
+      font-size: var(--fs-sm, 0.85rem);
       font-weight: 600;
       padding: 0.4rem 1rem;
-      border-radius: 0.5rem;
+      border-radius: var(--radius-05rem, 0.5rem);
       border: 1px solid var(--brand-dark);
       background-color: var(--brand-light);
       color: var(--brand-dark);
@@ -1013,7 +1018,7 @@ main .small {
       display: flex;
       flex-direction: column;
       align-items: flex-start;
-      gap: 0.25rem;
+      gap: var(--space-1, 0.25rem);
       padding: 0.35rem 0;
 }
 
@@ -1027,14 +1032,14 @@ main .small {
       flex: 0 0 auto;
       display: inline-flex;
       align-items: center;
-      gap: 0.4rem;
+      gap: var(--space-4rem, 0.4rem);
       white-space: nowrap;
-      margin-top: 0.1rem;
+      margin-top: var(--space-01rem, 0.1rem);
       flex-wrap: wrap;
 }
 
 .player-sponsor-slot {
-      font-size: 0.78rem;
+      font-size: var(--fs-078, 0.78rem);
       letter-spacing: 0.02em;
 }
 
@@ -1050,8 +1055,8 @@ main .small {
       width: 32px;
       height: 32px;
       padding: 0;
-      border-radius: 0.375rem;
-      font-size: 0.9rem;
+      border-radius: var(--radius-0375rem, 0.375rem);
+      font-size: var(--fs-09, 0.9rem);
       line-height: 1;
       border: 1px solid transparent;
       background: transparent;
@@ -1063,20 +1068,20 @@ main .small {
       display: flex;
       flex-direction: column;
       align-items: flex-start;
-      gap: 0.25rem;
+      gap: var(--space-1, 0.25rem);
 }
 
 .overview-slot-main {
       display: flex;
       align-items: center;
-      gap: 0.4rem;
+      gap: var(--space-4rem, 0.4rem);
       flex-wrap: wrap;
 }
 
 .overview-slot-meta {
       display: flex;
       align-items: center;
-      gap: 0.35rem;
+      gap: var(--space-035rem, 0.35rem);
       flex-wrap: wrap;
 }
 
@@ -1085,27 +1090,27 @@ main .small {
 }
 
 .overview-player-name {
-      font-size: 1.1rem;
+      font-size: var(--fs-md, 1.1rem);
       font-weight: 700;
-      margin-bottom: 0.9rem;
+      margin-bottom: var(--space-9rem, 0.9rem);
       line-height: 1.2;
 }
 
 .overview-slot-stack {
       display: flex;
       flex-direction: column;
-      gap: 0.6rem;
+      gap: var(--space-06rem, 0.6rem);
 }
 
 .overview-slot-row {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 0.75rem;
+      gap: var(--space-3, 0.75rem);
 }
 
 .overview-slot-label {
-      font-size: 0.9rem;
+      font-size: var(--fs-09, 0.9rem);
       font-weight: 600;
       color: var(--bs-body-color);
       white-space: nowrap;
@@ -1122,7 +1127,7 @@ main .small {
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      gap: 0.3rem;
+      gap: var(--space-03rem, 0.3rem);
       vertical-align: middle;
       white-space: nowrap;
       line-height: 1;
@@ -1229,8 +1234,8 @@ main .small {
       justify-content: center;
       min-width: 5.75rem;
       padding: 0.35rem 0.8rem;
-      border-radius: 999px;
-      font-size: 0.9rem;
+      border-radius: var(--radius-pill, 999px);
+      font-size: var(--fs-09, 0.9rem);
       font-weight: 700;
       line-height: 1;
       letter-spacing: 0.01em;
@@ -1256,7 +1261,7 @@ main .small {
       right: 0;
       height: 2px;
       background-color: var(--brand-light) !important;
-      border-radius: 2px;
+      border-radius: var(--radius-2px, 2px);
       transition: transform 0.25s ease, top 0.25s ease, opacity 0.25s ease;
 }
 
@@ -1301,14 +1306,14 @@ main .small {
    Developer Menu
 ================================ */
 #developerDropdown i {
-      margin-right: 6px;
+      margin-right: var(--space-6px, 6px);
       color: #ff9800;
       /* orange highlight */
 }
 
 .navbar .dropdown-menu {
       position: static !important;
-      border-radius: 0.85rem;
+      border-radius: var(--radius-085rem, 0.85rem);
       border: 1px solid rgba(18, 78, 102, 0.12);
       box-shadow: 0 12px 28px rgba(0, 0, 0, 0.12);
       background: var(--brand-light);
@@ -1316,8 +1321,8 @@ main .small {
 
 .navbar .dropdown-item {
       padding: 0.5rem 1rem;
-      font-size: 0.9rem;
-      border-radius: 0.25rem;
+      font-size: var(--fs-09, 0.9rem);
+      border-radius: var(--radius-025rem, 0.25rem);
       color: var(--brand-darkest);
       background: rgba(255, 255, 255, 0.72);
 }
@@ -1360,10 +1365,10 @@ main .small {
 @media (max-width: 991.98px) {
       .navbar-collapse {
             background-color: rgba(33, 42, 49, 0.96);
-            padding: 0.85rem;
-            border-radius: 1rem;
+            padding: var(--space-085rem, 0.85rem);
+            border-radius: var(--radius-1rem, 1rem);
             box-shadow: 0 10px 22px rgba(0, 0, 0, 0.16);
-            margin-top: 0.5rem;
+            margin-top: var(--space-2, 0.5rem);
             backdrop-filter: blur(12px);
       }
 
@@ -1374,7 +1379,7 @@ main .small {
             width: 100%;
             padding: 0.82rem 1rem;
             margin: 0.25rem 0;
-            border-radius: 0.85rem;
+            border-radius: var(--radius-085rem, 0.85rem);
             color: var(--brand-darkest) !important;
             background-color: var(--brand-light);
       }
@@ -1387,7 +1392,7 @@ main .small {
       .navbar-nav .nav-link.active {
             background-color: var(--brand-primary);
             color: #fff !important;
-            border-radius: 0.85rem;
+            border-radius: var(--radius-085rem, 0.85rem);
       }
 
       .navbar-nav .nav-link::after {
@@ -1403,8 +1408,8 @@ main .small {
             position: static;
             float: none;
             width: 100%;
-            margin-top: 0.25rem;
-            margin-bottom: 0.35rem;
+            margin-top: var(--space-1, 0.25rem);
+            margin-bottom: var(--space-035rem, 0.35rem);
             box-shadow: none;
             border: none;
             background: transparent;
@@ -1426,20 +1431,20 @@ main .small {
 
       .nav-main .dropdown-header {
             color: rgba(211, 217, 212, 0.72);
-            padding-left: 0.25rem;
+            padding-left: var(--space-1, 0.25rem);
       }
 
       .navbar-text {
             display: block;
-            margin-top: 0.5rem;
-            font-size: 0.85rem;
+            margin-top: var(--space-2, 0.5rem);
+            font-size: var(--fs-sm, 0.85rem);
             color: var(--brand-darkest) !important;
       }
 
       .navbar .btn-outline-secondary {
             display: block !important;
             width: 100% !important;
-            margin-top: 0.5rem !important;
+            margin-top: var(--space-2, 0.5rem) !important;
             color: var(--brand-darkest) !important;
             border-color: rgba(33, 42, 49, 0.08) !important;
       }
@@ -1469,15 +1474,15 @@ main .small {
       }
 
       .assign-stat-card h6 {
-            font-size: 0.54rem;
+            font-size: var(--fs-54, 0.54rem);
             line-height: 1;
-            margin-bottom: 0.15rem;
+            margin-bottom: var(--space-015rem, 0.15rem);
             letter-spacing: -0.02em;
             overflow-wrap: anywhere;
       }
 
       .assign-stat-card h3 {
-            font-size: 0.9rem;
+            font-size: var(--fs-09, 0.9rem);
             line-height: 1;
             margin-bottom: 0;
       }
@@ -1488,19 +1493,19 @@ main .small {
       }
 
       .assign-stats-row .col {
-            padding-left: 0.125rem;
-            padding-right: 0.125rem;
+            padding-left: var(--space-0125rem, 0.125rem);
+            padding-right: var(--space-0125rem, 0.125rem);
       }
 
       .assign-sponsors-page .season-banner {
-            font-size: 0.82rem;
+            font-size: var(--fs-082, 0.82rem);
             padding: 0.45rem 0.65rem !important;
-            margin-bottom: 0.75rem !important;
+            margin-bottom: var(--space-3, 0.75rem) !important;
       }
 
       .assign-sponsors-page .season-banner strong,
       .assign-sponsors-page .season-banner .badge {
-            font-size: 0.72rem;
+            font-size: var(--fs-072, 0.72rem);
       }
 
       .assign-sponsors-actions {
@@ -1510,7 +1515,7 @@ main .small {
       .assign-sponsors-actions .btn {
             min-width: 0;
             white-space: nowrap;
-            font-size: 0.72rem;
+            font-size: var(--fs-072, 0.72rem);
             padding: 0.35rem 0.4rem;
       }
 
@@ -1526,8 +1531,8 @@ main .small {
             flex: 1 1 0;
             min-width: 0;
             white-space: nowrap;
-            padding-left: 0.4rem;
-            padding-right: 0.4rem;
+            padding-left: var(--space-4rem, 0.4rem);
+            padding-right: var(--space-4rem, 0.4rem);
       }
 
       .players-avatar {
@@ -1537,8 +1542,8 @@ main .small {
       .player-mobile-card {
             background: #fff;
             border: 1px solid rgba(33, 42, 49, 0.08);
-            border-radius: 1rem;
-            padding: 0.9rem;
+            border-radius: var(--radius-1rem, 1rem);
+            padding: var(--space-9rem, 0.9rem);
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
       }
 
@@ -1556,7 +1561,7 @@ main .small {
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
-            gap: 0.75rem;
+            gap: var(--space-3, 0.75rem);
       }
 
       .player-mobile-actions {
@@ -1564,8 +1569,8 @@ main .small {
       }
 
       .player-mobile-sponsors {
-            padding-top: 0.75rem;
-            margin-top: 0.75rem;
+            padding-top: var(--space-3, 0.75rem);
+            margin-top: var(--space-3, 0.75rem);
             border-top: 1px solid rgba(33, 42, 49, 0.08);
       }
 
@@ -1647,7 +1652,7 @@ main .small {
             display: flex;
             flex-direction: column;
             align-items: stretch;
-            gap: 0.55rem;
+            gap: var(--space-055rem, 0.55rem);
             padding: 0;
             /* Natural content height, and don't let the parent flex box
                grow/shrink it — the parent (.navbar) is the scroll container. */
@@ -1659,7 +1664,7 @@ main .small {
       }
 
       .navbar-brand {
-            font-size: 1.2rem;
+            font-size: var(--fs-12, 1.2rem);
             letter-spacing: 0.2px;
             padding: 0.1rem 0.1rem 0.3rem;
             margin: 0;
@@ -1671,7 +1676,7 @@ main .small {
             flex-direction: column;
             align-items: stretch;
             justify-content: flex-start;
-            gap: 0.55rem;
+            gap: var(--space-055rem, 0.55rem);
             width: 100%;
             flex-basis: auto;
             overflow-x: hidden;
@@ -1693,24 +1698,24 @@ main .small {
             margin: 0;
             flex-direction: column;
             flex-wrap: nowrap;
-            gap: 0.3rem;
+            gap: var(--space-03rem, 0.3rem);
             width: 100%;
       }
 
       .nav-sections {
-            gap: 0.55rem;
+            gap: var(--space-055rem, 0.55rem);
             /* Small buffer so Log out isn't flush against the fixed bottom
                edge. Lives on the content, not the scroll container: Chrome
                omits a flex container's own padding-bottom from scroll height. */
-            padding-bottom: 1.25rem;
+            padding-bottom: var(--space-5, 1.25rem);
       }
 
       .nav-section {
-            gap: 0.3rem;
+            gap: var(--space-03rem, 0.3rem);
       }
 
       .nav-section-label {
-            font-size: 0.65rem;
+            font-size: var(--fs-065, 0.65rem);
             color: rgba(255, 255, 255, 0.6);
             padding: 0 0.15rem;
       }
@@ -1722,7 +1727,7 @@ main .small {
       .navbar-collapse>.d-flex {
             margin-left: 0;
             align-items: stretch;
-            gap: 0.55rem;
+            gap: var(--space-055rem, 0.55rem);
             width: 100%;
             overflow-x: hidden;
             overflow-y: visible;
@@ -1737,15 +1742,15 @@ main .small {
             background: transparent;
             color: rgba(255, 255, 255, 0.88) !important;
             padding: 0.58rem 0.8rem;
-            border-radius: 0.9rem;
+            border-radius: var(--radius-09rem, 0.9rem);
             box-shadow: none;
             border: 1px solid rgba(255, 255, 255, 0.06);
             line-height: 1.05;
             min-height: 2.35rem;
             width: 100%;
             justify-content: flex-start;
-            gap: 0.45rem;
-            font-size: 0.94rem;
+            gap: var(--space-045rem, 0.45rem);
+            font-size: var(--fs-94, 0.94rem);
             white-space: nowrap;
       }
 
@@ -1768,7 +1773,7 @@ main .small {
       }
 
       .nav-main .dropdown-toggle {
-            padding-right: 2rem;
+            padding-right: var(--space-8, 2rem);
       }
 
       .nav-main .dropdown-toggle::after {
@@ -1783,8 +1788,8 @@ main .small {
             box-shadow: none;
             border: 1px solid rgba(255, 255, 255, 0.08);
             background: rgba(255, 255, 255, 0.04);
-            padding: 0.3rem;
-            border-radius: 0.9rem;
+            padding: var(--space-03rem, 0.3rem);
+            border-radius: var(--radius-09rem, 0.9rem);
       }
 
       .nav-main .dropdown-menu:not(.show) {
@@ -1803,7 +1808,7 @@ main .small {
       }
 
       .nav-section:has(.dropdown-menu.show) {
-            margin-bottom: 0.5rem;
+            margin-bottom: var(--space-2, 0.5rem);
       }
 
       .navbar .btn.btn-outline-secondary {
@@ -1812,9 +1817,9 @@ main .small {
             border: 1px solid rgba(255, 255, 255, 0.12) !important;
             padding: 0.45rem 0.8rem;
             text-align: center;
-            border-radius: 0.7rem;
+            border-radius: var(--radius-07rem, 0.7rem);
             width: 100%;
-            font-size: 0.9rem;
+            font-size: var(--fs-09, 0.9rem);
       }
 
       .navbar .btn.btn-outline-secondary:hover {
@@ -1829,7 +1834,7 @@ main .small {
       .navbar-text {
             color: rgba(255, 255, 255, 0.88) !important;
             text-align: left;
-            font-size: 0.8rem;
+            font-size: var(--fs-08, 0.8rem);
             line-height: 1.25;
       }
 
@@ -1842,8 +1847,8 @@ main .small {
 
       .btn-logout {
             width: 100%;
-            padding-left: 1rem;
-            padding-right: 1rem;
+            padding-left: var(--space-4, 1rem);
+            padding-right: var(--space-4, 1rem);
             align-self: stretch;
       }
 
@@ -1855,16 +1860,16 @@ main .small {
             max-width: 100%;
             overflow-x: hidden;
             overflow-y: visible;
-            padding-bottom: 0.25rem;
+            padding-bottom: var(--space-1, 0.25rem);
       }
 
       .nav-section-meta {
-            padding-top: 0.15rem;
+            padding-top: var(--space-015rem, 0.15rem);
       }
 
       .season-strip-wrap {
             padding: 0.6rem 0.75rem 0;
-            margin-left: 300px;
+            margin-left: var(--space-300px, 300px);
             width: calc(100% - 300px);
             min-width: 0;
             transition: margin-left 0.25s ease, width 0.25s ease;
@@ -1876,11 +1881,11 @@ main .small {
       }
 
       main {
-            margin-left: 300px;
+            margin-left: var(--space-300px, 300px);
             max-width: none;
             width: calc(100% - 300px);
             min-width: 0;
-            padding-bottom: 6rem;
+            padding-bottom: var(--space-6rem, 6rem);
             transition: margin-left 0.25s ease, width 0.25s ease;
       }
 
@@ -1929,8 +1934,8 @@ main .small {
       .site-footer .container {
             max-width: none;
             width: 100%;
-            padding-left: 1.5rem;
-            padding-right: 1.5rem;
+            padding-left: var(--space-6, 1.5rem);
+            padding-right: var(--space-6, 1.5rem);
       }
 }
 
@@ -1969,7 +1974,7 @@ main .small {
 .sponsors-page .sponsors-hero {
       position: relative;
       overflow: hidden;
-      border-radius: 1.15rem;
+      border-radius: var(--radius-115rem, 1.15rem);
       background:
             linear-gradient(135deg, rgba(18, 78, 102, 0.98), rgba(33, 42, 49, 0.96));
       color: #fff;
@@ -1981,7 +1986,7 @@ main .small {
       inset: auto -20% -35% auto;
       width: 14rem;
       height: 14rem;
-      border-radius: 999px;
+      border-radius: var(--radius-pill, 999px);
       background: radial-gradient(circle, rgba(211, 217, 212, 0.22), rgba(211, 217, 212, 0));
       pointer-events: none;
 }
@@ -1999,7 +2004,7 @@ main .small {
 .sponsors-page .sponsors-stat-card {
       height: 100%;
       padding: 0.9rem 1rem;
-      border-radius: 1rem;
+      border-radius: var(--radius-1rem, 1rem);
       background: rgba(255, 255, 255, 0.08);
       border: 1px solid rgba(255, 255, 255, 0.12);
       backdrop-filter: blur(10px);
@@ -2007,35 +2012,35 @@ main .small {
 
 .sponsors-page .sponsors-stat-label {
       color: rgba(255, 255, 255, 0.72);
-      font-size: 0.72rem;
+      font-size: var(--fs-072, 0.72rem);
       font-weight: 700;
       letter-spacing: 0.09em;
       text-transform: uppercase;
-      margin-bottom: 0.25rem;
+      margin-bottom: var(--space-1, 0.25rem);
 }
 
 .sponsors-page .sponsors-stat-value {
       color: #fff;
-      font-size: 1.4rem;
+      font-size: var(--fs-14, 1.4rem);
       font-weight: 700;
       line-height: 1.15;
-      margin-bottom: 0.15rem;
+      margin-bottom: var(--space-015rem, 0.15rem);
 }
 
 .sponsors-page .sponsors-stat-note {
       color: rgba(255, 255, 255, 0.72);
-      font-size: 0.78rem;
+      font-size: var(--fs-078, 0.78rem);
 }
 
 .sponsors-page .sponsors-section-card {
-      border-radius: 1rem;
+      border-radius: var(--radius-1rem, 1rem);
       overflow: hidden;
 }
 
 .sponsors-page .sponsors-subpanel {
       height: 100%;
-      padding: 1rem;
-      border-radius: 0.95rem;
+      padding: var(--space-4, 1rem);
+      border-radius: var(--radius-095rem, 0.95rem);
       background: rgba(255, 255, 255, 0.8);
       border: 1px solid rgba(18, 78, 102, 0.08);
 }
@@ -2043,19 +2048,19 @@ main .small {
 .sponsors-page .sponsors-season-list {
       display: flex;
       flex-direction: column;
-      gap: 0.65rem;
+      gap: var(--space-065rem, 0.65rem);
       max-height: 22rem;
       overflow: auto;
-      padding-right: 0.15rem;
+      padding-right: var(--space-015rem, 0.15rem);
 }
 
 .sponsors-page .sponsors-season-item {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 1rem;
+      gap: var(--space-4, 1rem);
       padding: 0.85rem 0.95rem;
-      border-radius: 0.85rem;
+      border-radius: var(--radius-085rem, 0.85rem);
       background: #fff;
       border: 1px solid rgba(18, 78, 102, 0.08);
       box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
@@ -2069,27 +2074,27 @@ main .small {
       overflow-x: auto;
 }
 
-.sponsors-page table.table-modern tbody tr:hover {
+.sponsors-page table.hub-data-table--rounded tbody tr:hover {
       background-color: rgba(18, 78, 102, 0.04);
 }
 
-.sponsors-page table.table-modern tbody tr.sponsor-left-row {
+.sponsors-page table.hub-data-table--rounded tbody tr.sponsor-left-row {
       background-color: rgba(116, 141, 146, 0.14);
 }
 
-.sponsors-page table.table-modern tbody tr.sponsor-left-row:hover {
+.sponsors-page table.hub-data-table--rounded tbody tr.sponsor-left-row:hover {
       background-color: rgba(116, 141, 146, 0.18);
 }
 
-.sponsors-page table.table-modern thead th {
+.sponsors-page table.hub-data-table--rounded thead th {
       white-space: nowrap;
 }
 
 .sponsors-page .sponsors-mobile-card {
       background: rgba(255, 255, 255, 0.95);
       border: 1px solid rgba(18, 78, 102, 0.08);
-      border-radius: 1rem;
-      padding: 0.9rem;
+      border-radius: var(--radius-1rem, 1rem);
+      padding: var(--space-9rem, 0.9rem);
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
 }
 
@@ -2097,13 +2102,13 @@ main .small {
       display: flex;
       align-items: flex-start;
       justify-content: space-between;
-      gap: 0.75rem;
+      gap: var(--space-3, 0.75rem);
 }
 
 .sponsors-page .sponsors-mobile-avatar {
       width: 3rem;
       height: 3rem;
-      border-radius: 0.85rem;
+      border-radius: var(--radius-085rem, 0.85rem);
       background: rgba(18, 78, 102, 0.08);
       border: 1px solid rgba(18, 78, 102, 0.08);
       display: inline-flex;
@@ -2128,16 +2133,16 @@ main .small {
 .sponsors-page .sponsors-mobile-metrics {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 0.65rem;
-      margin-top: 0.9rem;
-      padding-top: 0.9rem;
+      gap: var(--space-065rem, 0.65rem);
+      margin-top: var(--space-9rem, 0.9rem);
+      padding-top: var(--space-9rem, 0.9rem);
       border-top: 1px solid rgba(18, 78, 102, 0.08);
 }
 
 .sponsors-page .sponsors-mobile-metric {
       display: flex;
       flex-direction: column;
-      gap: 0.2rem;
+      gap: var(--space-2rem, 0.2rem);
       min-width: 0;
 }
 
@@ -2146,7 +2151,7 @@ main .small {
 }
 
 .sponsors-page .sponsors-mobile-metric .label {
-      font-size: 0.72rem;
+      font-size: var(--fs-072, 0.72rem);
       font-weight: 700;
       letter-spacing: 0.08em;
       text-transform: uppercase;
@@ -2162,8 +2167,8 @@ main .small {
 .fixtures-mobile-card {
       background: rgba(255, 255, 255, 0.95);
       border: 1px solid rgba(18, 78, 102, 0.08);
-      border-radius: 1rem;
-      padding: 0.9rem;
+      border-radius: var(--radius-1rem, 1rem);
+      padding: var(--space-9rem, 0.9rem);
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
 }
 
@@ -2171,7 +2176,7 @@ main .small {
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
-      gap: 0.75rem;
+      gap: var(--space-3, 0.75rem);
 }
 
 .fixtures-mobile-opponent {
@@ -2183,17 +2188,17 @@ main .small {
       display: flex;
       flex-wrap: wrap;
       align-items: center;
-      gap: 0.45rem;
+      gap: var(--space-045rem, 0.45rem);
 }
 
 .fixtures-opponent-prefix {
       display: inline-flex;
       align-items: center;
       padding: 0.2rem 0.55rem;
-      border-radius: 999px;
+      border-radius: var(--radius-pill, 999px);
       background: rgba(33, 42, 49, 0.08);
       color: rgba(33, 42, 49, 0.72);
-      font-size: 0.75rem;
+      font-size: var(--fs-xs, 0.75rem);
       font-weight: 700;
       letter-spacing: 0.04em;
       text-transform: uppercase;
@@ -2203,11 +2208,11 @@ main .small {
       display: inline-flex;
       align-items: center;
       padding: 0.2rem 0.65rem;
-      border-radius: 999px;
+      border-radius: var(--radius-pill, 999px);
       border: 1px dashed rgba(107, 114, 128, 0.45);
       background: rgba(107, 114, 128, 0.12);
       color: #6b7280;
-      font-size: 0.85rem;
+      font-size: var(--fs-sm, 0.85rem);
       font-weight: 700;
       letter-spacing: 0.02em;
       text-transform: uppercase;
@@ -2216,28 +2221,28 @@ main .small {
 .fixtures-mobile-meta {
       display: flex;
       flex-wrap: wrap;
-      gap: 0.4rem;
-      margin-top: 0.4rem;
+      gap: var(--space-4rem, 0.4rem);
+      margin-top: var(--space-4rem, 0.4rem);
 }
 
 .fixtures-mobile-summary {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 0.65rem;
-      margin-top: 0.9rem;
-      padding-top: 0.9rem;
+      gap: var(--space-065rem, 0.65rem);
+      margin-top: var(--space-9rem, 0.9rem);
+      padding-top: var(--space-9rem, 0.9rem);
       border-top: 1px solid rgba(18, 78, 102, 0.08);
 }
 
 .fixtures-mobile-panel {
       display: flex;
       flex-direction: column;
-      gap: 0.2rem;
+      gap: var(--space-2rem, 0.2rem);
       min-width: 0;
 }
 
 .fixtures-mobile-panel .label {
-      font-size: 0.72rem;
+      font-size: var(--fs-072, 0.72rem);
       font-weight: 700;
       letter-spacing: 0.08em;
       text-transform: uppercase;
@@ -2251,7 +2256,7 @@ main .small {
 }
 
 .fixtures-mobile-actions {
-      margin-top: 0.9rem;
+      margin-top: var(--space-9rem, 0.9rem);
 }
 
 @media (max-width: 991.98px) {
@@ -2270,7 +2275,7 @@ main .small {
             align-items: stretch;
             overflow-x: auto;
             -webkit-overflow-scrolling: touch;
-            gap: 0.45rem;
+            gap: var(--space-045rem, 0.45rem);
       }
 
       .page-hero-actions .btn,
@@ -2282,7 +2287,7 @@ main .small {
       .card-footer.d-flex {
             flex-direction: column-reverse;
             align-items: stretch;
-            gap: 0.5rem;
+            gap: var(--space-2, 0.5rem);
       }
 
       .card-footer.d-flex .btn {
@@ -2318,11 +2323,11 @@ main .small {
       }
 
       .sponsors-page .sponsors-mobile-card {
-            padding: 0.85rem;
+            padding: var(--space-085rem, 0.85rem);
       }
 
       .fixtures-mobile-card {
-            padding: 0.85rem;
+            padding: var(--space-085rem, 0.85rem);
       }
 
       .fixtures-mobile-summary {
@@ -2340,7 +2345,7 @@ main .small {
       }
 
       .dl-mobile-stack dt {
-            margin-top: 0.5rem;
+            margin-top: var(--space-2, 0.5rem);
       }
 }
 
@@ -2422,10 +2427,10 @@ a:hover {
       display: flex;
       flex-wrap: wrap;
       align-items: center;
-      gap: .45rem;
-      padding: .45rem;
+      gap: var(--space-045rem, .45rem);
+      padding: var(--space-045rem, .45rem);
       border: 1px solid rgba(255, 255, 255, .18);
-      border-radius: .85rem;
+      border-radius: var(--radius-085rem, .85rem);
       background: rgba(43, 8, 20, .2);
 }
 
@@ -2434,10 +2439,10 @@ a:hover {
       min-height: 2.65rem;
       align-items: center;
       justify-content: center;
-      gap: .4rem;
+      gap: var(--space-4rem, .4rem);
       padding: .55rem .85rem;
-      border-radius: .58rem;
-      font-size: .82rem;
+      border-radius: var(--radius-58rem, .58rem);
+      font-size: var(--fs-082, .82rem);
       font-weight: 700;
 }
 
@@ -2450,20 +2455,20 @@ a:hover {
 .hub-metric-grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: .8rem;
-      margin-bottom: 1.5rem;
+      gap: var(--space-08rem, .8rem);
+      margin-bottom: var(--space-6, 1.5rem);
 }
 
 .hub-metric-card {
       display: grid;
       grid-template-columns: 2.75rem minmax(0, 1fr) auto;
       align-items: center;
-      gap: .8rem;
+      gap: var(--space-08rem, .8rem);
       min-width: 0;
       min-height: 7rem;
-      padding: 1rem;
+      padding: var(--space-4, 1rem);
       border: 1px solid rgba(75, 8, 24, .12);
-      border-radius: .85rem;
+      border-radius: var(--radius-085rem, .85rem);
       background: #fffdf9;
       color: inherit;
       text-decoration: none;
@@ -2482,7 +2487,7 @@ a:hover {
       width: 2.75rem;
       height: 2.75rem;
       place-items: center;
-      border-radius: .72rem;
+      border-radius: var(--radius-072rem, .72rem);
 }
 
 .hub-metric-card__icon--primary {
@@ -2518,7 +2523,7 @@ a:hover {
 .hub-metric-card__label {
       overflow: hidden;
       color: #756b68;
-      font-size: .68rem;
+      font-size: var(--fs-068, .68rem);
       font-weight: 800;
       letter-spacing: .055em;
       line-height: 1.3;
@@ -2528,7 +2533,7 @@ a:hover {
 
 .hub-metric-card__value {
       overflow: hidden;
-      margin-top: .18rem;
+      margin-top: var(--space-018rem, 0.18rem);
       color: #2f2728;
       font-size: clamp(1.3rem, 2vw, 1.65rem);
       font-weight: 800;
@@ -2538,9 +2543,9 @@ a:hover {
 
 .hub-metric-card__meta {
       overflow: hidden;
-      margin-top: .22rem;
+      margin-top: var(--space-022rem, 0.22rem);
       color: #756b68;
-      font-size: .72rem;
+      font-size: var(--fs-072, .72rem);
       line-height: 1.3;
       text-overflow: ellipsis;
       white-space: nowrap;
@@ -2548,7 +2553,7 @@ a:hover {
 
 .hub-metric-card__arrow {
       color: rgba(106, 32, 54, .45);
-      font-size: .72rem;
+      font-size: var(--fs-072, .72rem);
 }
 
 @media (min-width:768px) {
@@ -2579,9 +2584,9 @@ a:hover {
 
       .hub-metric-card {
             grid-template-columns: 2.35rem minmax(0, 1fr);
-            gap: .65rem;
+            gap: var(--space-065rem, .65rem);
             min-height: 6.65rem;
-            padding: .82rem;
+            padding: var(--space-82rem, .82rem);
       }
 
       .hub-metric-card__icon {
@@ -2611,10 +2616,10 @@ a:hover {
       display: flex;
       flex-wrap: wrap;
       align-items: center;
-      gap: .4rem;
+      gap: var(--space-4rem, .4rem);
       margin: -.25rem 0 1rem;
       color: rgba(31, 26, 29, .62);
-      font-size: .8rem;
+      font-size: var(--fs-08, .8rem);
       font-weight: 650;
 }
 
@@ -2630,7 +2635,7 @@ a:hover {
 
 .hub-breadcrumb i {
       color: rgba(31, 26, 29, .38);
-      font-size: .62rem;
+      font-size: var(--fs-062, .62rem);
 }
 
 .hub-local-actions {
@@ -2638,24 +2643,24 @@ a:hover {
       flex-wrap: wrap;
       align-items: center;
       justify-content: flex-end;
-      gap: .5rem;
+      gap: var(--space-2, .5rem);
 }
 
 .hub-local-actions .dropdown-menu {
       min-width: 13rem;
-      padding: .4rem;
+      padding: var(--space-4rem, .4rem);
       border-color: rgba(75, 8, 24, .13);
-      border-radius: .72rem;
+      border-radius: var(--radius-072rem, .72rem);
       box-shadow: 0 .75rem 1.8rem rgba(31, 26, 29, .12);
 }
 
 .hub-local-actions .dropdown-item {
       display: flex;
       align-items: center;
-      gap: .55rem;
+      gap: var(--space-055rem, .55rem);
       padding: .62rem .7rem;
-      border-radius: .45rem;
-      font-size: .82rem;
+      border-radius: var(--radius-45rem, .45rem);
+      font-size: var(--fs-082, .82rem);
       font-weight: 650;
 }
 
@@ -2670,25 +2675,25 @@ a:hover {
       flex-wrap: wrap;
       align-items: center;
       justify-content: space-between;
-      gap: .75rem;
-      margin-bottom: 1rem;
+      gap: var(--space-3, .75rem);
+      margin-bottom: var(--space-4, 1rem);
       padding: .85rem 1rem;
       border: 1px solid rgba(75, 8, 24, .13);
-      border-radius: .85rem;
+      border-radius: var(--radius-085rem, .85rem);
       background: #fffdf9;
       box-shadow: 0 .25rem .8rem rgba(31, 26, 29, .06);
 }
 
 .hub-section-commandbar h2 {
       margin: 0;
-      font-size: 1rem;
+      font-size: var(--fs-base, 1rem);
       font-weight: 800;
 }
 
 .hub-section-commandbar p {
       margin: .15rem 0 0;
       color: rgba(31, 26, 29, .62);
-      font-size: .78rem;
+      font-size: var(--fs-078, .78rem);
 }
 
 @media (max-width: 575.98px) {

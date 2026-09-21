@@ -1756,6 +1756,134 @@ function shop_mark_vsn_ordered(PDO $pdo, int $orderId): void
 }
 
 /**
+ * Pre-order kit orders not yet sent to VSN — the set the VSN order form PDF
+ * covers. Includes both paid and pending-payment orders (so the club can
+ * still plan the manufacturing run around someone who hasn't paid yet), but
+ * not cancelled/refunded/collected ones. Only pre-order items (VSN
+ * manufactures to order; regular in-stock products don't go through them)
+ * that haven't already been flagged sent.
+ *
+ * @return list<array<string, mixed>>
+ */
+function shop_orders_pending_vsn(PDO $pdo): array
+{
+    shop_ensure_schema($pdo);
+    return $pdo->query("SELECT * FROM shop_orders
+        WHERE status IN ('paid', 'pending_payment') AND is_preorder = 1 AND vsn_ordered_at IS NULL
+        ORDER BY created_at ASC")->fetchAll(PDO::FETCH_ASSOC);
+}
+
+/**
+ * Marks every currently-pending order (shop_orders_pending_vsn()) as sent —
+ * the bulk equivalent of shop_mark_vsn_ordered() for one order, used after
+ * downloading the combined VSN order form PDF.
+ */
+function shop_mark_all_vsn_ordered(PDO $pdo): int
+{
+    $stmt = $pdo->prepare("UPDATE shop_orders SET vsn_ordered_at = NOW()
+        WHERE status = 'paid' AND is_preorder = 1 AND vsn_ordered_at IS NULL");
+    $stmt->execute();
+    return $stmt->rowCount();
+}
+
+/**
+ * Renders one combined VSN kit order form PDF covering every order in
+ * $orders (normally shop_orders_pending_vsn()) — per-customer detail (who
+ * ordered what, sizes, contact details) for the order sent to VSN. Same
+ * dompdf pattern as invoice_pdf_render().
+ *
+ * @param list<array<string, mixed>> $orders
+ */
+function shop_vsn_order_form_pdf_render(PDO $pdo, array $orders, bool $forceDownload = false, bool $returnBytesOnly = false): string
+{
+    require_once __DIR__ . '/site_settings.php';
+    $settings = site_settings_all($pdo);
+    $clubName = $settings['club_name'] ?: 'MyClubHub';
+
+    $orderItems = []; // order id => items
+    foreach ($orders as $order) {
+        $orderItems[(int) $order['id']] = shop_order_items($pdo, (int) $order['id']);
+    }
+
+    $html = '<!doctype html><html><head><meta charset="UTF-8"><style>
+        @page { margin: 36px 40px; }
+        body { font-family: DejaVu Sans, Arial, sans-serif; color:#21141a; font-size:12px; margin:0; }
+        h1 { margin:0 0 2px; color:#4b0818; font-size:22px; }
+        h2 { margin:24px 0 8px; color:#4b0818; font-size:15px; }
+        .muted { color:#6f6470; }
+        table.items { width:100%; border-collapse:collapse; margin-top:6px; }
+        table.items th { background:#4b0818; color:#fff; text-align:left; font-size:10px; text-transform:uppercase; letter-spacing:.03em; padding:6px 8px; }
+        table.items td { border-bottom:1px solid #eadfdf; padding:6px 8px; }
+        table.items td.num, table.items th.num { text-align:right; }
+        .order-block { margin-top:16px; page-break-inside:avoid; }
+        .order-block .ref { font-weight:bold; }
+        .order-block .contact { color:#6f6470; }
+        .status-badge { display:inline-block; padding:2px 8px; border-radius:10px; font-size:9px; text-transform:uppercase; font-weight:bold; margin-left:6px; }
+        .status-paid { background:#d7f0dd; color:#146c2e; }
+        .status-pending_payment { background:#fbe7c6; color:#8a5a00; }
+    </style></head><body>';
+
+    $paidCount = count(array_filter($orders, static fn(array $o): bool => (string) $o['status'] === 'paid'));
+    $pendingCount = count($orders) - $paidCount;
+
+    $html .= '<div><strong>' . h($clubName) . '</strong></div>';
+    $html .= '<h1>VSN Kit Order Form</h1>';
+    $html .= '<div class="muted">Generated ' . h(date('d/m/Y H:i')) . ' — ' . count($orders) . ' order' . (count($orders) === 1 ? '' : 's')
+        . ' (' . $paidCount . ' paid, ' . $pendingCount . ' awaiting payment)</div>';
+
+    $html .= '<h2>Order detail</h2>';
+    foreach ($orders as $order) {
+        $orderStatus = (string) $order['status'];
+        $statusLabel = $orderStatus === 'paid' ? 'Paid' : 'Awaiting payment';
+        $html .= '<div class="order-block">';
+        $html .= '<div class="ref">' . h((string) $order['order_ref']) . '<span class="status-badge status-' . h($orderStatus) . '">' . h($statusLabel) . '</span></div>';
+        $html .= '<div class="contact">' . h((string) $order['customer_name']);
+        if (!empty($order['customer_email'])) {
+            $html .= ' &middot; ' . h((string) $order['customer_email']);
+        }
+        if (!empty($order['customer_phone'])) {
+            $html .= ' &middot; ' . h((string) $order['customer_phone']);
+        }
+        $html .= '</div>';
+        $html .= '<table class="items"><thead><tr><th>Product</th><th>Size / options</th><th class="num">Qty</th></tr></thead><tbody>';
+        foreach ($orderItems[(int) $order['id']] as $item) {
+            $html .= '<tr><td>' . h((string) $item['product_name']) . '</td><td>' . h((string) $item['options_label'] ?: '—') . '</td><td class="num">' . (int) $item['quantity'] . '</td></tr>';
+        }
+        $html .= '</tbody></table></div>';
+    }
+
+    $html .= '</body></html>';
+
+    if (!class_exists(Dompdf\Dompdf::class)) {
+        $autoloaders = [dirname(__DIR__) . '/vendor/autoload.php', dirname(__DIR__, 2) . '/project_1/vendor/autoload.php'];
+        foreach ($autoloaders as $autoloader) {
+            if (is_file($autoloader)) {
+                require_once $autoloader;
+                break;
+            }
+        }
+    }
+    if (!class_exists(Dompdf\Dompdf::class)) {
+        throw new RuntimeException('PDF export is unavailable.');
+    }
+
+    $dompdf = new Dompdf\Dompdf();
+    $dompdf->loadHtml($html);
+    $dompdf->setPaper('A4', 'portrait');
+    $dompdf->render();
+
+    if ($returnBytesOnly) {
+        return (string) $dompdf->output();
+    }
+
+    if (ob_get_length() !== false) {
+        ob_clean();
+    }
+    $dompdf->stream('vsn-order-form-' . date('Ymd-His') . '.pdf', ['Attachment' => $forceDownload]);
+    return '';
+}
+
+/**
  * Refund via Stripe (full or partial) and record it on the order.
  */
 function shop_refund_order(PDO $pdo, int $orderId, float $amount, string $reason = ''): void

@@ -187,7 +187,7 @@ function playersponsors_item_status_badge(string $status): string
         </summary>
         <div class="card-body pt-0">
           <div class="table-responsive">
-          <table class="table table-sm align-middle mb-0">
+          <table class="table table-sm align-middle mb-0 hub-data-table">
             <thead><tr><th>Player</th><th>Package</th><th class="text-end">Amount</th><th>Status</th><th></th></tr></thead>
             <tbody>
               <?php foreach ($items as $item): ?>
@@ -203,7 +203,7 @@ function playersponsors_item_status_badge(string $status): string
                       <?php if (!empty($order['stripe_checkout_session_id'])): ?>
                         <a href="https://dashboard.stripe.com/<?= stripe_mode() === 'test' ? 'test/' : '' ?>checkout/sessions/<?= rawurlencode((string) $order['stripe_checkout_session_id']) ?>" target="_blank" rel="noopener" class="btn btn-sm btn-outline-danger">Open payment in Stripe</a>
                       <?php endif; ?>
-                      <form method="post" class="d-inline" onsubmit="return confirm('Mark this conflict as resolved?');">
+                      <form method="post" class="d-inline" data-confirm="Mark this conflict as resolved?" data-confirm-action="Mark resolved" data-confirm-class="btn-primary">
                         <?= csrf_field() ?>
                         <input type="hidden" name="action" value="resolve_conflict">
                         <input type="hidden" name="item_id" value="<?= (int) $item['id'] ?>">

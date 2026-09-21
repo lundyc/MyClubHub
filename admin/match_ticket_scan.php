@@ -14,7 +14,7 @@ if (!hub_auth_is_authenticated()) {
     echo json_encode(['ok' => false, 'message' => 'You must be logged in to scan tickets.']);
     exit;
 }
-if (!hub_auth_has_permission('tickets.scan')) {
+if (!hub_auth_has_capability('tickets_ops')) {
     http_response_code(403);
     echo json_encode(['ok' => false, 'message' => 'You do not have permission to scan tickets.']);
     exit;

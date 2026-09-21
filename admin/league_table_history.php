@@ -302,7 +302,7 @@ $esc = static fn (mixed $v): string => htmlspecialchars((string) $v, ENT_QUOTES,
                 · updated <?= $esc(date('j M Y', strtotime((string) ($existing['updated_at'] ?: $existing['created_at'])))) ?>
               <?php endif; ?>
             </div>
-            <form method="post" onsubmit="return confirm('Delete the saved table for <?= $esc($season['name'] ?? '') ?>?');">
+            <form method="post" data-confirm="Delete the saved table for <?= $esc($season['name'] ?? '') ?>?" data-confirm-action="Delete">
               <?= csrf_field() ?>
               <input type="hidden" name="season_id" value="<?= $seasonId ?>">
               <input type="hidden" name="action" value="delete">
@@ -310,7 +310,7 @@ $esc = static fn (mixed $v): string => htmlspecialchars((string) $v, ENT_QUOTES,
             </form>
           </div>
           <div class="table-responsive">
-            <table class="table table-sm table-hover align-middle mb-0">
+            <table class="table table-sm table-hover align-middle mb-0 hub-data-table">
               <thead><tr><th class="c">#</th><th>Club</th><th class="c">P</th><th class="c">W</th><th class="c">D</th><th class="c">L</th><th class="c">F</th><th class="c">A</th><th class="c">GD</th><th class="c">Pts</th></tr></thead>
               <tbody>
                 <?php foreach ($existing['rows'] as $i => $r): ?>

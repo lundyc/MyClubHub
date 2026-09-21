@@ -5,7 +5,7 @@ declare(strict_types=1);
 
 // PHASE3B_GUARD_MARKER
 require_once __DIR__ . '/auth.php';
-if (!hub_auth_has_capability('football_ops')) {
+if (!hub_auth_has_capability('matchday')) {
     http_response_code(403);
     exit('Access denied.');
 }
@@ -160,7 +160,7 @@ $hasBackground = $match !== null && trim((string) ($match['background_image'] ??
                         <p class="page-kicker">Match Not Found</p>
                         <h1 class="feature-card__title">This fixture does not exist.</h1>
                         <p class="utility-panel__copy">Go back to the matches list and open a valid fixture.</p>
-                        <a class="btn btn-maroon" href="matches.php">Back to Matches</a>
+                        <a class="btn btn-brand" href="matches.php">Back to Matches</a>
                     </section>
                 <?php else: ?>
                     <section class="utility-grid dashboard-grid mb-4">
@@ -171,7 +171,7 @@ $hasBackground = $match !== null && trim((string) ($match['background_image'] ??
                                 Build the lineup and graphic setup here. The background you upload on this screen is the same one used by the preview and post screens.
                             </p>
                             <div class="dashboard-actions hub-actions">
-                                <a class="btn btn-maroon js-preview-link" href="match_graphic.php?id=<?= safe((string) $match['id']) ?>">Preview graphic</a>
+                                <a class="btn btn-brand js-preview-link" href="match_graphic.php?id=<?= safe((string) $match['id']) ?>">Preview graphic</a>
                                 <a class="btn btn-neutral" href="match_events.php?id=<?= safe((string) $match['id']) ?>">Add events</a>
                                 <a class="btn btn-neutral" href="match.php?id=<?= safe((string) $match['id']) ?>">Match workspace</a>
                                 <a class="btn btn-neutral" href="match_templates.php?id=<?= safe((string) $match['id']) ?>">Match templates</a>
@@ -372,7 +372,7 @@ $hasBackground = $match !== null && trim((string) ($match['background_image'] ??
                                 </section>
 
                                 <div class="dashboard-actions hub-actions">
-                                    <a class="btn btn-maroon js-preview-link" href="match_graphic.php?id=<?= safe((string) $match['id']) ?>">Preview graphic</a>
+                                    <a class="btn btn-brand js-preview-link" href="match_graphic.php?id=<?= safe((string) $match['id']) ?>">Preview graphic</a>
                                     <a class="btn btn-neutral" href="match.php?id=<?= safe((string) $match['id']) ?>">Match workspace</a>
                                 </div>
                             </form>

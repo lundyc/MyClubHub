@@ -1,17 +1,17 @@
 .fixture-tabs-shell {
   margin: 0 0 1.25rem;
-  padding: .35rem;
+  padding: var(--space-035rem, .35rem);
   overflow-x: auto;
   overscroll-behavior-x: contain;
   border: 1px solid var(--hub-line, rgba(75, 8, 24, .12));
-  border-radius: 8px;
+  border-radius: var(--radius-8px, 8px);
   background: var(--hub-surface, #fff);
   box-shadow: var(--hub-shadow-sm, 0 .45rem 1rem rgba(15, 23, 42, .05));
 }
 
 .fixture-tabs {
   display: flex;
-  gap: .35rem;
+  gap: var(--space-035rem, .35rem);
   min-width: max-content;
   border: 0;
 }
@@ -24,14 +24,14 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: .45rem;
+  gap: var(--space-045rem, .45rem);
   min-height: 2.55rem;
   padding: .58rem .85rem;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--radius-md, 6px);
   color: var(--hub-muted, #6f7779);
   background: transparent;
-  font-size: .88rem;
+  font-size: var(--fs-088, .88rem);
   font-weight: 750;
   line-height: 1.1;
   white-space: nowrap;
@@ -64,32 +64,32 @@
 
 .fixture-workspace {
   display: grid;
-  gap: 1rem;
+  gap: var(--space-4, 1rem);
 }
 
 .fixture-workspace .tab-pane > .card,
 .fixture-panel {
   border: 1px solid rgba(15, 23, 42, .08);
-  border-radius: 8px;
+  border-radius: var(--radius-8px, 8px);
   box-shadow: 0 .75rem 1.6rem rgba(15, 23, 42, .06) !important;
 }
 
 .fixture-workspace .card-body,
 .fixture-panel .card-body {
-  padding: 1.25rem;
+  padding: var(--space-5, 1.25rem);
 }
 
 .fixture-panel-title {
   margin: 0;
   color: #1f2937;
-  font-size: 1rem;
+  font-size: var(--fs-base, 1rem);
   font-weight: 800;
 }
 
 .fixture-panel-kicker {
-  margin-bottom: .2rem;
+  margin-bottom: var(--space-2rem, .2rem);
   color: #64748b;
-  font-size: .72rem;
+  font-size: var(--fs-072, .72rem);
   font-weight: 800;
   letter-spacing: .06em;
   text-transform: uppercase;
@@ -99,7 +99,7 @@
 .fixture-details-card .form-label,
 .fixture-sponsorship-card .form-label {
   color: #334155;
-  font-size: .82rem;
+  font-size: var(--fs-082, .82rem);
   font-weight: 750;
 }
 
@@ -113,25 +113,25 @@
 }
 
 .fixture-sponsorship-table thead th {
-  padding-top: .7rem;
-  padding-bottom: .7rem;
+  padding-top: var(--space-07rem, .7rem);
+  padding-bottom: var(--space-07rem, .7rem);
   border-bottom: 1px solid rgba(15, 23, 42, .1);
   color: #64748b;
-  font-size: .74rem;
+  font-size: var(--fs-074, .74rem);
   font-weight: 800;
   letter-spacing: .05em;
   text-transform: uppercase;
 }
 
 .fixture-sponsorship-table tbody td {
-  padding-top: .78rem;
-  padding-bottom: .78rem;
+  padding-top: var(--space-78rem, .78rem);
+  padding-bottom: var(--space-78rem, .78rem);
 }
 
 .fixture-starting11-shell {
   overflow: hidden;
   border: 1px solid rgba(15, 23, 42, .08);
-  border-radius: 8px;
+  border-radius: var(--radius-8px, 8px);
   background: #fff;
   box-shadow: 0 .75rem 1.6rem rgba(15, 23, 42, .06);
 }
@@ -140,7 +140,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 1rem;
+  gap: var(--space-4, 1rem);
   padding: 1rem 1.25rem;
   border-bottom: 1px solid rgba(15, 23, 42, .08);
   background: #f8fafc;
@@ -155,10 +155,10 @@
 }
 
 .hub-section-commandbar {
-  margin-bottom: 1rem;
+  margin-bottom: var(--space-4, 1rem);
   padding: 1rem 1.15rem;
   border: 1px solid rgba(15, 23, 42, .08);
-  border-radius: 8px;
+  border-radius: var(--radius-8px, 8px);
   background: #fff;
   box-shadow: 0 .6rem 1.4rem rgba(15, 23, 42, .05);
 }
@@ -166,18 +166,18 @@
 .hub-section-commandbar h2 {
   margin: 0 0 .2rem;
   color: #1f2937;
-  font-size: 1rem;
+  font-size: var(--fs-base, 1rem);
   font-weight: 800;
 }
 
 .hub-section-commandbar p {
   margin: 0;
   color: #64748b;
-  font-size: .9rem;
+  font-size: var(--fs-09, .9rem);
 }
 
 .match-event-grid__button {
-  border-radius: 8px;
+  border-radius: var(--radius-8px, 8px);
 }
 
 .match-event-timeline__item,
@@ -186,7 +186,7 @@
 .hub-form-card,
 .hub-section {
   border-color: rgba(15, 23, 42, .08) !important;
-  border-radius: 8px !important;
+  border-radius: var(--radius-8px, 8px) !important;
   box-shadow: 0 .75rem 1.6rem rgba(15, 23, 42, .06) !important;
 }
 
@@ -195,7 +195,7 @@
 }
 
 .next-match-editor .card-body {
-  padding: 1.25rem;
+  padding: var(--space-5, 1.25rem);
 }
 
 .match-event-timeline__item {
@@ -215,7 +215,7 @@
 
   .fixture-workspace .card-body,
   .fixture-panel .card-body {
-    padding: 1rem;
+    padding: var(--space-4, 1rem);
   }
 
   .fixture-starting11-toolbar {
@@ -224,6 +224,6 @@
   }
 
   .hub-section-commandbar {
-    padding: 1rem;
+    padding: var(--space-4, 1rem);
   }
 }

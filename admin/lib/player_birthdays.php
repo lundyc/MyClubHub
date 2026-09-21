@@ -24,6 +24,22 @@ function players_format_date_of_birth(?string $value): string
     return $timestamp !== false ? date('d M Y', $timestamp) : $value;
 }
 
+function players_calculate_age(?string $dateOfBirth): ?int
+{
+    $dateOfBirth = trim((string) $dateOfBirth);
+    if ($dateOfBirth === '') {
+        return null;
+    }
+
+    try {
+        $dob = new DateTimeImmutable($dateOfBirth);
+    } catch (Exception) {
+        return null;
+    }
+
+    return (new DateTimeImmutable('today'))->diff($dob)->y;
+}
+
 /**
  * @param array<string,mixed> $row
  * @return array{name: string, id: int, date_of_birth: string, next_birthday: string, days_until: int, age_turning: int, role_label: string, href: string}|null
@@ -50,7 +66,7 @@ function players_build_birthday_row(array $row, string $nameKey, string $dobKey,
         'next_birthday' => $nextBirthday->format('Y-m-d'),
         'days_until' => (int) $today->diff($nextBirthday)->format('%a'),
         'age_turning' => (int) $nextBirthday->format('Y') - (int) $dob->format('Y'),
-        'role_label' => $roleLabel,
+        'role_label' => ucfirst($roleLabel),
         'href' => $href,
     ];
 }
@@ -122,11 +138,20 @@ function players_all_birthdays(PDO $pdo, int $limit = 0): array
         && players_birthdays_table_exists($pdo, 'person_positions')
         && players_birthdays_table_exists($pdo, 'hub_positions')
     ) {
+        $accessRoleSelect = "''";
+        $accessRoleJoins = '';
+        if (players_birthdays_table_exists($pdo, 'person_access_roles') && players_birthdays_table_exists($pdo, 'access_roles')) {
+            $accessRoleSelect = "GROUP_CONCAT(DISTINCT access_role.slug ORDER BY access_role.slug SEPARATOR ',')";
+            $accessRoleJoins = 'LEFT JOIN person_access_roles par ON par.person_id = p.id
+                LEFT JOIN access_roles access_role ON access_role.id = par.role_id';
+        }
         $peopleStmt = $pdo->query("
             SELECT p.id, p.display_name, p.date_of_birth,
+                   {$accessRoleSelect} AS access_role_codes,
                    GROUP_CONCAT(DISTINCT r.code ORDER BY r.code SEPARATOR ',') AS role_codes,
                    GROUP_CONCAT(DISTINCT hp.name ORDER BY hp.sort_order, hp.name SEPARATOR ', ') AS position_names
             FROM people p
+            {$accessRoleJoins}
             LEFT JOIN accounts a ON a.person_id = p.id AND a.is_active = 1
             LEFT JOIN account_roles ar ON ar.account_id = a.id
             LEFT JOIN roles r ON r.id = ar.role_id
@@ -146,7 +171,7 @@ function players_all_birthdays(PDO $pdo, int $limit = 0): array
                 $row,
                 'display_name',
                 'date_of_birth',
-                players_birthday_role_label((string) ($row['role_codes'] ?? ''), (string) ($row['position_names'] ?? '')),
+                players_birthday_role_label(($row['role_codes'] ?? '') . ',' . ($row['access_role_codes'] ?? ''), (string) ($row['position_names'] ?? '')),
                 '/club_person.php?id=' . (int) $row['id']
             );
             if ($birthday !== null) {

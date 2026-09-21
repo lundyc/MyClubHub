@@ -64,22 +64,13 @@ function hub_player_match_stats(
         return $stats;
     }
 
+    // $matchesDataFile is accepted for backward compatibility but no longer
+    // read — events always come straight from matchday_events now (see
+    // hub_matchday_events_by_fixture() in lib/stats.php).
     $eventsByFixture = $matchEvents ?? [];
-    if ($matchEvents === null && is_file($matchesDataFile)) {
-        $decoded = json_decode((string)file_get_contents($matchesDataFile), true);
-        if (is_array($decoded)) {
-            foreach ($decoded as $match) {
-                if (!is_array($match)) {
-                    continue;
-                }
-                $fixtureId = (int)($match['id'] ?? 0);
-                if ($fixtureId > 0) {
-                    $eventsByFixture[$fixtureId] = is_array($match['events'] ?? null)
-                        ? $match['events']
-                        : [];
-                }
-            }
-        }
+    if ($matchEvents === null) {
+        require_once __DIR__ . '/stats.php';
+        $eventsByFixture = hub_matchday_events_by_fixture($pdo);
     }
 
     if ($fixtures === null) {
@@ -139,7 +130,7 @@ function hub_player_match_stats(
             $type = (string)($event['type'] ?? '');
             $team = (string)($event['team'] ?? '');
             $eventPlayer = hub_player_stats_normalize_name((string)($event['player'] ?? ''));
-            $isScoringEvent = $type === 'goal'
+            $isScoringEvent = $type === 'goal' || $type === 'penalty_scored'
                 || ($type === 'penalty' && (string)($event['outcome'] ?? '') === 'scored');
 
             if ($isScoringEvent && $team === 'opponent') {

@@ -18,7 +18,7 @@ require_once __DIR__ . '/header.php';
 require_once __DIR__ . '/lib/matchday_finance.php';
 require_once __DIR__ . '/lib/audit.php';
 
-if (!hub_auth_is_admin() && !hub_auth_has_any_capability(['finance', 'football_ops'])) {
+if (!hub_auth_is_admin() && !hub_auth_has_any_capability(['finance', 'matchday'])) {
     http_response_code(403);
     echo '<div><div class="alert alert-danger">You do not have permission to view this page.</div></div>';
     require __DIR__ . '/footer.php';
@@ -166,7 +166,7 @@ $moneyInput = static function (string $column, string $group, string $display, a
                 <span class="mf-card__hint">For each point, enter the float you started with and the cash counted at the end. <strong>Takings = counted &minus; float.</strong></span>
             </div>
             <div class="table-responsive">
-                <table class="table mf-recon align-middle mb-0">
+                <table class="table mf-recon align-middle mb-0 hub-data-table">
                     <thead>
                         <tr>
                             <th scope="col">Cash point</th>

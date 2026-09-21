@@ -25,7 +25,7 @@ $logs = $stmt->fetchAll(PDO::FETCH_ASSOC);
           <div class="card border-0 shadow-sm">
                     <div class="card-body p-0">
                               <div class="table-responsive">
-                              <table class="table table-modern table-sm mb-0">
+                              <table class="table hub-data-table--rounded table-sm mb-0 hub-data-table">
                                         <thead class="table-dark">
                                                   <tr>
                                                             <th>ID</th>

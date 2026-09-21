@@ -44,28 +44,22 @@ foreach (is_array($_GET['seasons'] ?? null) ? $_GET['seasons'] : [] as $rid) {
 usort($seasonIds, static fn(int $a, int $b): int =>
     strcmp((string)($seasonById[$a]['start_date'] ?? ''), (string)($seasonById[$b]['start_date'] ?? '')) ?: ($a <=> $b));
 
-if (!isset($metricLabels[$metric]) || $player === '' || $seasonIds === []) {
+if (($metric !== 'all' && !isset($metricLabels[$metric])) || $player === '' || $seasonIds === []) {
     http_response_code(400);
     echo json_encode(['success' => false, 'error' => 'Missing or invalid parameters.']);
     exit;
 }
 
-$detail = hub_player_stat_match_rows(
-    $pdo,
-    $seasonIds,
-    $seasonById,
-    $player,
-    $metric,
-    $competitions,
-    $venue,
-    __DIR__ . '/data/matches.json'
-);
+$detail = $metric === 'all'
+    ? hub_player_all_events_match_rows($pdo, $seasonIds, $seasonById, $player, $competitions, $venue, __DIR__ . '/data/matches.json')
+    : hub_player_stat_match_rows($pdo, $seasonIds, $seasonById, $player, $metric, $competitions, $venue, __DIR__ . '/data/matches.json');
 
 echo json_encode([
     'success' => true,
     'player' => $detail['player'],
     'metric' => $metric,
-    'metric_label' => $metricLabels[$metric],
+    'metric_label' => $metric === 'all' ? 'Match-by-match' : $metricLabels[$metric],
     'total' => $detail['total'],
+    'summary' => $detail['summary'] ?? null,
     'rows' => $detail['rows'],
 ]);

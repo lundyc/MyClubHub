@@ -448,7 +448,7 @@ $statusMeta = [
           <span class="players-section__count"><?= $statusCount ?> <?= $statusCount === 1 ? 'player' : 'players' ?></span>
         </header>
         <div class="players-section__table">
-          <table class="table table-modern players-table hub-data-table hub-data-table--responsive align-middle mb-0">
+          <table class="table hub-data-table--rounded players-table hub-data-table hub-data-table--responsive align-middle mb-0">
             <thead>
               <tr>
                 <th scope="col">Player</th>
@@ -465,7 +465,7 @@ $statusMeta = [
                     ? 'players-table-row--inactive'
                     : (isset($atRiskPlayers[$pl['id']]) ? 'players-table-row--warning' : '');
                 ?>
-                <tr class="players-table-row <?= $rowStateClass ?>">
+                <tr class="players-table-row players-table-row--clickable <?= $rowStateClass ?>" data-href="player_view.php?id=<?= $pl['id'] ?>">
                   <td class="players-table__player-cell" data-label="Player">
                     <div class="players-player">
                       <div class="players-avatar players-avatar--table">
@@ -494,20 +494,10 @@ $statusMeta = [
                   <td class="text-center" data-label="Website"><?= renderDoneIcon((bool) $pl['website_done']) ?></td>
                   <td class="text-center players-table__actions-col" data-label="Actions">
                     <div class="btn-group players-row-actions hub-actions" role="group" aria-label="Player actions">
-                      <a href="player_view.php?id=<?= $pl['id'] ?>"
-                        class="btn btn-sm btn-action btn-view"
-                        title="View player">
-                        <i class="fa-regular fa-eye"></i>
-                      </a>
                       <a href="player_edit.php?id=<?= $pl['id'] ?>"
                         class="btn btn-sm btn-action btn-edit"
                         title="Edit player">
                         <i class="fa-regular fa-pen-to-square"></i>
-                      </a>
-                      <a href="player_website.php?id=<?= $pl['id'] ?>"
-                        class="btn btn-sm btn-action btn-edit"
-                        title="Website profile">
-                        <i class="fa-solid fa-globe"></i>
                       </a>
                     </div>
                   </td>
@@ -542,7 +532,7 @@ $statusMeta = [
                 : (isset($atRiskPlayers[$pl['id']]) ? 'player-mobile-card player-mobile-warning' : 'player-mobile-card');
               $statusLabel = renderPlayerStatusLabel((string) ($pl['status'] ?? ''), (bool) ($pl['active'] ?? false));
             ?>
-            <div class="<?= $playerCardClass ?>">
+            <div class="<?= $playerCardClass ?> player-mobile-card--clickable" data-href="player_view.php?id=<?= $pl['id'] ?>">
               <div class="player-mobile-head">
                 <div class="players-player">
                   <div class="players-avatar players-avatar--mobile">
@@ -558,9 +548,6 @@ $statusMeta = [
                   </div>
                 </div>
                 <div class="btn-group player-mobile-actions hub-actions" role="group" aria-label="Player actions">
-                  <a href="player_view.php?id=<?= $pl['id'] ?>" class="btn btn-sm btn-action btn-view" title="View">
-                    <i class="fa-regular fa-eye"></i>
-                  </a>
                   <a href="player_edit.php?id=<?= $pl['id'] ?>" class="btn btn-sm btn-action btn-edit" title="Edit">
                     <i class="fa-regular fa-pen-to-square"></i>
                   </a>
@@ -620,6 +607,17 @@ $statusMeta = [
     });
     $('#exportPdf').on('click', function() {
       window.location = 'export_players.php?format=pdf';
+    });
+
+    // Clickable player rows/cards — ignore clicks on links, buttons, or other controls within.
+    $('.players-table-row--clickable, .player-mobile-card--clickable').on('click', function(e) {
+      if ($(e.target).closest('a, button, input, select, textarea').length) {
+        return;
+      }
+      var href = $(this).data('href');
+      if (href) {
+        window.location = href;
+      }
     });
   });
 </script>

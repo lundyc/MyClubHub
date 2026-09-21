@@ -173,7 +173,7 @@ $under16Price = trim((string)($_GET['under16'] ?? 'FREE'));
       link.remove();
       URL.revokeObjectURL(link.href);
     } catch (error) {
-      window.alert(error?.message || 'The poster could not be generated.');
+      window.hubToast(error?.message || 'The poster could not be generated.', 'danger');
     } finally {
       downloadButton.disabled = false;
       downloadButton.innerHTML = originalLabel;
@@ -183,7 +183,7 @@ $under16Price = trim((string)($_GET['under16'] ?? 'FREE'));
   printButton.addEventListener('click', () => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
-      window.alert('Allow pop-ups for this site to open the PDF print view.');
+      window.hubToast('Allow pop-ups for this site to open the PDF print view.', 'danger');
       return;
     }
     printWindow.location.href = renderUrl('print');

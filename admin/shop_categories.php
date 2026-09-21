@@ -8,6 +8,7 @@ require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/lib/functions.php';
 require_once __DIR__ . '/lib/shop.php';
 require_once __DIR__ . '/account_auth.php';
+hub_auth_require_capability('shop');
 require_once __DIR__ . '/lib/audit.php';
 
 shop_ensure_schema($pdo);
@@ -64,12 +65,6 @@ $pageHero = [
 ];
 require_once __DIR__ . '/header.php';
 
-if ((string) ($currentRole ?? 'guest') !== 'admin') {
-    http_response_code(403);
-    echo '<div><div class="alert alert-danger">You do not have permission to manage the shop.</div></div>';
-    require __DIR__ . '/footer.php';
-    exit;
-}
 
 $categories = shop_get_categories($pdo, true);
 $editing = $editId > 0 ? shop_get_category($pdo, $editId) : null;
@@ -144,7 +139,7 @@ $parentOptions = array_filter($categories, static fn($c) => (int) ($c['parent_id
                             <td data-label="Status"><?= (int) $c['is_active'] === 1 ? '<span class="badge text-bg-success">Visible</span>' : '<span class="badge text-bg-secondary">Hidden</span>' ?></td>
                             <td data-label="Actions" class="text-end text-nowrap">
                                 <a class="btn btn-sm btn-outline-secondary" href="/admin/shop_categories.php?edit=<?= (int) $c['id'] ?>">Edit</a>
-                                <form method="post" class="d-inline" onsubmit="return confirm('Delete this category?');">
+                                <form method="post" class="d-inline" data-confirm="Delete this category?" data-confirm-action="Delete">
                                     <?= csrf_field() ?><input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="<?= (int) $c['id'] ?>">
                                     <button class="btn btn-sm btn-outline-danger" type="submit" <?= ((int) $c['product_count'] > 0 || $hasChildren) ? 'disabled title="Move its products/subcategories first"' : '' ?>>Delete</button>
                                 </form>

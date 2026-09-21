@@ -5,13 +5,18 @@ declare(strict_types=1);
 /**
  * Manual "paste the WOSFL table" update tool.
  *
- * WOSFL's site (wosfl.co.uk, via LeagueRepublic) is fronted by an AWS WAF
- * that challenges/blocks hosting-provider IPs — this server included, and
- * this held true even after moving to a different VPS IP, since the block
- * is keyed to the IP's "hosting provider" reputation category rather than
- * one specific address. No API is offered either. So until that changes,
- * standings are updated by pasting the table from a staff member's own
- * browser (not blocked — it's not a datacenter IP) into this page.
+ * WOSFL's site (wosfl.co.uk, via LeagueRepublic) sits behind an AWS WAF that
+ * challenges (HTTP 202, empty body) a request made straight to a standings
+ * page — this held true across a VPS IP change too, so it reads as an
+ * IP-reputation rule on that specific URL pattern, not a one-off IP ban.
+ *
+ * 2026-09-20: found that the WAF lets the request through once it's carrying
+ * the ALB/session cookies a normal visit to the site's homepage picks up
+ * first — wosfl-table.php now does that warm-up request before asking for
+ * the standings page, and live scraping works again (see its comments for
+ * detail). Kept this manual-paste tool as the fallback for whenever that
+ * stops working again — WAF rules change without notice — rather than
+ * removing it.
  */
 
 $pageHero = [

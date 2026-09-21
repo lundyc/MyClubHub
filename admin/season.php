@@ -82,6 +82,11 @@ $seasonTicketTerms = seasonTicketTermsTemplateForSeason($season);
                                                             <label class="form-check-label" for="isLocked">Locked</label>
                                                   </div>
                                         </div>
+                                        <div class="col-md-6">
+                                                  <label class="form-label" for="sponsorshipDeadline">Sponsorship deadline</label>
+                                                  <input type="date" class="form-control" id="sponsorshipDeadline" name="sponsorship_deadline" value="<?= h((string)($season['sponsorship_deadline'] ?? '')) ?>" <?= hub_auth_is_sponsorship_editor() ? '' : 'readonly' ?>>
+                                                  <div class="form-text">Once this date passes, player sponsorships are locked for everyone (including the sponsorship editor) and can no longer be changed. Leave blank for no deadline.<?= hub_auth_is_sponsorship_editor() ? '' : ' Only the club owner can change this.' ?></div>
+                                        </div>
                                         <div class="col-md-12">
                                                   <label class="form-label">League competition</label>
                                                   <select name="competition_id" class="form-select">

@@ -473,7 +473,7 @@ function playerReferenceAvatarUrl(?string $avatar): string
       toggle.setAttribute('aria-label', labelText);
     } catch (error) {
       checkbox.checked = !uploaded;
-      window.alert(error.message || 'Could not save website status.');
+      window.hubToast(error.message || 'Could not save website status.', 'danger');
     } finally {
       checkbox.disabled = false;
     }
@@ -547,7 +547,7 @@ function playerReferenceAvatarUrl(?string $avatar): string
         display.classList.remove('d-none');
         select.classList.add('d-none');
       } catch (error) {
-        window.alert(error.message || 'Could not save position.');
+        window.hubToast(error.message || 'Could not save position.', 'danger');
       } finally {
         select.disabled = false;
       }

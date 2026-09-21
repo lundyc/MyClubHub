@@ -5,7 +5,7 @@ declare(strict_types=1);
 
 // PHASE3B_GUARD_MARKER
 require_once __DIR__ . '/auth.php';
-if (!hub_auth_has_capability('football_ops')) {
+if (!hub_auth_has_capability('matchday')) {
     http_response_code(403);
     exit('Access denied.');
 }
@@ -320,7 +320,7 @@ if ($formState['event_secondary_player'] !== '' && !in_array($formState['event_s
                 <section class="utility-panel">
                     <p class="page-kicker">Match Not Found</p>
                     <h1 class="feature-card__title">This fixture does not exist.</h1>
-                    <a class="btn btn-maroon" href="matches.php">Back to Matches</a>
+                    <a class="btn btn-brand" href="matches.php">Back to Matches</a>
                 </section>
             <?php else: ?>
                 <section class="utility-panel matches-page-bar legacy-page-header mb-4">
@@ -331,7 +331,7 @@ if ($formState['event_secondary_player'] !== '' && !in_array($formState['event_s
                     <div class="dashboard-actions hub-actions">
                         <a class="btn btn-neutral" href="match.php?id=<?= safe((string) $match['id']) ?>">Match workspace</a>
                         <a class="btn btn-neutral" href="match_starting_11.php?id=<?= safe((string) $match['id']) ?>">Starting XI</a>
-                        <button id="postLatestEventToFacebookBtn" class="btn btn-maroon" type="button">Post latest event to Facebook</button>
+                        <button id="postLatestEventToFacebookBtn" class="btn btn-brand" type="button">Post latest event to Facebook</button>
                         <button id="shareLatestEventToTwitterBtn" class="btn btn-outline-maroon" type="button">Share latest event to X</button>
                     </div>
                 </section>
@@ -369,7 +369,7 @@ if ($formState['event_secondary_player'] !== '' && !in_array($formState['event_s
                                     <input type="hidden" name="action" value="quick_state">
                                     <input type="hidden" name="match_id" value="<?= safe((string) $match['id']) ?>">
                                     <input type="hidden" name="state_type" value="<?= safe($stateKey) ?>">
-                                    <button class="btn btn-maroon" type="submit"><?= safe($stateLabel) ?></button>
+                                    <button class="btn btn-brand" type="submit"><?= safe($stateLabel) ?></button>
                                 </form>
                             <?php endforeach; ?>
                         </div>
@@ -485,7 +485,7 @@ if ($formState['event_secondary_player'] !== '' && !in_array($formState['event_s
                             </section>
 
                             <div class="dashboard-actions hub-actions">
-                                <button class="btn btn-maroon matches-events-submit" type="submit"><?= $editingEventId !== '' ? 'Update Event' : 'Add Event' ?></button>
+                                <button class="btn btn-brand matches-events-submit" type="submit"><?= $editingEventId !== '' ? 'Update Event' : 'Add Event' ?></button>
                                 <?php if ($editingEventId !== ''): ?>
                                     <a class="btn btn-neutral" href="match_events.php?id=<?= safe((string) $match['id']) ?>">Cancel Edit</a>
                                 <?php endif; ?>

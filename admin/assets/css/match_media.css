@@ -5,9 +5,9 @@
 }
 
 .match-media-filelist {
-    margin-top: .6rem;
+    margin-top: var(--space-06rem, 0.6rem);
     max-width: 90%;
-    font-size: .78rem;
+    font-size: var(--fs-078, .78rem);
     font-weight: 600;
     color: var(--brand-primary);
     text-align: center;
@@ -17,12 +17,12 @@
 .match-media-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-    gap: 1.1rem;
+    gap: var(--space-11rem, 1.1rem);
 }
 
 .match-media-item {
     border: 1px solid rgba(75, 8, 24, .09);
-    border-radius: 8px;
+    border-radius: var(--radius-8px, 8px);
     overflow: hidden;
     background: #fff;
     box-shadow: 0 .75rem 1.6rem rgba(15, 23, 42, .06);
@@ -65,26 +65,26 @@
 }
 
 .match-media-item__body {
-    padding: .85rem;
+    padding: var(--space-085rem, .85rem);
     display: flex;
     flex-direction: column;
-    gap: .55rem;
+    gap: var(--space-055rem, .55rem);
 }
 
 .match-media-tags {
     display: flex;
     flex-wrap: wrap;
-    gap: .35rem;
+    gap: var(--space-035rem, .35rem);
     min-height: 1.6rem;
 }
 
 .match-media-tag {
     display: inline-flex;
     align-items: center;
-    gap: .3rem;
+    gap: var(--space-03rem, .3rem);
     padding: .25rem .55rem;
-    border-radius: 999px;
-    font-size: .72rem;
+    border-radius: var(--radius-pill, 999px);
+    font-size: var(--fs-072, .72rem);
     font-weight: 700;
     background: rgba(23, 114, 74, .1);
     color: var(--brand-darkest);
@@ -111,17 +111,17 @@
 .match-media-new-person {
     display: flex;
     flex-direction: column;
-    gap: .4rem;
-    padding: .6rem;
-    margin-top: .4rem;
+    gap: var(--space-4rem, .4rem);
+    padding: var(--space-06rem, 0.6rem);
+    margin-top: var(--space-4rem, .4rem);
     border: 1px dashed rgba(75, 8, 24, .24);
-    border-radius: 8px;
+    border-radius: var(--radius-8px, 8px);
     background: rgba(246, 236, 222, .35);
 }
 
 .match-media-new-person__actions {
     display: flex;
-    gap: .4rem;
+    gap: var(--space-4rem, .4rem);
 }
 
 .match-media-new-person__actions .btn {

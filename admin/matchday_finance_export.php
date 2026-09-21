@@ -17,7 +17,7 @@ if (!hub_auth_is_authenticated()) {
     header('Location: login.php');
     exit;
 }
-if (!hub_auth_is_admin() && !hub_auth_has_any_capability(['finance', 'football_ops'])) {
+if (!hub_auth_is_admin() && !hub_auth_has_any_capability(['finance', 'matchday'])) {
     http_response_code(403);
     exit('Access denied.');
 }

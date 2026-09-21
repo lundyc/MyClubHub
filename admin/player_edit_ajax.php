@@ -2,7 +2,7 @@
 
 // PHASE3B_GUARD_MARKER
 require_once __DIR__ . '/auth.php';
-if (!hub_auth_has_capability('football_ops')) {
+if (!hub_auth_has_capability('matchday')) {
     http_response_code(403);
     exit('Access denied.');
 }
@@ -97,6 +97,10 @@ try {
 
                     $allowed = ['notes']; // amount now readonly
                     if ($id > 0 && in_array($field, $allowed, true)) {
+                              $rowSeasonStmt = $pdo->prepare("SELECT season_id FROM sponsorships WHERE id = :id LIMIT 1");
+                              $rowSeasonStmt->execute([':id' => $id]);
+                              assertSponsorshipEditable($pdo, (int) $rowSeasonStmt->fetchColumn() ?: $seasonId);
+
                               $stmt = $pdo->prepare("UPDATE sponsorships SET $field = :val WHERE id = :id");
                               $stmt->execute([':val' => $value, ':id' => $id]);
                               auditLog($pdo, 'sponsorship_updated', "Updated {$field} for sponsorship #{$id}");
@@ -106,6 +110,10 @@ try {
           } elseif ($action === 'delete_sponsorship') {
                     $id = (int)($_POST['id'] ?? 0);
                     if ($id > 0) {
+                              $rowSeasonStmt = $pdo->prepare("SELECT season_id FROM sponsorships WHERE id = :id LIMIT 1");
+                              $rowSeasonStmt->execute([':id' => $id]);
+                              assertSponsorshipEditable($pdo, (int) $rowSeasonStmt->fetchColumn() ?: $seasonId);
+
                               $stmt = $pdo->prepare("UPDATE sponsorships SET ended_at = NOW(), ended_reason = 'deleted' WHERE id = :id");
                               $stmt->execute([':id' => $id]);
                               auditLog($pdo, 'sponsorship_ended', "Ended sponsorship #{$id}");
@@ -117,6 +125,7 @@ try {
                     $sponsorId = (int)($_POST['sponsor_id'] ?? 0);
                     $slot      = strtolower(trim($_POST['slot'] ?? ''));
                     $notes     = trim($_POST['notes'] ?? '');
+                    $complimentary = !empty($_POST['complimentary']) ? 1 : 0;
                     $postSeasonId = (int)($_POST['season_id'] ?? 0);
                     if ($postSeasonId > 0) {
                               $seasonId = $postSeasonId;
@@ -125,29 +134,7 @@ try {
                     }
 
                     if ($playerId > 0 && $sponsorId > 0 && in_array($slot, $playerEditSlots, true)) {
-                              $season = getSeasonById($pdo, $seasonId);
-                              if (!$season) {
-                                        throw new Exception("Invalid season selected");
-                              }
-                              if ((int)$season['is_locked'] === 1) {
-                                        throw new Exception("This season is locked");
-                              }
-
-                              $playerActiveStmt = $pdo->prepare("
-                                        SELECT COUNT(*)
-                                        FROM sponsorships
-                                        WHERE player_id = :pid
-                                          AND season_id = :season_id
-                                          AND ended_at IS NULL
-                                          AND LOWER(slot) IN ('home', 'away')
-                              ");
-                              $playerActiveStmt->execute([
-                                        ':pid' => $playerId,
-                                        ':season_id' => $seasonId,
-                              ]);
-                              if ((int)$playerActiveStmt->fetchColumn() > 0) {
-                                        throw new Exception("This player already has a sponsorship");
-                              }
+                              assertSponsorshipEditable($pdo, $seasonId);
 
                               $existingStmt = $pdo->prepare("
                                         SELECT id, ended_at
@@ -172,8 +159,9 @@ try {
                                                   UPDATE sponsorships
                                                   SET sponsor_id = :sid,
                                                       amount = 0,
+                                                      complimentary = :complimentary,
                                                       notes = :notes,
-                                                      paid = 0,
+                                                      paid = :paid,
                                                       ended_at = NULL,
                                                       ended_reason = NULL,
                                                       assigned_at = NOW(),
@@ -182,29 +170,35 @@ try {
                                         ");
                                         $stmt->execute([
                                                   ':sid' => $sponsorId,
+                                                  ':complimentary' => $complimentary,
                                                   ':notes' => $notes ?: null,
+                                                  ':paid' => $complimentary ? 1 : 0,
                                                   ':id' => (int)$existing['id'],
                                         ]);
                                         $id = (int)$existing['id'];
                               } else {
                                         $stmt = $pdo->prepare("
-                                                  INSERT INTO sponsorships (season_id, player_id, sponsor_id, slot, amount, notes, assigned_at, started_at)
-                                                  VALUES (:season_id, :pid, :sid, :slot, 0, :notes, NOW(), NOW())
+                                                  INSERT INTO sponsorships (season_id, player_id, sponsor_id, slot, amount, complimentary, paid, notes, assigned_at, started_at)
+                                                  VALUES (:season_id, :pid, :sid, :slot, 0, :complimentary, :paid, :notes, NOW(), NOW())
                                         ");
                                         $stmt->execute([
                                                   ':season_id' => $seasonId,
                                                   ':pid'   => $playerId,
                                                   ':sid'   => $sponsorId,
                                                   ':slot'  => $slot,
+                                                  ':complimentary' => $complimentary,
+                                                  ':paid' => $complimentary ? 1 : 0,
                                                   ':notes' => $notes ?: null
                                         ]);
                                         $id = (int)$pdo->lastInsertId();
                                         $sponsorshipCreated = true;
                               }
 
-                              auditLog($pdo, $sponsorshipCreated ? 'sponsorship_added' : 'sponsorship_updated', ($sponsorshipCreated ? 'Added' : 'Updated') . " {$slot} sponsorship for player #{$playerId}");
+                              auditLog($pdo, $sponsorshipCreated ? 'sponsorship_added' : 'sponsorship_updated', ($sponsorshipCreated ? 'Added' : 'Updated') . " {$slot} sponsorship for player #{$playerId}" . ($complimentary ? ' (complimentary)' : ''));
 
-                              recalculateSponsorAmounts($pdo, $playerId, $sponsorId, $seasonId);
+                              if (!$complimentary) {
+                                        recalculateSponsorAmounts($pdo, $playerId, $sponsorId, $seasonId);
+                              }
                               $affectedStmt = $pdo->prepare("SELECT id FROM sponsorships WHERE player_id = :pid AND sponsor_id = :sid AND season_id = :season_id");
                               $affectedStmt->execute([':pid' => $playerId, ':sid' => $sponsorId, ':season_id' => $seasonId]);
                               foreach ($affectedStmt->fetchAll(PDO::FETCH_COLUMN) as $affectedId) {
@@ -267,6 +261,10 @@ try {
                                                   ':season_id' => $seasonId,
                                         ]);
                                         $assignments = $assignmentsStmt->fetchAll(PDO::FETCH_ASSOC);
+
+                                        if ($assignments && in_array($sponsorshipAction, ['transfer', 'unassign'], true)) {
+                                                  assertSponsorshipEditable($pdo, $seasonId);
+                                        }
 
                                         if ($sponsorshipAction === 'transfer' && $assignments) {
                                                   $transferTargets = [];
@@ -368,13 +366,7 @@ try {
                               throw new Exception("Select a valid replacement player");
                     }
 
-                    $season = getSeasonById($pdo, $seasonId);
-                    if (!$season) {
-                              throw new Exception("Invalid season selected");
-                    }
-                    if ((int)$season['is_locked'] === 1) {
-                              throw new Exception("This season is locked");
-                    }
+                    assertSponsorshipEditable($pdo, $seasonId);
 
                     $playerStmt = $pdo->prepare("SELECT id, name, status, active, left_at FROM players WHERE id = :id LIMIT 1");
                     $playerStmt->execute([':id' => $playerId]);

@@ -150,6 +150,50 @@ function pub_player_sponsors(int $playerId): array
     return $slots;
 }
 
+/**
+ * The active/complimentary Player of the Match sponsor for one fixture, if any
+ * (home matchday sponsorship — see admin/lib/match_sponsorship.php). Only a
+ * paid or complimentary placement is ever shown publicly.
+ *
+ * @return array{name:string,logo:string}|null
+ */
+function pub_motm_sponsor(int $fixtureId): ?array
+{
+    try {
+        $stmt = db()->prepare(
+            "SELECT s.name, s.logo_path, ms.amount, ms.is_complimentary,
+                    COALESCE((SELECT SUM(amount) FROM match_sponsorship_payments WHERE match_sponsorship_id = ms.id), 0) AS paid_total
+             FROM match_sponsorships ms
+             JOIN sponsors s ON s.id = ms.sponsor_id AND s.is_active = 1
+             WHERE ms.fixture_id = :fid
+               AND ms.sponsorship_role = 'motm'
+               AND ms.ended_at IS NULL
+             LIMIT 1"
+        );
+        $stmt->execute([':fid' => $fixtureId]);
+        $row = $stmt->fetch();
+    } catch (Throwable) {
+        return null;
+    }
+    if (!$row) {
+        return null;
+    }
+
+    $amount = max(0.0, (float) $row['amount']);
+    $displayable = (int) $row['is_complimentary'] === 1
+        || $amount === 0.0
+        || (float) $row['paid_total'] + 0.005 >= $amount;
+    if (!$displayable) {
+        return null;
+    }
+
+    $name = trim((string) $row['name']);
+    if ($name === '') {
+        return null;
+    }
+    return ['name' => $name, 'logo' => trim((string) $row['logo_path'])];
+}
+
 /** First non-empty social link for a sponsor row, or ''. */
 function pub_sponsor_link(array $s): string
 {

@@ -201,7 +201,39 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 });
 
-// Consistent confirmation for destructive links and forms.
+// Lightweight, non-blocking success/error feedback for AJAX flows that update
+// the page in place (no reload) and so have no `.alert-*` banner to show one.
+// Renders into the `.hub-toast-region` live region every authenticated page
+// already has in footer.php, using Bootstrap's own Toast component.
+window.hubToast = function (message, type) {
+  var region = document.querySelector('.hub-toast-region');
+  if (!region || typeof bootstrap === 'undefined') return;
+
+  type = type === 'danger' ? 'danger' : 'success';
+  var toastEl = document.createElement('div');
+  toastEl.className = 'toast align-items-center text-bg-' + type + ' border-0';
+  toastEl.setAttribute('role', type === 'danger' ? 'alert' : 'status');
+  toastEl.setAttribute('aria-atomic', 'true');
+  toastEl.innerHTML =
+    '<div class="d-flex">' +
+      '<div class="toast-body"></div>' +
+      '<button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>' +
+    '</div>';
+  toastEl.querySelector('.toast-body').textContent = message;
+  region.appendChild(toastEl);
+
+  var toast = new bootstrap.Toast(toastEl, { delay: 4000 });
+  toastEl.addEventListener('hidden.bs.toast', function () { toastEl.remove(); });
+  toast.show();
+};
+
+// Consistent confirmation for destructive links and forms — and, via
+// window.hubConfirm(), for imperative JS flows too. Previously the declarative
+// data-confirm path used this branded modal while dozens of inline <script>
+// blocks fell back to the browser's native confirm()/alert(), an unstyled,
+// blocking dialog that looked like a bug next to everything else in the Hub.
+// window.hubConfirm() gives that JS the same modal as a Promise<boolean>:
+//   window.hubConfirm('Delete this?', { actionLabel: 'Delete' }).then(ok => { ... })
 document.addEventListener("DOMContentLoaded", () => {
   const dialogElement = document.getElementById("hubConfirmDialog");
   const actionButton = document.getElementById("hubConfirmDialogAction");
@@ -210,29 +242,47 @@ document.addEventListener("DOMContentLoaded", () => {
   if (!dialogElement || !actionButton || typeof bootstrap === "undefined") return;
 
   const dialog = new bootstrap.Modal(dialogElement);
-  let pendingAction = null;
+  let resolvePending = null;
 
-  const openDialog = (trigger, action) => {
-    pendingAction = action;
-    title.textContent = trigger.getAttribute("data-confirm-title") || "Confirm this action";
-    message.textContent = trigger.getAttribute("data-confirm") || "This action cannot be undone.";
-    actionButton.textContent = trigger.getAttribute("data-confirm-action") || "Continue";
-    actionButton.className = "btn " + (trigger.getAttribute("data-confirm-class") || "btn-danger");
-    dialog.show();
+  const settle = (result) => {
+    if (!resolvePending) return;
+    const resolve = resolvePending;
+    resolvePending = null;
+    resolve(result);
   };
+
+  window.hubConfirm = function (messageText, options) {
+    options = options || {};
+    return new Promise((resolve) => {
+      settle(false); // an overlapping call shouldn't normally happen, but don't leak it if it does
+      resolvePending = resolve;
+      title.textContent = options.title || "Confirm this action";
+      message.textContent = messageText || "This action cannot be undone.";
+      actionButton.textContent = options.actionLabel || "Continue";
+      actionButton.className = "btn " + (options.actionClass || "btn-danger");
+      dialog.show();
+    });
+  };
+
+  const confirmFromAttrs = (trigger) => window.hubConfirm(trigger.getAttribute("data-confirm") || "This action cannot be undone.", {
+    title: trigger.getAttribute("data-confirm-title"),
+    actionLabel: trigger.getAttribute("data-confirm-action"),
+    actionClass: trigger.getAttribute("data-confirm-class"),
+  });
 
   document.addEventListener("click", event => {
     const link = event.target.closest("a[data-confirm]");
     if (link) {
       event.preventDefault();
-      openDialog(link, () => { window.location.assign(link.href); });
+      confirmFromAttrs(link).then(ok => { if (ok) window.location.assign(link.href); });
       return;
     }
 
     const submitButton = event.target.closest("button[data-confirm]");
     if (!submitButton || submitButton.dataset.confirmed === "true" || !submitButton.form) return;
     event.preventDefault();
-    openDialog(submitButton, () => {
+    confirmFromAttrs(submitButton).then(ok => {
+      if (!ok) return;
       submitButton.dataset.confirmed = "true";
       submitButton.form.requestSubmit(submitButton);
     });
@@ -243,20 +293,19 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!form.matches("form[data-confirm]") || form.dataset.confirmed === "true") return;
     event.preventDefault();
     event.stopImmediatePropagation();
-    openDialog(form, () => {
+    confirmFromAttrs(form).then(ok => {
+      if (!ok) return;
       form.dataset.confirmed = "true";
       form.requestSubmit(event.submitter || undefined);
     });
   }, true);
 
   actionButton.addEventListener("click", () => {
-    const action = pendingAction;
-    pendingAction = null;
     dialog.hide();
-    if (action) action();
+    settle(true);
   });
 
-  dialogElement.addEventListener("hidden.bs.modal", () => { pendingAction = null; });
+  dialogElement.addEventListener("hidden.bs.modal", () => { settle(false); });
 });
 
 // Close the mobile navbar after using a navigation link.
@@ -273,6 +322,23 @@ document.addEventListener("click", (e) => {
   if (collapse) {
     collapse.hide();
   }
+});
+
+// Unsaved-changes guard — opt-in via <form data-warn-unsaved> on long or
+// complex forms, where losing edits to a stray back-button or an expired
+// session is costly. Warns before leaving the page while the form has
+// uncommitted edits; a real submit clears the flag so saving never warns.
+document.querySelectorAll('form[data-warn-unsaved]').forEach(function (form) {
+  var dirty = false;
+  form.addEventListener('input', function () { dirty = true; });
+  form.addEventListener('change', function () { dirty = true; });
+  form.addEventListener('submit', function () { dirty = false; });
+
+  window.addEventListener('beforeunload', function (event) {
+    if (!dirty) return;
+    event.preventDefault();
+    event.returnValue = '';
+  });
 });
 
 // Sidebar sections — personalisation. Every collapse/expand the user makes is
@@ -324,3 +390,157 @@ document.addEventListener("click", (e) => {
     panel.addEventListener("hidden.bs.collapse", () => { store[key] = 0; save(); });
   });
 })();
+
+// Dashboard sections — same idea as the sidebar above, but for the index.php
+// widgets (Stripe activity, snapshot, operations, club business, match day).
+// Previously there was no way to collapse a section you don't care about, so
+// every visit meant scrolling past all of it. Defaults to fully expanded
+// (unchanged behaviour) until someone actually collapses one.
+(function () {
+  const KEY = "hubDashboardSections";
+  const sections = document.querySelectorAll(".hub-index-section");
+  if (!sections.length) return;
+
+  let store = {};
+  try {
+    store = JSON.parse(window.localStorage.getItem(KEY) || "{}") || {};
+  } catch (error) {
+    store = {};
+  }
+  const save = () => {
+    try {
+      window.localStorage.setItem(KEY, JSON.stringify(store));
+    } catch (error) {
+      /* storage unavailable (private mode) — preference just won't persist */
+    }
+  };
+
+  sections.forEach((section) => {
+    const header = section.querySelector(".hub-index-section__header");
+    const heading = header ? header.querySelector("h2[id]") : null;
+    if (!header || !heading) return;
+
+    const key = heading.id;
+    const toggle = document.createElement("button");
+    toggle.type = "button";
+    toggle.className = "hub-index-section__toggle";
+    toggle.setAttribute("aria-controls", key);
+    toggle.innerHTML = '<i class="fa-solid fa-chevron-down" aria-hidden="true"></i>';
+    header.appendChild(toggle);
+
+    const setCollapsed = (collapsed) => {
+      section.classList.toggle("is-collapsed", collapsed);
+      toggle.setAttribute("aria-expanded", collapsed ? "false" : "true");
+      toggle.setAttribute("aria-label", (collapsed ? "Expand" : "Collapse") + " section: " + heading.textContent.trim());
+    };
+
+    setCollapsed(store[key] === 1);
+
+    toggle.addEventListener("click", () => {
+      const collapsed = !section.classList.contains("is-collapsed");
+      setCollapsed(collapsed);
+      store[key] = collapsed ? 1 : 0;
+      save();
+    });
+  });
+})();
+
+// Shared click-to-sort table behaviour. Pairs with hub_render_table_head()
+// in admin/lib/ui.php (see admin/DESIGN_SYSTEM.md Phase 3) — before this,
+// every page that wanted a sortable table (e.g. sponsors.php) reimplemented
+// this by hand. Sorts rows client-side by a th's data-sort-key, reading each
+// row's matching data-sort-<key> attribute; data-sort-type="number" sorts
+// numerically, anything else sorts as text.
+window.initHubSortableTable = function (table, options) {
+  if (!table) return;
+  options = options || {};
+  var storageKey = options.storageKey || null;
+  var headers = Array.prototype.slice.call(table.querySelectorAll('thead th[data-sort-key]'));
+  var tableBody = table.querySelector('tbody');
+  if (!headers.length || !tableBody) return;
+
+  function attrName(key) {
+    return 'sort' + key.replace(/(^|-)([a-z])/g, function (_, __, letter) {
+      return letter.toUpperCase();
+    });
+  }
+
+  function sortValue(row, key, type) {
+    var value = row.dataset[attrName(key)] || '';
+    if (type === 'number') {
+      var numericValue = parseFloat(value);
+      return isNaN(numericValue) ? 0 : numericValue;
+    }
+    return String(value).toLowerCase();
+  }
+
+  function updateHeaders(activeHeader, direction) {
+    headers.forEach(function (header) {
+      var button = header.querySelector('button');
+      var isActive = header === activeHeader;
+      header.setAttribute('aria-sort', isActive ? (direction === 'asc' ? 'ascending' : 'descending') : 'none');
+      if (button) {
+        button.setAttribute('aria-label', header.textContent.trim() + (isActive ? ', sorted ' + (direction === 'asc' ? 'ascending' : 'descending') : ', sort column'));
+      }
+    });
+  }
+
+  function applySort(header, direction) {
+    var key = header.dataset.sortKey;
+    var type = header.dataset.sortType || 'text';
+    var rows = Array.prototype.slice.call(tableBody.querySelectorAll('tr'));
+
+    rows.sort(function (left, right) {
+      var result = type === 'number'
+        ? sortValue(left, key, type) - sortValue(right, key, type)
+        : sortValue(left, key, type).localeCompare(sortValue(right, key, type), undefined, { numeric: true, sensitivity: 'base' });
+      return direction === 'asc' ? result : -result;
+    });
+
+    headers.forEach(function (otherHeader) {
+      if (otherHeader !== header) delete otherHeader.dataset.sortDirection;
+    });
+    header.dataset.sortDirection = direction;
+    if (storageKey) {
+      try {
+        sessionStorage.setItem(storageKey, JSON.stringify({ key: key, direction: direction }));
+      } catch (error) { /* Browser storage is optional. */ }
+    }
+    updateHeaders(header, direction);
+    rows.forEach(function (row) { tableBody.appendChild(row); });
+  }
+
+  headers.forEach(function (header) {
+    header.setAttribute('aria-sort', 'none');
+    var button = header.querySelector('button');
+    if (!button) return;
+    button.addEventListener('click', function () {
+      var direction = header.dataset.sortDirection === 'asc' ? 'desc' : 'asc';
+      applySort(header, direction);
+    });
+  });
+  updateHeaders(null, 'asc');
+
+  var remembered = null;
+  if (storageKey) {
+    try {
+      remembered = JSON.parse(sessionStorage.getItem(storageKey) || 'null');
+    } catch (error) {
+      remembered = null;
+    }
+  }
+  if (remembered) {
+    var rememberedHeader = headers.find(function (header) {
+      return header.dataset.sortKey === remembered.key;
+    });
+    if (rememberedHeader) {
+      applySort(rememberedHeader, remembered.direction);
+    }
+  }
+};
+
+document.addEventListener('DOMContentLoaded', function () {
+  document.querySelectorAll('table[data-hub-sortable]').forEach(function (table) {
+    window.initHubSortableTable(table, { storageKey: table.getAttribute('data-hub-sortable') || null });
+  });
+});

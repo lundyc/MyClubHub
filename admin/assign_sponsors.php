@@ -10,6 +10,9 @@ $errors = [];
 $success = false;
 $isAjaxRequest = isset($_POST['ajax']) && $_POST['ajax'] === '1';
 
+$sponsorshipDeadlinePassed = !empty($season['sponsorship_deadline']) && strtotime((string) $season['sponsorship_deadline']) <= time();
+$canEditSponsorships = hub_auth_is_sponsorship_editor() && !$sponsorshipDeadlinePassed;
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   if (!csrf_check()) {
     $errors[] = 'Invalid CSRF token.';
@@ -30,9 +33,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       if (!$season) {
         throw new RuntimeException('Invalid season selected.');
       }
-      if ((int)$season['is_locked'] === 1) {
-        throw new RuntimeException('This season is locked.');
-      }
+      assertSponsorshipEditable($pdo, $seasonId);
 
       $playerId = (int)($_POST['player_id'] ?? 0);
       $slotInputs = [
@@ -266,6 +267,12 @@ $availableSponsors = count($sponsorOptions);
     <div class="alert alert-danger"><?= h($error) ?></div>
   <?php endforeach; ?>
 
+  <?php if ($sponsorshipDeadlinePassed): ?>
+    <div class="alert alert-warning">This season's sponsorship deadline has passed — player sponsorships are locked for everyone and can't be changed.</div>
+  <?php elseif (!$canEditSponsorships): ?>
+    <div class="alert alert-info">Player sponsorships can only be changed by the club owner. You can view assignments here, but the fields below are read-only.</div>
+  <?php endif; ?>
+
   <?php hub_render_metric_grid([
     ['label'=>'Current players','value'=>(int)$totalCurrentPlayers,'meta'=>'Available for assignment','icon'=>'fa-users','tone'=>'primary'],
     ['label'=>'With sponsors','value'=>(int)$playersWithSponsors,'meta'=>'At least one placement','icon'=>'fa-handshake','tone'=>'success'],
@@ -291,7 +298,7 @@ $availableSponsors = count($sponsorOptions);
       <div class="card shadow-sm border-0">
         <div class="card-body p-0">
           <div class="table-responsive">
-            <table class="table table-modern table-hover align-middle mb-0">
+            <table class="table hub-data-table--rounded table-hover align-middle mb-0 hub-data-table">
               <thead class="bg-brand-primary text-white">
                 <tr>
                   <th style="min-width: 180px;">Player</th>
@@ -329,7 +336,7 @@ $availableSponsors = count($sponsorOptions);
                       </div>
                     </td>
                     <td>
-                      <select form="<?= h($formId) ?>" name="home_sponsor_id" class="form-select">
+                      <select form="<?= h($formId) ?>" name="home_sponsor_id" class="form-select" <?= $canEditSponsorships ? '' : 'disabled' ?>>
                         <option value="">Select home sponsor</option>
                         <?php foreach ($sponsorOptions as $sponsor): ?>
                           <option value="<?= (int)$sponsor['id'] ?>" <?= (int)$currentHome === (int)$sponsor['id'] ? 'selected' : '' ?>>
@@ -339,7 +346,7 @@ $availableSponsors = count($sponsorOptions);
                       </select>
                     </td>
                     <td>
-                      <select form="<?= h($formId) ?>" name="away_sponsor_id" class="form-select">
+                      <select form="<?= h($formId) ?>" name="away_sponsor_id" class="form-select" <?= $canEditSponsorships ? '' : 'disabled' ?>>
                         <option value="">Select away sponsor</option>
                         <?php foreach ($sponsorOptions as $sponsor): ?>
                           <option value="<?= (int)$sponsor['id'] ?>" <?= (int)$currentAway === (int)$sponsor['id'] ? 'selected' : '' ?>>
@@ -350,7 +357,7 @@ $availableSponsors = count($sponsorOptions);
                     </td>
                     <?php if ($showThirdSlot): ?>
                       <td>
-                        <select form="<?= h($formId) ?>" name="third_sponsor_id" class="form-select">
+                        <select form="<?= h($formId) ?>" name="third_sponsor_id" class="form-select" <?= $canEditSponsorships ? '' : 'disabled' ?>>
                           <option value="">Select third sponsor</option>
                           <?php foreach ($sponsorOptions as $sponsor): ?>
                             <option value="<?= (int)$sponsor['id'] ?>" <?= (int)$currentThird === (int)$sponsor['id'] ? 'selected' : '' ?>>
@@ -403,7 +410,7 @@ $availableSponsors = count($sponsorOptions);
 
                 <div class="mb-2">
                   <label class="form-label mb-1 small">Home Sponsor Slot</label>
-                  <select name="home_sponsor_id" class="form-select form-select-sm">
+                  <select name="home_sponsor_id" class="form-select form-select-sm" <?= $canEditSponsorships ? '' : 'disabled' ?>>
                     <option value="">Select home sponsor</option>
                     <?php foreach ($sponsorOptions as $sponsor): ?>
                       <option value="<?= (int)$sponsor['id'] ?>" <?= (int)$currentHome === (int)$sponsor['id'] ? 'selected' : '' ?>>
@@ -415,7 +422,7 @@ $availableSponsors = count($sponsorOptions);
 
                 <div class="mb-2">
                   <label class="form-label mb-1 small">Away Sponsor Slot</label>
-                  <select name="away_sponsor_id" class="form-select form-select-sm">
+                  <select name="away_sponsor_id" class="form-select form-select-sm" <?= $canEditSponsorships ? '' : 'disabled' ?>>
                     <option value="">Select away sponsor</option>
                     <?php foreach ($sponsorOptions as $sponsor): ?>
                       <option value="<?= (int)$sponsor['id'] ?>" <?= (int)$currentAway === (int)$sponsor['id'] ? 'selected' : '' ?>>
@@ -428,7 +435,7 @@ $availableSponsors = count($sponsorOptions);
                 <?php if ($showThirdSlot): ?>
                   <div class="mb-2">
                     <label class="form-label mb-1 small">Third</label>
-                    <select name="third_sponsor_id" class="form-select form-select-sm">
+                    <select name="third_sponsor_id" class="form-select form-select-sm" <?= $canEditSponsorships ? '' : 'disabled' ?>>
                       <option value="">Select third sponsor</option>
                       <?php foreach ($sponsorOptions as $sponsor): ?>
                         <option value="<?= (int)$sponsor['id'] ?>" <?= (int)$currentThird === (int)$sponsor['id'] ? 'selected' : '' ?>>

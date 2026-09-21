@@ -61,6 +61,7 @@ $leagueConfig['show_table_lines'] = !empty($leagueConfig['show_table_lines']);
 $leagueConfig['league_title'] = trim((string) ($leagueConfig['league_title'] ?? 'WOSFL Fourth Division')) ?: 'WOSFL Fourth Division';
 $leagueConfig['league_table_link'] = trim((string) ($leagueConfig['league_table_link'] ?? 'league_table.php')) ?: 'league_table.php';
 $leagueConfig['league_banner_image'] = trim((string) ($leagueConfig['league_banner_image'] ?? 'assets/images/header.png')) ?: 'assets/images/header.png';
+$leagueConfig['white_badge_image'] = trim((string) ($leagueConfig['white_badge_image'] ?? ''));
 
 $leagueBadgeDir = __DIR__ . '/badges';
 $leagueBadgeOverrides = league_table_load_badge_overrides(__DIR__ . '/data/wosfl_badge_overrides.json');
@@ -87,6 +88,7 @@ if (is_array($leagueCompetition) && !empty($leagueCompetition['is_league'])) {
     }
     $leagueConfig['league_table_link'] = trim((string) ($leagueCompetition['league_url'] ?? '')) ?: $leagueConfig['league_table_link'];
     $leagueConfig['league_banner_image'] = trim((string) ($leagueCompetition['league_banner_image'] ?? '')) ?: $leagueConfig['league_banner_image'];
+    $leagueConfig['white_badge_image'] = trim((string) ($leagueCompetition['white_badge_image'] ?? '')) ?: $leagueConfig['white_badge_image'];
     $leagueConfig['promotion_spots'] = isset($leagueCompetition['promotion_spots']) && $leagueCompetition['promotion_spots'] !== null
         ? max(1, (int) $leagueCompetition['promotion_spots'])
         : $leagueConfig['promotion_spots'];
@@ -326,7 +328,9 @@ function league_table_asset_url(string $path): string
 
 $leagueTableTitle = (string) $leagueConfig['league_title'];
 $leagueBannerImage = league_table_asset_url((string) $leagueConfig['league_banner_image']);
-$compactLeagueBannerImage = '/saltcoats/media/badges/league-logos/wosfl/wosfl-white.png';
+$compactLeagueBannerImage = $leagueConfig['white_badge_image'] !== ''
+    ? league_table_asset_url((string) $leagueConfig['white_badge_image'])
+    : $leagueBannerImage;
 $leagueBannerAlt = trim($leagueTableTitle) !== '' ? $leagueTableTitle . ' banner' : 'League table banner';
 $leagueTableHref = (string) $leagueConfig['league_table_link'];
 $postComposerPresets = [
@@ -697,10 +701,12 @@ function league_table_render_row(array $team): string
                 // goes any further.
                 if (result.json && result.json.requires_confirmation) {
                     var message = result.json.summary || result.json.message || 'Publish anyway?';
-                    if (window.confirm(message)) {
-                        return submitComposerRequest(config, caption, true);
-                    }
-                    throw new Error('Post cancelled.');
+                    return window.hubConfirm(message, { actionLabel: 'Publish anyway', actionClass: 'btn-primary' }).then(function (confirmed) {
+                        if (confirmed) {
+                            return submitComposerRequest(config, caption, true);
+                        }
+                        throw new Error('Post cancelled.');
+                    });
                 }
                 return result;
             });

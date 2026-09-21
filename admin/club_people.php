@@ -14,7 +14,7 @@ require_once __DIR__ . '/lib/people.php';
 require_once __DIR__ . '/lib/accounts.php';
 require_once __DIR__ . '/lib/positions.php';
 
-if ((string) ($currentRole ?? 'guest') !== 'admin') {
+if (!hub_auth_has_capability('admin_settings')) {
     http_response_code(403);
     echo '<div><div class="alert alert-danger">You do not have permission to manage people.</div></div>';
     require __DIR__ . '/footer.php';
@@ -237,10 +237,15 @@ $committeeCount = count($people) - count($members);
     </div>
 </form>
 
+<?php
+$peopleFiltersActive = $search !== '' || $statusFilter !== 'active' || $accountFilter !== '' || $positionFilter !== 0 || $roleFilter !== '' || $loginFilter !== '';
+?>
 <div class="hub-section-commandbar">
     <div>
         <h2>People & Users</h2>
-        <p><?= count($people) ?> person<?= count($people) === 1 ? '' : 's' ?> found &mdash; <?= $committeeCount ?> with a club role, <?= count($members) ?> without. A person only becomes a site user when they have a Hub account.</p>
+        <p><?= count($people) ?> person<?= count($people) === 1 ? '' : 's' ?> found &mdash; <?= $committeeCount ?> with a club role, <?= count($members) ?> without. A person only becomes a site user when they have a Hub account.
+        <?php if ($peopleFiltersActive): ?> <a href="/admin/club_people.php">Clear filters</a><?php endif; ?>
+        </p>
     </div>
     <div class="hub-local-actions"><a class="btn btn-brand btn-sm" href="/admin/club_person.php"><i class="fa-solid fa-plus me-1" aria-hidden="true"></i>Add person</a></div>
 </div>

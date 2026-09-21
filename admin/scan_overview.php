@@ -16,7 +16,7 @@ if (!hub_auth_is_authenticated()) {
     header('Location: /admin/login.php');
     exit;
 }
-hub_auth_require_permission('tickets.scan');
+hub_auth_require_capability('tickets_ops');
 
 ensureSeasonTicketAttendanceSchema($pdo);
 
@@ -99,7 +99,7 @@ if (!$fixture && $seasonId > 0) {
     $fixture = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
 }
 
-$canClearCheckIns = hub_auth_has_permission('tickets.manage');
+$canClearCheckIns = hub_auth_has_capability('tickets_ops');
 $csrfToken = (string) ($_SESSION['csrf_token'] ?? '');
 if ($csrfToken === '') {
     $csrfToken = bin2hex(random_bytes(32));
@@ -224,7 +224,7 @@ require_once __DIR__ . '/header.php';
                 <a class="btn btn-brand w-100 mb-3" href="<?= h($enterScanUrl) ?>"><i class="fa-solid fa-qrcode me-1" aria-hidden="true"></i>Enter Scan</a>
                 <a class="btn btn-outline-secondary w-100 mb-3" href="/scan/?season_id=<?= (int) $seasonId ?>"><i class="fa-solid fa-list me-1" aria-hidden="true"></i>Choose Match</a>
                 <?php if ($canClearCheckIns): ?>
-                    <form method="post" onsubmit="return confirm('Clear all check-ins and scan logs for this fixture?');">
+                    <form method="post" data-confirm="Clear all check-ins and scan logs for this fixture?" data-confirm-action="Clear">
                         <input type="hidden" name="csrf_token" value="<?= h($csrfToken) ?>">
                         <input type="hidden" name="action" value="clear_scans">
                         <button class="btn btn-outline-danger w-100" type="submit"><i class="fa-solid fa-trash-can me-1" aria-hidden="true"></i>Clear Check Ins</button>

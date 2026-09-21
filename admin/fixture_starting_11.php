@@ -309,7 +309,7 @@ $effectiveBackgroundUrl = $fixtureBackgroundUrl !== '' ? $fixtureBackgroundUrl :
           </div>
 
           <div class="table-responsive">
-            <table class="table table-sm align-middle starting11-table mb-0">
+            <table class="table table-sm align-middle starting11-table mb-0 hub-data-table">
               <thead>
                 <tr>
                   <th style="width: 80px;">No.</th>

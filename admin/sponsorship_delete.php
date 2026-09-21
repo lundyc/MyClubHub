@@ -14,6 +14,14 @@ if ($id <= 0 || $playerId <= 0) {
           exit;
 }
 
+try {
+          assertSponsorshipEditable($pdo, $seasonId);
+} catch (Throwable $e) {
+          echo '<div class="alert alert-danger">' . htmlspecialchars($e->getMessage(), ENT_QUOTES, 'UTF-8') . '</div>';
+          require __DIR__ . '/footer.php';
+          exit;
+}
+
 // Fetch sponsorship
 $stmt = $pdo->prepare("
     SELECT s.id, p.name AS player_name, sp.name AS sponsor_name, s.slot

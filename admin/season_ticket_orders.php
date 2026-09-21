@@ -31,7 +31,7 @@ require_once __DIR__ . '/lib/season_tickets.php';
 require_once __DIR__ . '/lib/season_passes.php';
 require_once __DIR__ . '/lib/audit.php';
 require_once __DIR__ . '/lib/invoices.php';
-hub_auth_require_permission('tickets.view');
+hub_auth_require_capability('tickets_ops');
 ensureSeasonPassSchema($pdo);
 invoices_ensure_schema($pdo);
 
@@ -152,7 +152,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                 exit;
             }
             if ($action === 'refund_order') {
-                if (!hub_auth_has_permission('tickets.refund') && !hub_auth_has_permission('finance.refund')) {
+                if (!hub_auth_has_capability('tickets_ops') && !hub_auth_has_capability('finance')) {
                     throw new RuntimeException('You do not have permission to refund ticket orders.');
                 }
                 refundSeasonPassOrder($pdo, $orderId, (float) ($_POST['amount'] ?? 0), (string) ($_POST['reason'] ?? ''), isset($currentUser['account_id']) ? (int) $currentUser['account_id'] : null);

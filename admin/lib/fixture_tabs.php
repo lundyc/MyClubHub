@@ -41,7 +41,7 @@ function renderFixtureTabs(int $fixtureId, int $seasonId, string $activeTab, boo
                               'target' => '',
                     ],
                     'player_of_match' => [
-                              'label' => 'Man of the Match',
+                              'label' => 'POTM',
                               'icon' => 'fa-medal',
                               'href' => 'match_player_of_match.php?fixture_id=' . $fixtureId . '&season_id=' . $seasonId,
                               'target' => '',

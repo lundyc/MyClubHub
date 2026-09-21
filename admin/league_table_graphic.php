@@ -359,7 +359,7 @@ $leagueTableTitle = (string) $leagueConfig['league_title'];
 
                 <div class="post-modal__footer">
                     <button type="button" class="btn btn-neutral" data-post-modal-close>Cancel</button>
-                    <button id="postModalSubmitBtn" type="submit" class="btn btn-maroon">Send</button>
+                    <button id="postModalSubmitBtn" type="submit" class="btn btn-brand">Send</button>
                 </div>
             </form>
         </div>
@@ -395,7 +395,7 @@ $leagueTableTitle = (string) $leagueConfig['league_title'];
                                 Refresh the latest standings, export the image, and prepare or publish the table for match day channels.
                             </p>
                             <div class="dashboard-actions">
-                                <button id="refreshTableBtn" class="btn btn-maroon" type="button">Refresh Table</button>
+                                <button id="refreshTableBtn" class="btn btn-brand" type="button" data-csrf-token="<?= htmlspecialchars(hub_auth_csrf_token(), ENT_QUOTES, 'UTF-8') ?>">Refresh Table</button>
                                 <button id="saveAsImageBtn" class="btn btn-neutral" type="button">Save as Image</button>
                             </div>
                         </article>
@@ -407,7 +407,7 @@ $leagueTableTitle = (string) $leagueConfig['league_title'];
                                 Generate a fresh export and send it straight into your posting workflow.
                             </p>
                             <div class="dashboard-actions">
-                                <button id="postToFacebookBtn" class="btn btn-maroon" type="button">Post to Facebook</button>
+                                <button id="postToFacebookBtn" class="btn btn-brand" type="button">Post to Facebook</button>
                                 <button id="postToInstagramBtn" class="btn btn-outline-maroon" type="button">Post to Instagram</button>
                                 <button id="postToTwitterBtn" class="btn btn-outline-maroon" type="button">Prepare Twitter Share</button>
                             </div>
@@ -569,7 +569,11 @@ $leagueTableTitle = (string) $leagueConfig['league_title'];
             setRefreshStatus('success', 'Refreshing standings data...');
 
             fetch('refresh.php', {
-                method: 'POST'
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                },
+                body: 'csrf_token=' + encodeURIComponent(button.getAttribute('data-csrf-token') || '')
             }).then(function(response) {
                 return response.json().then(function(json) {
                     return {

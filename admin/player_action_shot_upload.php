@@ -8,7 +8,7 @@ if (!hub_auth_has_capability('content_social')) {
 }
 // player_action_shot_upload.php: Handles action-shot photo uploads for a player.
 // Action shots are extra photos (beyond the single profile picture) used when
-// generating graphics such as Man of the Match, Goal and Player Sponsor posters.
+// generating graphics such as Player of the Match, Goal and Player Sponsor posters.
 require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/lib/functions.php';

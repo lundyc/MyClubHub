@@ -243,7 +243,7 @@ function invoices_has_source_access(PDO $pdo, array $invoice): bool
     return match ($sourceType) {
         'sponsorship_agreement', 'player_sponsorship_order' => hub_auth_has_capability('finance'),
         'shop_order' => hub_auth_is_admin(),
-        'match_ticket_order', 'season_pass_order' => hub_auth_has_permission('tickets.view'),
+        'match_ticket_order', 'season_pass_order' => hub_auth_has_capability('tickets_ops'),
         default => hub_auth_is_admin(),
     };
 }
@@ -727,7 +727,7 @@ function invoices_render_admin_section(array $invoices, string $generateButtonHt
             btn.dataset.wired = '1';
             btn.addEventListener('click', async () => {
                 const newStatus = btn.dataset.status;
-                if (newStatus === 'void' && !confirm('Void this invoice? This cannot be undone.')) return;
+                if (newStatus === 'void' && !(await window.hubConfirm('Void this invoice? This cannot be undone.', { actionLabel: 'Void invoice' }))) return;
                 btn.disabled = true;
                 try {
                     const response = await fetch('/admin/invoice_status.php', {
@@ -740,7 +740,7 @@ function invoices_render_admin_section(array $invoices, string $generateButtonHt
                     if (!response.ok || !json || !json.ok) throw new Error((json && json.error) ? json.error : 'Could not update the invoice.');
                     window.location.reload();
                 } catch (error) {
-                    alert(error.message || 'Could not update the invoice.');
+                    window.hubToast(error.message || 'Could not update the invoice.', 'danger');
                     btn.disabled = false;
                 }
             });

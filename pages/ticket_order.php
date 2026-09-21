@@ -58,7 +58,9 @@ set_meta(['title' => 'Tickets — ' . club('club_short_name') . ' v ' . (string)
               <h3><?= e((string) $ticket['ticket_label']) ?></h3>
               <div class="tcard__qr" data-qr data-qr-url="<?= e($ticketUrl) ?>"></div>
               <div class="tcard__manual">Manual code</div>
-              <div class="tcard__code"><?= e((string) $ticket['manual_code']) ?></div>
+              <div class="tcard__code"><?= e((string) $ticket['manual_code']) ?>
+                <button type="button" class="copybtn" data-copy="<?= e((string) $ticket['manual_code']) ?>" data-copy-type="ticket_manual_code">Copy</button>
+              </div>
               <div class="tcard__used<?= !empty($ticket['checked_in_at']) ? '' : ' is-hidden' ?>" data-ticket-used-label>✓ Checked in</div>
             </article>
           <?php endforeach; ?>

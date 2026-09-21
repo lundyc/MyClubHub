@@ -275,7 +275,7 @@ require_once __DIR__ . '/header.php';
                                                   <h5 class="card-title">Current Sponsorships</h5>
                                                   <?php if ($sponsorships): ?>
                                                             <div class="table-responsive">
-                                                                      <table class="table table-sm align-middle mb-0">
+                                                                      <table class="table table-sm align-middle mb-0 hub-data-table">
                                                                                 <thead>
                                                                                           <tr>
                                                                                                     <th>Sponsor</th>

@@ -14,6 +14,7 @@ require_once __DIR__ . '/header.php';
 require_once __DIR__ . '/lib/sponsorship_catalog.php';
 require_once __DIR__ . '/lib/season_passes.php';
 require_once __DIR__ . '/lib/player_match_stats.php';
+require_once __DIR__ . '/lib/stats.php';
 
 ensureSponsorshipCatalogSchema($pdo);
 syncLegacySponsorshipAgreements($pdo);
@@ -789,10 +790,8 @@ function reportRows_season_tickets(array $rows): array
             'Payment Status' => (string)$row['payment_status'],
             'Method' => (string)$row['payment_method'],
             'Ticket Status' => (string)$row['ticket_status'],
-            'Credential' => (int)$row['credential_active'] === 1 ? 'Active credential' : 'Inactive credential',
-            'Manual Code' => (string)$row['manual_code'],
             'Ordered' => reportDate((string)$row['created_at'], true),
-            'Paid' => reportDate((string)($row['paid_at'] ?? ''), true),
+            'Paid at' => reportDate((string)($row['paid_at'] ?? ''), true),
             'Amount' => (float)$row['total_amount'],
         ];
     }, $rows);
@@ -998,17 +997,17 @@ $REPORTS = [
 /**
  * Which capability each report type needs — reports.php mixes finance and
  * football data in one file, so it's gated per report type rather than as a
- * single page-level capability. A Manager (football_ops only) can open the
- * page but only reach the four pure football-stats reports; a Treasurer
- * (finance only) reaches everything else. Unlisted/unknown types deny by
- * default. Admin bypasses as always via hub_auth_has_any_capability().
+ * single page-level capability. Someone with only the Match Day capability
+ * can open the page but only reach the four pure football-stats reports; a
+ * Treasurer (finance only) reaches everything else. Unlisted/unknown types
+ * deny by default. Admin bypasses as always via hub_auth_has_any_capability().
  */
 $reportTypeCapability = [
-    'fixtures' => ['football_ops'],
-    'appearances' => ['football_ops'],
-    'match_events' => ['football_ops'],
-    'results_summary' => ['football_ops'],
-    'roster' => ['finance', 'football_ops'],
+    'fixtures' => ['matchday'],
+    'appearances' => ['matchday'],
+    'match_events' => ['matchday'],
+    'results_summary' => ['matchday'],
+    'roster' => ['finance', 'matchday'],
     'season_tickets' => ['finance', 'tickets_ops'],
     'season_ticket_comparison' => ['finance', 'tickets_ops'],
 ];
@@ -1493,27 +1492,6 @@ function reportRows_fixtures(array $fixtures): array
     return $rows;
 }
 
-/** Loads the Match Graphics event timeline (goals/cards/subs) written by match_events.php, keyed by fixture id. */
-function reportLoadMatchEvents(string $matchesDataFile): array
-{
-    $eventsByFixture = [];
-    if (is_file($matchesDataFile)) {
-        $decoded = json_decode((string)file_get_contents($matchesDataFile), true);
-        if (is_array($decoded)) {
-            foreach ($decoded as $match) {
-                if (!is_array($match)) {
-                    continue;
-                }
-                $fixtureId = (int)($match['id'] ?? 0);
-                if ($fixtureId > 0) {
-                    $eventsByFixture[$fixtureId] = is_array($match['events'] ?? null) ? $match['events'] : [];
-                }
-            }
-        }
-    }
-    return $eventsByFixture;
-}
-
 /**
  * Players who left before this season (e.g. released at the end of last season) are dropped
  * entirely; players who left during this season are kept but sorted to the bottom, below
@@ -1570,7 +1548,7 @@ function reportRows_match_events(array $fixtures, array $eventsByFixture, string
                 continue;
             }
             $type = (string)($event['type'] ?? '');
-            $isGoal = $type === 'goal' || ($type === 'penalty' && (string)($event['outcome'] ?? '') === 'scored');
+            $isGoal = $type === 'goal' || $type === 'penalty_scored' || ($type === 'penalty' && (string)($event['outcome'] ?? '') === 'scored');
             $isYellow = $type === 'yellow_card' || ($type === 'card' && (string)($event['card_type'] ?? '') === 'yellow');
             $isRed = $type === 'red_card' || ($type === 'card' && (string)($event['card_type'] ?? '') === 'red');
             if (!$isGoal && !$isYellow && !$isRed) {
@@ -1888,7 +1866,7 @@ switch ($reportType) {
         $reportRows = reportRows_appearances($filteredPlayers, $pdo, $seasonId, $teamNames, __DIR__ . '/data/matches.json', $season['start_date'] ?? null, $season['end_date'] ?? null);
         break;
     case 'match_events':
-        $reportRows = reportRows_match_events($filteredFixtures, reportLoadMatchEvents(__DIR__ . '/data/matches.json'), $playerFilter, $eventFilter);
+        $reportRows = reportRows_match_events($filteredFixtures, hub_matchday_events_by_fixture($pdo), $playerFilter, $eventFilter);
         break;
     case 'results_summary':
         $reportRows = reportRows_results_summary($filteredFixtures);
@@ -2324,7 +2302,7 @@ $packageTypesSummary = match (true) {
                     <?php endif; ?>
                 </div>
                 <div class="rpt-filter-actions">
-                    <button type="submit" class="btn rpt-btn rpt-btn--primary"><i class="fa-solid fa-filter" aria-hidden="true"></i> Apply filters</button>
+                    <button type="submit" class="btn rpt-btn btn-brand"><i class="fa-solid fa-filter" aria-hidden="true"></i> Apply filters</button>
                     <a href="?report_type=<?= h($reportType) ?>" class="btn rpt-btn rpt-btn--ghost">Reset</a>
                     <span class="rpt-filter-actions__count"><?= number_format(count($reportRows)) ?> result<?= count($reportRows) === 1 ? '' : 's' ?></span>
                 </div>

@@ -1,20 +1,20 @@
 .facebook-import {
     display: grid;
-    gap: 1rem;
+    gap: var(--space-4, 1rem);
 }
 
 .facebook-import-toolbar,
 .facebook-import-actions {
     background: #fff;
     border: 1px solid rgba(15, 23, 42, .08);
-    border-radius: 8px;
+    border-radius: var(--radius-8px, 8px);
     box-shadow: 0 8px 24px rgba(15, 23, 42, .06);
-    padding: 1rem;
+    padding: var(--space-4, 1rem);
 }
 
 .facebook-import-toolbar {
     display: grid;
-    gap: 1rem;
+    gap: var(--space-4, 1rem);
 }
 
 .facebook-import-toolbar__header,
@@ -22,18 +22,18 @@
     align-items: center;
     display: flex;
     justify-content: space-between;
-    gap: 1rem;
+    gap: var(--space-4, 1rem);
 }
 
 .facebook-import-actions__buttons {
     display: flex;
     flex-wrap: wrap;
-    gap: .6rem;
+    gap: var(--space-06rem, 0.6rem);
     justify-content: flex-end;
 }
 
 .facebook-import-toolbar h2 {
-    font-size: 1rem;
+    font-size: var(--fs-base, 1rem);
     margin: 0 0 .2rem;
 }
 
@@ -46,7 +46,7 @@
     align-items: center;
     display: flex;
     flex-wrap: wrap;
-    gap: .6rem;
+    gap: var(--space-06rem, 0.6rem);
     width: 100%;
 }
 
@@ -64,10 +64,10 @@
 
 .facebook-import-status {
     border: 1px solid rgba(15, 23, 42, .08);
-    border-radius: 999px;
+    border-radius: var(--radius-pill, 999px);
     color: #475569;
     flex: 0 0 auto;
-    font-size: .86rem;
+    font-size: var(--fs-086, .86rem);
     font-weight: 700;
     padding: .45rem .7rem;
     white-space: nowrap;
@@ -105,21 +105,21 @@ html.hub-nav-collapsed .facebook-import-actions {
 
 .facebook-import-grid {
     display: grid;
-    gap: 1rem;
+    gap: var(--space-4, 1rem);
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
 }
 
 .facebook-import-loadmore {
     display: flex;
     flex-wrap: wrap;
-    gap: .6rem;
+    gap: var(--space-06rem, 0.6rem);
     justify-content: center;
 }
 
 .facebook-import-card {
     background: #fff;
     border: 1px solid rgba(15, 23, 42, .1);
-    border-radius: 8px;
+    border-radius: var(--radius-8px, 8px);
     overflow: hidden;
     position: relative;
 }
@@ -136,9 +136,9 @@ html.hub-nav-collapsed .facebook-import-actions {
 .facebook-import-card__check {
     align-items: center;
     background: rgba(255, 255, 255, .94);
-    border-radius: 999px;
+    border-radius: var(--radius-pill, 999px);
     display: flex;
-    gap: .4rem;
+    gap: var(--space-4rem, .4rem);
     left: .65rem;
     padding: .35rem .7rem;
     position: absolute;
@@ -168,28 +168,28 @@ html.hub-nav-collapsed .facebook-import-actions {
 
 .facebook-import-card__body {
     display: grid;
-    gap: .75rem;
-    padding: .9rem;
+    gap: var(--space-3, .75rem);
+    padding: var(--space-9rem, .9rem);
 }
 
 .facebook-import-card__meta {
     color: #64748b;
     display: flex;
-    font-size: .82rem;
+    font-size: var(--fs-082, .82rem);
     justify-content: space-between;
-    gap: .75rem;
+    gap: var(--space-3, .75rem);
 }
 
 .facebook-import-card__reject {
     align-items: center;
     background: #fff;
     border: 1px solid rgba(220, 38, 38, .22);
-    border-radius: 6px;
+    border-radius: var(--radius-md, 6px);
     color: #991b1b;
     display: inline-flex;
-    font-size: .82rem;
+    font-size: var(--fs-082, .82rem);
     font-weight: 700;
-    gap: .35rem;
+    gap: var(--space-035rem, .35rem);
     justify-self: start;
     padding: .35rem .55rem;
 }
@@ -203,7 +203,7 @@ html.hub-nav-collapsed .facebook-import-actions {
 .facebook-import-card__text {
     color: #334155;
     display: -webkit-box;
-    font-size: .9rem;
+    font-size: var(--fs-09, .9rem);
     line-height: 1.35;
     margin: 0;
     min-height: 2.4rem;
@@ -213,8 +213,8 @@ html.hub-nav-collapsed .facebook-import-actions {
 }
 
 .facebook-import-suggestion {
-    border-radius: 6px;
-    font-size: .82rem;
+    border-radius: var(--radius-md, 6px);
+    font-size: var(--fs-082, .82rem);
     font-weight: 700;
     padding: .45rem .55rem;
 }
@@ -236,21 +236,21 @@ html.hub-nav-collapsed .facebook-import-actions {
 
 .facebook-import-fields {
     display: grid;
-    gap: .6rem;
+    gap: var(--space-06rem, 0.6rem);
 }
 
 .facebook-import-fields label {
     color: #475569;
     display: grid;
-    font-size: .78rem;
+    font-size: var(--fs-078, .78rem);
     font-weight: 700;
-    gap: .25rem;
+    gap: var(--space-1, .25rem);
     text-transform: uppercase;
 }
 
 .facebook-import-group-reference {
     display: grid;
-    gap: .65rem;
+    gap: var(--space-065rem, .65rem);
 }
 
 .facebook-import-group-reference .btn {
@@ -259,25 +259,25 @@ html.hub-nav-collapsed .facebook-import-actions {
 
 .facebook-import-faces {
     display: grid;
-    gap: .6rem;
+    gap: var(--space-06rem, 0.6rem);
 }
 
 .facebook-import-face {
     align-items: center;
     background: #f8fafc;
     border: 1px solid rgba(15, 23, 42, .08);
-    border-radius: 6px;
+    border-radius: var(--radius-md, 6px);
     display: grid;
-    gap: .65rem;
+    gap: var(--space-065rem, .65rem);
     grid-template-columns: 4.25rem minmax(0, 1fr);
-    padding: .55rem;
+    padding: var(--space-055rem, .55rem);
 }
 
 .facebook-import-face img,
 .facebook-import-face__empty {
     aspect-ratio: 1;
     background: #e2e8f0;
-    border-radius: 6px;
+    border-radius: var(--radius-md, 6px);
     display: block;
     object-fit: cover;
     width: 100%;
@@ -285,13 +285,13 @@ html.hub-nav-collapsed .facebook-import-actions {
 
 .facebook-import-face-help {
     color: #64748b;
-    font-size: .82rem;
+    font-size: var(--fs-082, .82rem);
     margin: 0;
 }
 
 .facebook-import-new-person {
     display: grid;
-    gap: .45rem;
+    gap: var(--space-045rem, .45rem);
     grid-template-columns: minmax(0, 1fr) auto;
 }
 
@@ -305,7 +305,7 @@ html.hub-nav-collapsed .facebook-import-actions {
 
 .facebook-import-face-match {
     color: #166534;
-    font-size: .78rem;
+    font-size: var(--fs-078, .78rem);
     font-weight: 700;
     grid-column: 1 / -1;
 }
@@ -321,11 +321,11 @@ html.hub-nav-collapsed .facebook-import-actions {
 .facebook-import-new-fixture {
     background: #f8fafc;
     border: 1px solid rgba(15, 23, 42, .08);
-    border-radius: 6px;
+    border-radius: var(--radius-md, 6px);
     display: grid;
-    gap: .55rem;
+    gap: var(--space-055rem, .55rem);
     grid-template-columns: minmax(0, 1fr) minmax(7rem, .45fr);
-    padding: .65rem;
+    padding: var(--space-065rem, .65rem);
 }
 
 .facebook-import-new-fixture label {

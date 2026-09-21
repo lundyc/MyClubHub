@@ -317,4 +317,156 @@
       });
     });
   }
+
+  /* ------------------------------------------------------------------------
+   * GA4 event tracking (additive — see ANALYTICS_EVENTS.md at the repo root
+   * for the full reference: event names, params and where each fires).
+   * Every call is routed through track() so it's a no-op when gtag isn't
+   * loaded (no ga_measurement_id set) or analytics consent hasn't been
+   * granted (gtag itself queues/drops events per the consent state set in
+   * head.php / site_footer.php). Nothing here changes existing behaviour —
+   * it only listens; it never calls preventDefault() or stopPropagation().
+   * ------------------------------------------------------------------------ */
+  var track = function (name, params) {
+    if (typeof window.gtag === "function") {
+      window.gtag("event", name, params || {});
+    }
+  };
+
+  var linkText = function (el) {
+    return (el.textContent || "").replace(/\s+/g, " ").trim().slice(0, 100);
+  };
+
+  /* Navigation clicks — utility bar, brand/logo, primary nav + dropdowns,
+     mobile toggles, footer link groups. */
+  (function () {
+    var navGroups = [
+      [".utility-bar__links a", "utility_bar"],
+      [".masthead .brand", "logo"],
+      [".primary-nav__list > .nav-item > .nav-item__link", "primary_nav"],
+      [".primary-nav .subnav__link", "primary_nav_dropdown"],
+      [".site-footer__cols nav a", "footer"],
+      [".site-footer__legal a", "footer_legal"]
+    ];
+    navGroups.forEach(function (group) {
+      Array.prototype.forEach.call(doc.querySelectorAll(group[0]), function (link) {
+        link.addEventListener("click", function () {
+          track("nav_click", {
+            link_text: linkText(link),
+            link_url: link.getAttribute("href") || "",
+            nav_area: group[1]
+          });
+        });
+      });
+    });
+
+    var mobileToggle = doc.querySelector(".nav-toggle");
+    if (mobileToggle) {
+      mobileToggle.addEventListener("click", function () {
+        var opening = mobileToggle.getAttribute("aria-expanded") !== "true";
+        track("nav_menu_toggle", { menu_name: "mobile_drawer", action: opening ? "open" : "close" });
+      });
+    }
+    Array.prototype.forEach.call(doc.querySelectorAll(".nav-item__toggle"), function (btn) {
+      btn.addEventListener("click", function () {
+        var item = btn.closest(".nav-item");
+        var label = item ? linkText(item.querySelector(".nav-item__link")) : "";
+        var opening = btn.getAttribute("aria-expanded") !== "true";
+        track("nav_menu_toggle", { menu_name: label || "submenu", action: opening ? "open" : "close" });
+      });
+    });
+  })();
+
+  /* Search — shop search box ("search" is a GA4-recommended event name). */
+  (function () {
+    var shopSearchForm = doc.querySelector(".shopsearch");
+    if (!shopSearchForm) return;
+    shopSearchForm.addEventListener("submit", function () {
+      var q = shopSearchForm.querySelector('input[name="q"]');
+      var term = q ? q.value.trim() : "";
+      if (term !== "") track("search", { search_term: term, search_area: "shop" });
+    });
+  })();
+
+  /* Filter interactions — shop category bar + news category chips. */
+  (function () {
+    Array.prototype.forEach.call(doc.querySelectorAll(".shopbar__cats a"), function (link) {
+      link.addEventListener("click", function () {
+        track("filter_select", { filter_type: "shop_category", filter_value: linkText(link) });
+      });
+    });
+    Array.prototype.forEach.call(doc.querySelectorAll(".chipnav__item"), function (link) {
+      link.addEventListener("click", function () {
+        track("filter_select", { filter_type: "news_category", filter_value: linkText(link) });
+      });
+    });
+  })();
+
+  /* Copy-to-clipboard — order reference / ticket manual code buttons.
+     data-copy holds the value to copy; data-copy-type is the event label
+     only (the value itself is never sent to GA4). */
+  (function () {
+    Array.prototype.forEach.call(doc.querySelectorAll("[data-copy]"), function (btn) {
+      var original = btn.textContent;
+      var resetTimer;
+      btn.addEventListener("click", function () {
+        var value = btn.getAttribute("data-copy") || "";
+        var done = function (ok) {
+          track("copy_to_clipboard", { content_type: btn.getAttribute("data-copy-type") || "unknown", success: ok });
+          if (!ok) return;
+          btn.classList.add("is-copied");
+          btn.textContent = "Copied";
+          clearTimeout(resetTimer);
+          resetTimer = setTimeout(function () {
+            btn.classList.remove("is-copied");
+            btn.textContent = original;
+          }, 1500);
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(value).then(function () { done(true); }, function () { done(false); });
+          return;
+        }
+        var ta = doc.createElement("textarea");
+        ta.value = value;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        doc.body.appendChild(ta);
+        ta.select();
+        var ok = false;
+        try { ok = doc.execCommand("copy"); } catch (e) { ok = false; }
+        doc.body.removeChild(ta);
+        done(ok);
+      });
+    });
+  })();
+
+  /* Scroll depth — 25/50/75/100%, fired once each per page, and only on
+     pages long enough that reaching each milestone is meaningful (content
+     taller than 1.5x the viewport). */
+  (function () {
+    var doc2 = doc.documentElement;
+    var pageHeight = Math.max(doc2.scrollHeight, doc.body ? doc.body.scrollHeight : 0);
+    if (pageHeight < window.innerHeight * 1.5) return;
+
+    var thresholds = [25, 50, 75, 100];
+    var fired = {};
+    var ticking = false;
+
+    var check = function () {
+      ticking = false;
+      var scrolled = window.scrollY + window.innerHeight;
+      var pct = Math.min(100, Math.round((scrolled / pageHeight) * 100));
+      thresholds.forEach(function (t) {
+        if (pct >= t && !fired[t]) {
+          fired[t] = true;
+          track("scroll_depth", { percent_scrolled: t, page_path: location.pathname });
+        }
+      });
+      if (fired[100]) window.removeEventListener("scroll", onScroll2);
+    };
+    var onScroll2 = function () {
+      if (!ticking) { ticking = true; requestAnimationFrame(check); }
+    };
+    window.addEventListener("scroll", onScroll2, { passive: true });
+  })();
 })();

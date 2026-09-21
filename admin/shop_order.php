@@ -2,21 +2,21 @@
 
 declare(strict_types=1);
 
-// Club Shop — single order detail and fulfilment actions. Hub admin only.
+// Club Shop — single order detail and fulfilment actions. Requires Shop access.
 
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/lib/functions.php';
 require_once __DIR__ . '/lib/shop.php';
 require_once __DIR__ . '/account_auth.php';
+hub_auth_require_capability('shop');
 require_once __DIR__ . '/lib/audit.php';
 require_once __DIR__ . '/lib/invoices.php';
 
 shop_ensure_schema($pdo);
 invoices_ensure_schema($pdo);
-$isAdmin = hub_auth_is_admin();
 $id = (int) ($_GET['id'] ?? $_POST['id'] ?? 0);
 
-if ($isAdmin && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
+if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     $back = '/admin/shop_order.php?id=' . $id;
     if (!csrf_check()) {
         header('Location: ' . $back . '&e=' . rawurlencode('Session expired — try again.'));
@@ -84,12 +84,6 @@ $pageHero = [
 ];
 require_once __DIR__ . '/header.php';
 
-if ((string) ($currentRole ?? 'guest') !== 'admin') {
-    http_response_code(403);
-    echo '<div><div class="alert alert-danger">You do not have permission to manage the shop.</div></div>';
-    require __DIR__ . '/footer.php';
-    exit;
-}
 
 $order = shop_get_order($pdo, $id);
 if (!$order) {
@@ -136,7 +130,7 @@ function shop_status_badge(string $status): string
             <section class="card hub-panel p-3 mb-3">
                 <h2 class="h6 fw-bold text-uppercase text-muted">Items</h2>
                 <div class="table-responsive">
-                <table class="table align-middle mb-0">
+                <table class="table align-middle mb-0 hub-data-table">
                     <tbody>
                     <?php foreach ($items as $it): ?>
                         <tr>
@@ -235,7 +229,7 @@ function shop_status_badge(string $status): string
                 <h2 class="h6 fw-bold text-uppercase text-muted">Actions</h2>
                 <div class="d-grid gap-2">
                     <?php if ((string) $order['status'] === 'pending_payment'): ?>
-                        <form method="post" onsubmit="return confirm('Mark this order as paid without taking a Stripe payment?');">
+                        <form method="post" data-confirm="Mark this order as paid without taking a Stripe payment?" data-confirm-action="Mark paid" data-confirm-class="btn-primary">
                             <?= csrf_field() ?><input type="hidden" name="action" value="mark_paid"><input type="hidden" name="id" value="<?= $id ?>">
                             <button class="btn btn-success w-100" type="submit">Mark as paid (manual)</button>
                         </form>
@@ -274,7 +268,7 @@ function shop_status_badge(string $status): string
             <?php if (in_array((string) $order['status'], ['paid', 'collected'], true) && !empty($order['stripe_payment_intent_id']) && $remainingRefund > 0): ?>
                 <section class="card hub-panel p-3 border-danger-subtle">
                     <h2 class="h6 fw-bold text-uppercase text-danger">Refund</h2>
-                    <form method="post" onsubmit="return confirm('Process this refund via Stripe?');" class="row g-2">
+                    <form method="post" data-confirm="Process this refund via Stripe?" data-confirm-action="Process refund" class="row g-2">
                         <?= csrf_field() ?><input type="hidden" name="action" value="refund"><input type="hidden" name="id" value="<?= $id ?>">
                         <div class="col-7"><label class="form-label">Amount (£)</label>
                             <input class="form-control" type="number" step="0.01" min="0.01" max="<?= h((string) $remainingRefund) ?>" name="amount" value="<?= h((string) $remainingRefund) ?>" required></div>

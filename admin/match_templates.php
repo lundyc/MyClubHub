@@ -5,7 +5,7 @@ declare(strict_types=1);
 
 // PHASE3B_GUARD_MARKER
 require_once __DIR__ . '/auth.php';
-if (!hub_auth_has_capability('football_ops')) {
+if (!hub_auth_has_capability('matchday')) {
     http_response_code(403);
     exit('Access denied.');
 }
@@ -162,7 +162,7 @@ if ($statusMessage === '' && isset($_GET['status']) && is_string($_GET['status']
                         <p class="page-kicker">Match Not Found</p>
                         <h1 class="feature-card__title">This fixture does not exist.</h1>
                         <p class="utility-panel__copy">Go back to the matches list and open a valid fixture.</p>
-                        <a class="btn btn-maroon" href="matches.php">Back to Matches</a>
+                        <a class="btn btn-brand" href="matches.php">Back to Matches</a>
                     </section>
                 <?php else: ?>
                     <section class="mb-4">
@@ -173,7 +173,7 @@ if ($statusMessage === '' && isset($_GET['status']) && is_string($_GET['status']
                                 This is the fixture workbench. Edit the match-specific copy of the master templates here, then move straight into the Starting XI, events, preview, and posting steps.
                             </p>
                             <div class="dashboard-actions hub-actions">
-                                <a class="btn btn-maroon" href="match.php?id=<?= safe((string) $match['id']) ?>">Back to Match</a>
+                                <a class="btn btn-brand" href="match.php?id=<?= safe((string) $match['id']) ?>">Back to Match</a>
                                 <a class="btn btn-neutral" href="match_starting_11.php?id=<?= safe((string) $match['id']) ?>">Starting XI</a>
                                 <a class="btn btn-neutral" href="match_events.php?id=<?= safe((string) $match['id']) ?>">Match Events</a>
                                 <a class="btn btn-neutral" href="match_graphic.php?id=<?= safe((string) $match['id']) ?>">Preview Graphic</a>
@@ -254,7 +254,7 @@ if ($statusMessage === '' && isset($_GET['status']) && is_string($_GET['status']
                                         </label>
 
                                         <div class="dashboard-actions hub-actions">
-                                            <button class="btn btn-maroon" type="submit">Save Starting XI Background</button>
+                                            <button class="btn btn-brand" type="submit">Save Starting XI Background</button>
                                             <a class="btn btn-neutral" href="match_starting_11.php?id=<?= safe((string) $match['id']) ?>">Open Starting XI</a>
                                         </div>
                                     </form>
@@ -341,7 +341,7 @@ if ($statusMessage === '' && isset($_GET['status']) && is_string($_GET['status']
                                             <?php endforeach; ?>
 
                                             <div class="dashboard-actions hub-actions">
-                                                <button class="btn btn-maroon" type="submit">Save <?= safe($templateDefinition['label']) ?></button>
+                                                <button class="btn btn-brand" type="submit">Save <?= safe($templateDefinition['label']) ?></button>
                                             </div>
                                         </form>
 
@@ -374,7 +374,7 @@ if ($statusMessage === '' && isset($_GET['status']) && is_string($_GET['status']
                         Once the template copy is right, move in order: build the Starting XI, record events, preview the graphic, then post to social.
                     </p>
                     <div class="dashboard-actions hub-actions">
-                        <a class="btn btn-maroon" href="match_starting_11.php?id=<?= safe((string) $match['id']) ?>">Build Starting XI</a>
+                        <a class="btn btn-brand" href="match_starting_11.php?id=<?= safe((string) $match['id']) ?>">Build Starting XI</a>
                         <a class="btn btn-neutral" href="match_events.php?id=<?= safe((string) $match['id']) ?>">Record Events</a>
                         <a class="btn btn-neutral" href="match_graphic.php?id=<?= safe((string) $match['id']) ?>">Preview and Post</a>
                         <a class="btn btn-neutral" href="match.php?id=<?= safe((string) $match['id']) ?>">Return to Match Workspace</a>

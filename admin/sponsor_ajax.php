@@ -46,6 +46,8 @@ try {
                 throw new Exception("Missing required fields");
             }
 
+            assertSponsorshipEditable($pdo, $seasonId);
+
             $stmt = $pdo->prepare("
                 INSERT INTO sponsorships (season_id, sponsor_id, player_id, slot, amount, notes, assigned_at, started_at)
                 VALUES (:season_id, :sponsor_id, :player_id, :slot, :amount, '', NOW(), NOW())
@@ -69,6 +71,11 @@ try {
         case 'delete_slot':
             $id = (int)($_POST['id'] ?? 0);
             if (!$id) throw new Exception("Invalid slot ID");
+
+            $slotSeasonStmt = $pdo->prepare("SELECT season_id FROM sponsorships WHERE id = :id LIMIT 1");
+            $slotSeasonStmt->execute([':id' => $id]);
+            $slotSeasonId = (int) $slotSeasonStmt->fetchColumn();
+            assertSponsorshipEditable($pdo, $slotSeasonId ?: $seasonId);
 
             $pdo->prepare("UPDATE sponsorships SET ended_at = NOW(), ended_reason = 'deleted' WHERE id = :id")
                 ->execute([':id' => $id]);

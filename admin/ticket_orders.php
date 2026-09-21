@@ -11,7 +11,7 @@ require_once __DIR__ . '/header.php';
 require_once __DIR__ . '/lib/match_tickets.php';
 require_once __DIR__ . '/lib/audit.php';
 require_once __DIR__ . '/lib/invoices.php';
-hub_auth_require_permission('tickets.view');
+hub_auth_require_capability('tickets_ops');
 ensureMatchTicketSchema($pdo);
 invoices_ensure_schema($pdo);
 
@@ -36,7 +36,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                 exit;
             }
             if ($action === 'refund_order') {
-                if (!hub_auth_has_permission('tickets.refund') && !hub_auth_has_permission('finance.refund')) {
+                if (!hub_auth_has_capability('tickets_ops') && !hub_auth_has_capability('finance')) {
                     throw new RuntimeException('You do not have permission to refund ticket orders.');
                 }
                 refundMatchTicketOrder($pdo, $orderId, (string) ($_POST['reason'] ?? ''), $userId);
@@ -162,7 +162,7 @@ if ($orderId > 0) {
                 <div class="card-body">
                     <h3 class="h5 mb-3">Tickets</h3>
                     <div class="table-responsive">
-                        <table class="table align-middle">
+                        <table class="table align-middle mb-0 hub-data-table">
                             <thead><tr><th>Ticket</th><th>Manual Code</th><th>Status</th><th></th></tr></thead>
                             <tbody>
                                 <?php foreach ($tickets as $ticket): ?>
@@ -275,7 +275,7 @@ hub_render_metric_grid([
 <div class="card shadow-sm border-0">
     <div class="card-body p-0">
         <div class="table-responsive">
-            <table class="table table-striped align-middle mb-0">
+            <table class="table table-striped align-middle mb-0 hub-data-table">
                 <thead><tr><th>Order</th><th>Buyer</th><th>Fixture</th><th>Total</th><th>Status</th><th>Used</th><th></th></tr></thead>
                 <tbody>
                     <?php foreach ($orders as $order): ?>

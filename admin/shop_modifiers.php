@@ -8,6 +8,7 @@ require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/lib/functions.php';
 require_once __DIR__ . '/lib/shop.php';
 require_once __DIR__ . '/account_auth.php';
+hub_auth_require_capability('shop');
 require_once __DIR__ . '/lib/audit.php';
 
 shop_ensure_schema($pdo);
@@ -60,12 +61,6 @@ $pageHero = [
 ];
 require_once __DIR__ . '/header.php';
 
-if ((string) ($currentRole ?? 'guest') !== 'admin') {
-    http_response_code(403);
-    echo '<div><div class="alert alert-danger">You do not have permission to manage the shop.</div></div>';
-    require __DIR__ . '/footer.php';
-    exit;
-}
 
 $groups = shop_get_modifier_groups($pdo);
 $selectedId = (int) ($_GET['group'] ?? 0);
@@ -133,7 +128,7 @@ $newGroup = isset($_GET['new']);
                         <div class="col-12 d-flex gap-2">
                             <button class="btn btn-dark" type="submit"><?= $group ? 'Save group' : 'Create group' ?></button>
                             <?php if ($group): ?>
-                                <form method="post" class="d-inline" onsubmit="return confirm('Delete this group and its options? It will be removed from any products.');">
+                                <form method="post" class="d-inline" data-confirm="Delete this group and its options? It will be removed from any products." data-confirm-action="Delete">
                                     <?= csrf_field() ?><input type="hidden" name="action" value="delete_group"><input type="hidden" name="id" value="<?= (int) $group['id'] ?>">
                                     <button class="btn btn-outline-danger" type="submit">Delete group</button>
                                 </form>
@@ -147,7 +142,7 @@ $newGroup = isset($_GET['new']);
                 <section class="card hub-panel p-3">
                     <h2 class="h6 fw-bold text-uppercase text-muted">Options in "<?= h((string) $group['name']) ?>"</h2>
                     <div class="table-responsive mb-3">
-                        <table class="table table-sm align-middle mb-0">
+                        <table class="table table-sm align-middle mb-0 hub-data-table">
                             <thead><tr><th>Group</th><th>Label</th><th class="text-end">Price change</th><th>SKU</th><th class="text-end">Stock</th><th>Active</th><th></th></tr></thead>
                             <tbody>
                             <?php if (!$options): ?><tr><td colspan="7" class="text-muted text-center py-3">No options yet.</td></tr><?php endif; ?>
@@ -161,7 +156,7 @@ $newGroup = isset($_GET['new']);
                                     <td><?= (int) $o['is_active'] === 1 ? '<span class="badge text-bg-success">Yes</span>' : '<span class="badge text-bg-secondary">No</span>' ?></td>
                                     <td class="text-end text-nowrap">
                                         <a class="btn btn-sm btn-outline-secondary" href="/admin/shop_modifiers.php?group=<?= (int) $group['id'] ?>&option=<?= (int) $o['id'] ?>">Edit</a>
-                                        <form method="post" class="d-inline" onsubmit="return confirm('Remove this option?');">
+                                        <form method="post" class="d-inline" data-confirm="Remove this option?" data-confirm-action="Remove">
                                             <?= csrf_field() ?><input type="hidden" name="action" value="delete_option"><input type="hidden" name="group_id" value="<?= (int) $group['id'] ?>"><input type="hidden" name="id" value="<?= (int) $o['id'] ?>">
                                             <button class="btn btn-sm btn-outline-danger" type="submit">×</button>
                                         </form>

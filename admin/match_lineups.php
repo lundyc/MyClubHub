@@ -24,7 +24,7 @@ require_once __DIR__ . '/lib/match_sponsorship.php';
 require_once __DIR__ . '/lib/matchday_record.php';
 require_once __DIR__ . '/lib/audit.php';
 
-if (!hub_auth_has_capability('football_ops')) {
+if (!hub_auth_has_capability('matchday')) {
     http_response_code(403);
     echo '<div class="container-fluid"><div class="alert alert-danger">Access denied.</div></div>';
     require __DIR__ . '/footer.php';
@@ -355,7 +355,7 @@ require_once __DIR__ . '/lib/functions.php';
                                             <span class="text-success"><?= h((string) $s['player_on_name']) ?></span>
                                             <?php if ((string) $s['reason'] !== ''): ?><span class="text-secondary">· <?= h((string) $s['reason']) ?></span><?php endif; ?>
                                         </span>
-                                        <form method="post" action="match_sub_save.php" onsubmit="return confirm('Remove this substitution?');">
+                                        <form method="post" action="match_sub_save.php" data-confirm="Remove this substitution?" data-confirm-action="Remove">
                                             <?= csrf_field() ?>
                                             <input type="hidden" name="fixture_id" value="<?= $fixtureId ?>">
                                             <input type="hidden" name="season_id" value="<?= $seasonId ?>">

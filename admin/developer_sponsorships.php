@@ -60,7 +60,7 @@ $history = $stmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
 
 <div>
-          <h1 class="mb-4"><i class="fas fa-history"></i> Sponsorships History</h1>
+          <h1 class="mb-4"><i class="fa-solid fa-history"></i> Sponsorships History</h1>
 
           <!-- Filters -->
           <form method="get" class="row g-2 mb-3">
@@ -83,7 +83,7 @@ $history = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
           <!-- Table -->
           <div class="table-responsive">
-                    <table class="table table-bordered table-striped table-sm">
+                    <table class="table table-bordered table-striped table-sm mb-0 hub-data-table">
                               <thead class="table-dark">
                                         <tr>
                                                   <th>ID</th>
@@ -126,19 +126,14 @@ $history = $stmt->fetchAll(PDO::FETCH_ASSOC);
           </div>
 
           <!-- Pagination -->
-          <?php if ($totalPages > 1): ?>
-                    <nav>
-                              <ul class="pagination">
-                                        <?php for ($i = 1; $i <= $totalPages; $i++): ?>
-                                                  <li class="page-item <?= ($i === $page) ? 'active' : '' ?>">
-                                                            <a class="page-link" href="?page=<?= $i ?>&sponsor_id=<?= urlencode($sponsorId) ?>&player_id=<?= urlencode($playerId) ?>&slot=<?= urlencode($slot) ?>&action=<?= urlencode($action) ?>">
-                                                                      <?= $i ?>
-                                                            </a>
-                                                  </li>
-                                        <?php endfor; ?>
-                              </ul>
-                    </nav>
-          <?php endif; ?>
+          <?php
+          hub_render_pagination(
+              $page,
+              (int) $totalPages,
+              static fn (int $targetPage): string => '?page=' . $targetPage . '&sponsor_id=' . urlencode($sponsorId) . '&player_id=' . urlencode($playerId) . '&slot=' . urlencode($slot) . '&action=' . urlencode($action),
+              'Sponsorship history pages'
+          );
+          ?>
 </div>
 
 <?php require_once __DIR__ . '/footer.php'; ?>

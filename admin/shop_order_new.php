@@ -4,8 +4,8 @@ require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/lib/functions.php';
 require_once __DIR__ . '/lib/shop.php';
 require_once __DIR__ . '/account_auth.php';
+hub_auth_require_capability('shop');
 require_once __DIR__ . '/lib/audit.php';
-if (!hub_auth_is_admin()) { http_response_code(403); exit('Forbidden'); }
 shop_ensure_schema($pdo);
 if (session_status() !== PHP_SESSION_ACTIVE) { session_start(); }
 $_SESSION['shop_manual_nonce'] ??= bin2hex(random_bytes(24));

@@ -1,10 +1,14 @@
 <?php
 // sponsor.php — Sponsor profile & editor
+$pageHero = [];
 require_once __DIR__ . '/header.php';
 require_once __DIR__ . '/lib/functions.php';
 require_once __DIR__ . '/sync_social_directory.php';
 require_once __DIR__ . '/lib/sponsorship_catalog.php';
 require_once __DIR__ . '/lib/facebook_page_resolver.php';
+require_once __DIR__ . '/lib/match_sponsorship.php';
+require_once __DIR__ . '/lib/stripe.php';
+require_once __DIR__ . '/lib/sponsor_workspace.php';
 
 ensureSponsorshipCatalogSchema($pdo);
 
@@ -169,7 +173,65 @@ if ($action === 'view') {
     exit;
   }
 
+  $workspaceAjax = strtolower((string)($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '')) === 'xmlhttprequest';
+  $workspaceError = '';
+  $workspaceMessage = (string)($_SESSION['sponsor_workspace_message'][$id] ?? '');
+  unset($_SESSION['sponsor_workspace_message'][$id]);
+  if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && isset($_POST['workspace_action'])) {
+    try {
+      if (!csrf_check()) throw new RuntimeException('Your session expired. Please try again.');
+      $workspaceAction = (string)$_POST['workspace_action'];
+      $paymentAction = in_array($workspaceAction, ['add_payment', 'mark_paid', 'edit_payment', 'delete_payment'], true);
+      if (!hub_auth_has_capability($paymentAction ? 'finance' : 'sponsorship')) throw new RuntimeException('You do not have permission to make this change.');
+      if (in_array($workspaceAction, ['archive_sponsor', 'restore_sponsor'], true)) {
+        $isActive = $workspaceAction === 'restore_sponsor' ? 1 : 0;
+        $pdo->prepare('UPDATE sponsors SET is_active = :active WHERE id = :id')->execute([':active' => $isActive, ':id' => $id]);
+        $sponsor['is_active'] = $isActive;
+        auditLog($pdo, $isActive ? 'sponsor_restored' : 'sponsor_archived', 'Sponsor #' . $id . ' (' . (string)$sponsor['name'] . ')');
+        $workspaceMessage = $isActive ? 'Sponsor restored to the active list.' : 'Sponsor archived. All agreements, payments and notes have been kept.';
+      } elseif ($paymentAction) {
+        sponsorWorkspacePayment($pdo, $id, $_POST);
+        $workspaceMessage = $workspaceAction === 'delete_payment' ? 'Payment removed. The balance has been updated.' : 'Payment saved. The balance has been updated.';
+      } elseif ($workspaceAction === 'save_agreement') {
+        sponsorWorkspaceSave($pdo, $id, $_POST);
+        $workspaceMessage = 'Agreement saved.';
+      } elseif ($workspaceAction === 'delete_agreement') {
+        $agreementId = (int)($_POST['agreement_id'] ?? 0);
+        sponsorWorkspaceAgreement($pdo, $id, $agreementId);
+        deleteSponsorshipAgreement($pdo, $agreementId);
+        auditLog($pdo, 'sponsorship_agreement_deleted', "Deleted agreement #{$agreementId} for sponsor #{$id}");
+        $workspaceMessage = 'Agreement deleted.';
+      } else {
+        throw new RuntimeException('Unknown action.');
+      }
+      if (!$workspaceAjax) {
+        $_SESSION['sponsor_workspace_message'][$id] = $workspaceMessage;
+        header('Location: sponsor.php?id=' . $id . '&tab=agreements');
+        exit;
+      }
+    } catch (Throwable $e) {
+      $workspaceError = $e->getMessage();
+      if ($workspaceAjax) {
+        while (ob_get_level()) ob_end_clean();
+        header('Content-Type: application/json');
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => $workspaceError]);
+        exit;
+      }
+    }
+  }
+
   $clubAgreements = getSponsorshipAgreements($pdo, ['sponsor_id' => $id]);
+  if ($workspaceAjax && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && isset($_POST['workspace_action'])) {
+    ob_start();
+    require __DIR__ . '/partials/sponsor_agreements.php';
+    $workspaceHtml = ob_get_clean();
+    while (ob_get_level()) ob_end_clean();
+    header('Content-Type: application/json');
+    echo json_encode(['success' => true, 'html' => $workspaceHtml, 'count' => count($clubAgreements), 'sponsor_active' => (bool)$sponsor['is_active']]);
+    exit;
+  }
+
   $hasMainSponsorAgreement = false;
   foreach ($clubAgreements as $clubAgreement) {
     if ((string)$clubAgreement['package_code'] === 'main_sponsor' && (string)$clubAgreement['effective_status'] === 'active') {
@@ -177,77 +239,6 @@ if ($action === 'view') {
       break;
     }
   }
-  $agreementTotalDue = 0.0;
-  $agreementTotalPaid = 0.0;
-  foreach ($clubAgreements as $clubAgreement) {
-    if (!in_array((string)$clubAgreement['effective_status'], ['active', 'scheduled'], true)) continue;
-    if (!empty($clubAgreement['season_id']) && (int)$clubAgreement['season_id'] !== $seasonId) continue;
-    $agreementTotalDue += (float)$clubAgreement['agreed_amount'];
-    $agreementTotalPaid += (float)$clubAgreement['total_paid'];
-  }
-  $agreementTotalOutstanding = max(0, $agreementTotalDue - $agreementTotalPaid);
-
-  $totalsStmt = $pdo->prepare("
-        SELECT SUM(sp.amount) AS total_due, COALESCE(SUM(pay.amount), 0) AS total_paid
-        FROM sponsorships sp
-        LEFT JOIN sponsorship_payments pay ON pay.sponsorship_id = sp.id
-        WHERE sp.sponsor_id = :id
-          AND sp.season_id = :season_id
-          AND sp.ended_at IS NULL
-    ");
-  $totalsStmt->execute([':id' => $id, ':season_id' => $seasonId]);
-  $totals = $totalsStmt->fetch(PDO::FETCH_ASSOC) ?: [];
-  $total_due = (float)($totals['total_due'] ?? 0);
-  $total_paid = (float)($totals['total_paid'] ?? 0);
-  $total_outstanding = $total_due - $total_paid;
-
-  $sponsorshipStmt = $pdo->prepare("
-        SELECT sp.id,
-               sp.player_id,
-               sp.season_id,
-               sp.slot,
-               sp.amount,
-               sp.started_at,
-               sp.ended_at,
-               sp.ended_reason,
-               se.name AS season_name,
-               p.name AS player_name,
-               p.active AS player_active,
-               a.id AS agreement_id,
-               COALESCE(SUM(pay.amount), 0) AS paid_total
-        FROM sponsorships sp
-        JOIN players p ON sp.player_id = p.id
-        LEFT JOIN seasons se ON se.id = sp.season_id
-        LEFT JOIN sponsorship_payments pay ON pay.sponsorship_id = sp.id
-        LEFT JOIN sponsorship_agreements a ON a.legacy_source = 'player' AND a.legacy_id = sp.id
-        WHERE sp.sponsor_id = :id
-        GROUP BY sp.id, sp.player_id, sp.season_id, sp.slot, sp.amount, sp.started_at, sp.ended_at, sp.ended_reason, se.name, p.name, p.active, a.id
-        ORDER BY sp.ended_at IS NULL DESC, sp.season_id DESC, p.name ASC, FIELD(sp.slot, 'home', 'away', 'third')
-    ");
-  $sponsorshipStmt->execute([':id' => $id]);
-  $sponsorships = $sponsorshipStmt->fetchAll(PDO::FETCH_ASSOC);
-  $payableSponsorships = array_values(array_filter($sponsorships, static function (array $sp) use ($seasonId): bool {
-    return (int)$sp['season_id'] === $seasonId && empty($sp['ended_at']);
-  }));
-
-  $paymentsStmt = $pdo->prepare("
-        SELECT pay.*, p.name AS player_name, sp.slot, sp.season_id, sp.ended_at, se.name AS season_name
-        FROM sponsorship_payments pay
-        JOIN sponsorships sp ON pay.sponsorship_id = sp.id
-        JOIN players p ON sp.player_id = p.id
-        LEFT JOIN seasons se ON se.id = COALESCE(pay.season_id, sp.season_id)
-        WHERE sp.sponsor_id = :id
-        ORDER BY pay.paid_at DESC
-    ");
-  $paymentsStmt->execute([':id' => $id]);
-  $payments = $paymentsStmt->fetchAll(PDO::FETCH_ASSOC);
-  $activeSponsorshipCount = count(array_filter($sponsorships, static fn(array $sp): bool => empty($sp['ended_at'])));
-  $historicSponsorshipCount = count(array_filter($sponsorships, static fn(array $sp): bool => !empty($sp['ended_at'])));
-  $playerSponsorshipDue = array_sum(array_map(static fn(array $sp): float => empty($sp['ended_at']) ? (float)$sp['amount'] : 0.0, $sponsorships));
-  $playerSponsorshipPaid = array_sum(array_map(static fn(array $sp): float => empty($sp['ended_at']) ? (float)$sp['paid_total'] : 0.0, $sponsorships));
-  $playerSponsorshipOutstanding = max(0, $playerSponsorshipDue - $playerSponsorshipPaid);
-  $allPlayerPaymentTotal = array_sum(array_map(static fn(array $payment): float => (float)$payment['amount'], $payments));
-
   $notesStmt = $pdo->prepare("
         SELECT n.*
         FROM sponsor_notes n
@@ -256,34 +247,6 @@ if ($action === 'view') {
     ");
   $notesStmt->execute([':id' => $id]);
   $notes = $notesStmt->fetchAll(PDO::FETCH_ASSOC);
-
-  $slotAmounts = getSponsorshipSlotAmounts($pdo, $seasonId);
-  $availableSlots = getAllowedSponsorshipSlots($pdo, $seasonId);
-  $slotAmountMap = [];
-  foreach ($availableSlots as $index => $slotName) {
-    $slotAmountMap[$slotName] = (float)($slotAmounts[$index + 1] ?? 0);
-  }
-  $activePlayersStmt = $pdo->prepare("
-        SELECT
-          p.id,
-          p.name,
-          COALESCE(GROUP_CONCAT(DISTINCT LOWER(s.slot) ORDER BY FIELD(UPPER(s.slot), 'HOME', 'AWAY', 'THIRD') SEPARATOR ','), '') AS occupied_slots,
-          COUNT(DISTINCT s.slot) AS occupied_count
-        FROM players p
-        LEFT JOIN sponsorships s
-          ON s.player_id = p.id
-         AND s.season_id = :season_id
-         AND s.ended_at IS NULL
-        WHERE p.active = 1
-        GROUP BY p.id, p.name
-        HAVING COUNT(DISTINCT s.slot) < :allowed_slot_count
-        ORDER BY p.name ASC
-    ");
-  $activePlayersStmt->execute([
-    ':season_id' => $seasonId,
-    ':allowed_slot_count' => count($availableSlots),
-  ]);
-  $activePlayers = $activePlayersStmt->fetchAll(PDO::FETCH_ASSOC);
 
   $logoUrl = $sponsor['logo_path'] ?? null;
   $saved = isset($_GET['saved']);
@@ -319,28 +282,21 @@ if ($action === 'view') {
           <div>
             <div class="page-hero-eyebrow">Sponsor profile</div>
             <h1 class="page-hero-title"><i class="fa-solid fa-user-tie me-2"></i><?= h($sponsor['name']) ?></h1>
-            <p class="page-hero-subtitle">Review sponsorships, payment history, and notes in one place.</p>
+            <p class="page-hero-subtitle mb-0" id="sponsorStatus"><?= $sponsor['is_active'] ? 'Active' : 'Archived' ?></p>
           </div>
           <div class="ms-lg-auto d-flex flex-column align-items-start align-items-lg-end gap-3">
             <div class="d-flex flex-wrap gap-2">
-              <span class="badge <?= $sponsor['is_active'] ? 'bg-success' : 'bg-secondary' ?>">
-                <?= $sponsor['is_active'] ? 'Active' : 'Inactive' ?>
-              </span>
+              <a href="sponsor.php?action=edit&amp;id=<?= $id ?>" class="btn btn-outline-light btn-sm" title="Edit sponsor" aria-label="Edit sponsor"><i class="fa-solid fa-pen" aria-hidden="true"></i></a>
+              <?php if (hub_auth_has_capability('sponsorship')): ?>
+                <button type="button" id="archiveSponsorButton" class="btn btn-outline-light btn-sm" data-action="<?= $sponsor['is_active'] ? 'archive_sponsor' : 'restore_sponsor' ?>" title="<?= $sponsor['is_active'] ? 'Archive sponsor' : 'Restore sponsor' ?>" aria-label="<?= $sponsor['is_active'] ? 'Archive sponsor' : 'Restore sponsor' ?>"><i class="fa-solid <?= $sponsor['is_active'] ? 'fa-box-archive' : 'fa-rotate-left' ?>" aria-hidden="true"></i></button>
+              <?php endif; ?>
               <?php if ($hasMainSponsorAgreement): ?>
                 <span class="badge bg-warning text-dark">Main Sponsor</span>
               <?php endif; ?>
-              <span class="badge bg-primary">Total: <?= gbp($agreementTotalDue) ?></span>
-              <span class="badge bg-success">Paid: <?= gbp($agreementTotalPaid) ?></span>
-              <span class="badge bg-warning text-dark">Outstanding: <?= gbp($agreementTotalOutstanding) ?></span>
             </div>
           </div>
         </div>
       </div>
-    </div>
-
-    <div class="hub-section-commandbar">
-      <div><h2>Sponsor record</h2><p>Company identity, links and portfolio status.</p></div>
-      <div class="hub-local-actions"><a href="sponsor.php?action=edit&amp;id=<?= $id ?>" class="btn btn-outline-primary btn-sm"><i class="fa-solid fa-pen me-1" aria-hidden="true"></i>Edit sponsor</a></div>
     </div>
 
     <?php if (
@@ -466,411 +422,16 @@ if ($action === 'view') {
       }
     </style>
 
-    <ul class="nav nav-tabs reports-tabs flex-nowrap" role="tablist">
-      <li class="nav-item">
-        <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#agreements" type="button"><i class="fa-solid fa-file-signature me-1" aria-hidden="true"></i>Agreements <span class="badge text-bg-light ms-1"><?= count($clubAgreements) ?></span></button>
-      </li>
-      <li class="nav-item">
-        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#sponsorships" type="button"><i class="fa-solid fa-shirt me-1" aria-hidden="true"></i>Players <span class="badge text-bg-light ms-1"><?= count($sponsorships) ?></span></button>
-      </li>
-      <li class="nav-item">
-        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#payments" type="button"><i class="fa-solid fa-wallet me-1" aria-hidden="true"></i>Payments <span class="badge text-bg-light ms-1"><?= count($payments) ?></span></button>
-      </li>
-      <li class="nav-item">
-        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#notes" type="button"><i class="fa-regular fa-note-sticky me-1" aria-hidden="true"></i>Notes <span class="badge text-bg-light ms-1"><?= count($notes) ?></span></button>
-      </li>
+    <ul class="nav nav-tabs reports-tabs" role="tablist">
+      <li class="nav-item" role="presentation"><button class="nav-link active" id="agreementsTab" data-bs-toggle="tab" data-bs-target="#agreements" type="button" role="tab" aria-controls="agreements" aria-selected="true">Agreements &amp; payments <span class="badge text-bg-light ms-1"><?= count($clubAgreements) ?></span></button></li>
+      <li class="nav-item" role="presentation"><button class="nav-link" id="notesTab" data-bs-toggle="tab" data-bs-target="#notes" type="button" role="tab" aria-controls="notes" aria-selected="false">Notes <span class="badge text-bg-light ms-1"><?= count($notes) ?></span></button></li>
     </ul>
-
     <div class="tab-content mt-3">
-      <div class="tab-pane fade show active" id="agreements">
-        <div class="sponsor-tab-panel">
-          <div class="sponsor-tab-head">
-            <div>
-              <h3>Agreement Portfolio</h3>
-              <p>Club-wide, match, player, team and digital agreements linked to this sponsor.</p>
-            </div>
-            <a class="btn btn-brand btn-sm" href="/admin/sponsorship_agreement.php?action=new&amp;sponsor_id=<?= $id ?>"><i class="fa-solid fa-plus me-1" aria-hidden="true"></i>Add agreement</a>
-          </div>
-          <div class="sponsor-tab-summary">
-            <div><span>Total value</span><strong><?= gbp($agreementTotalDue) ?></strong></div>
-            <div><span>Paid</span><strong><?= gbp($agreementTotalPaid) ?></strong></div>
-            <div><span>Outstanding</span><strong><?= gbp($agreementTotalOutstanding) ?></strong></div>
-            <div><span>Agreements</span><strong><?= count($clubAgreements) ?></strong></div>
-          </div>
-        </div>
-        <div class="table-responsive sponsor-profile-table-wrap">
-          <table class="table table-modern table-hover align-middle mb-0">
-            <thead><tr><th>Package</th><th>Applies to</th><th>Dates</th><th class="text-end">Value</th><th>Status</th><th class="text-end">Action</th></tr></thead>
-            <tbody>
-              <?php foreach ($clubAgreements as $agreement): ?>
-                <?php $target = (string)($agreement['season_name'] ?: 'Club-wide'); if (!empty($agreement['fixture_id'])) $target = 'Fixture #' . (int)$agreement['fixture_id'] . ' · ' . (string)$agreement['fixture_opponent']; elseif (!empty($agreement['player_id'])) $target = (string)$agreement['player_name']; ?>
-                <tr>
-                  <td><div class="fw-semibold"><?= h((string)$agreement['package_name']) ?></div><span class="badge text-bg-light"><?= h((string)$agreement['package_category']) ?></span></td>
-                  <td><div><?= h($target) ?></div><div class="small text-muted"><?= h((string)($agreement['season_name'] ?: 'No season')) ?></div></td>
-                  <td class="text-nowrap"><?= h(sponsorProfileDate($agreement['start_date'] ?? null, 'Open')) ?> &rarr; <?= h(sponsorProfileDate($agreement['end_date'] ?? null, 'Ongoing')) ?></td>
-                  <td class="text-end fw-semibold"><?= gbp((float)$agreement['agreed_amount']) ?></td>
-                  <td><?= sponsorProfileStatusBadge((string)$agreement['effective_status']) ?></td>
-                  <td class="text-end"><a class="btn btn-sm btn-outline-primary" href="/admin/sponsorship_agreement.php?id=<?= (int)$agreement['id'] ?>">Manage</a></td>
-                </tr>
-              <?php endforeach; ?>
-              <?php if (!$clubAgreements): ?><tr><td colspan="6" class="text-center text-muted py-4">No agreements recorded.</td></tr><?php endif; ?>
-            </tbody>
-          </table>
-        </div>
+      <div class="tab-pane fade show active" id="agreements" role="tabpanel" aria-labelledby="agreementsTab">
+        <div id="workspaceContent"><?php require __DIR__ . '/partials/sponsor_agreements.php'; ?></div>
       </div>
 
-      <div class="tab-pane fade" id="sponsorships">
-        <div class="sponsor-tab-panel">
-          <div class="sponsor-tab-head">
-            <div>
-              <h3>Player Sponsorships</h3>
-              <p>Current and historic player kit sponsorships held by this sponsor.</p>
-            </div>
-            <button type="button" class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#addSponsorshipModal">
-              <i class="fa-solid fa-user-plus me-1"></i>Add sponsorship
-            </button>
-          </div>
-          <div class="sponsor-tab-summary">
-            <div><span>Active</span><strong><?= (int)$activeSponsorshipCount ?></strong></div>
-            <div><span>Historic</span><strong><?= (int)$historicSponsorshipCount ?></strong></div>
-            <div><span>Active value</span><strong><?= gbp($playerSponsorshipDue) ?></strong></div>
-            <div><span>Outstanding</span><strong><?= gbp($playerSponsorshipOutstanding) ?></strong></div>
-          </div>
-        </div>
-        <div class="table-responsive sponsor-profile-table-wrap">
-        <table class="table table-modern table-hover align-middle mb-0">
-          <thead>
-            <tr>
-              <th>Player</th>
-              <th>Package</th>
-              <th>Season</th>
-              <th>Status</th>
-              <th class="text-end">Value</th>
-              <th class="text-end">Paid</th>
-              <th class="text-end">Outstanding</th>
-              <th class="text-end">Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            <?php foreach ($sponsorships as $sp): ?>
-              <?php
-                $isEnded = !empty($sp['ended_at']);
-                $outstanding = max(0, (float)$sp['amount'] - (float)$sp['paid_total']);
-              ?>
-              <tr>
-                <td>
-                  <a class="fw-semibold" href="player_view.php?id=<?= (int)$sp['player_id'] ?>"><?= h($sp['player_name']) ?></a>
-                  <?php if ((int)($sp['player_active'] ?? 1) !== 1): ?><div class="small text-muted">Former player</div><?php endif; ?>
-                </td>
-                <td><?= h(sponsorProfileSlotLabel($sp['slot'] ?? '')) ?></td>
-                <td><?= h((string)($sp['season_name'] ?: ('Season #' . (int)$sp['season_id']))) ?></td>
-                <td>
-                  <?php if ($isEnded): ?>
-                    <span class="badge hub-status text-bg-secondary">Ended</span>
-                    <div class="small text-muted"><?= h(sponsorProfileDateTime($sp['ended_at'] ?? null)) ?></div>
-                  <?php else: ?>
-                    <span class="badge hub-status text-bg-success">Active</span>
-                  <?php endif; ?>
-                </td>
-                <td class="text-end fw-semibold"><?= gbp($sp['amount']) ?></td>
-                <td class="text-end"><?= gbp($sp['paid_total']) ?></td>
-                <td class="text-end"><?= gbp($outstanding) ?></td>
-                <td class="text-end">
-                  <?php if (!$isEnded && (int)$sp['season_id'] === $seasonId && $outstanding > 0): ?>
-                    <div class="d-inline-flex flex-wrap gap-1 justify-content-end">
-                      <button
-                        type="button"
-                        class="btn btn-sm btn-outline-success"
-                        data-bs-toggle="modal"
-                        data-bs-target="#markPaidModal"
-                        data-sponsorship-id="<?= (int)$sp['id'] ?>"
-                        data-player-name="<?= h($sp['player_name']) ?>"
-                        data-slot="<?= h(ucfirst((string)$sp['slot'])) ?>"
-                        data-outstanding="<?= h(number_format($outstanding, 2, '.', '')) ?>"
-                      >
-                        Mark Paid
-                      </button>
-                      <?php if (!empty($sp['agreement_id'])): ?>
-                        <a class="btn btn-sm btn-outline-primary" href="/admin/sponsorship_agreement.php?id=<?= (int)$sp['agreement_id'] ?>#stripePaymentCard" title="Generate / send a Stripe payment link for this slot">
-                          <i class="fa-brands fa-stripe-s me-1" aria-hidden="true"></i>Stripe link
-                        </a>
-                      <?php endif; ?>
-                    </div>
-                  <?php elseif (!$isEnded && $outstanding <= 0): ?>
-                    <span class="badge text-bg-success">Paid</span>
-                  <?php elseif (!$isEnded): ?>
-                    <span class="text-muted small">Different season selected</span>
-                  <?php else: ?>
-                    <span class="text-muted small">No action</span>
-                  <?php endif; ?>
-                </td>
-              </tr>
-            <?php endforeach; ?>
-            <?php if (!$sponsorships): ?>
-              <tr data-placeholder="sponsorships-empty">
-                <td colspan="8" class="text-muted text-center py-4">
-                  No sponsorships found for this sponsor.
-                  <button type="button" class="btn btn-link btn-sm align-baseline p-0 ms-1" data-bs-toggle="modal" data-bs-target="#addSponsorshipModal">
-                    Add one now
-                  </button>
-                </td>
-              </tr>
-            <?php endif; ?>
-          </tbody>
-        </table>
-        </div>
-      </div>
-
-      <div class="tab-pane fade" id="payments">
-        <div class="sponsor-tab-panel">
-          <div class="sponsor-tab-head">
-            <div>
-              <h3>Payments</h3>
-              <p>Recorded payments across every player sponsorship for this sponsor.</p>
-            </div>
-          </div>
-          <div class="sponsor-tab-summary">
-            <div><span>Current due</span><strong><?= gbp($total_due) ?></strong></div>
-            <div><span>Current paid</span><strong><?= gbp($total_paid) ?></strong></div>
-            <div><span>Current outstanding</span><strong><?= gbp($total_outstanding) ?></strong></div>
-            <div><span>All payments</span><strong><?= gbp($allPlayerPaymentTotal) ?></strong></div>
-          </div>
-        </div>
-        <div class="table-responsive sponsor-profile-table-wrap mb-3">
-        <table class="table table-modern table-hover align-middle mb-0">
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>Player</th>
-              <th>Slot</th>
-              <th>Season</th>
-              <th>Amount</th>
-              <th>Method</th>
-              <th>Note</th>
-              <th class="text-end">Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            <?php foreach ($payments as $pay): ?>
-              <tr>
-                <td class="text-nowrap"><?= h(sponsorProfileDateTime($pay['paid_at'] ?? null)) ?></td>
-                <td><?= h($pay['player_name']) ?><?php if (!empty($pay['ended_at'])): ?><div class="small text-muted">Ended sponsorship</div><?php endif; ?></td>
-                <td><?= h(sponsorProfileSlotLabel($pay['slot'] ?? '')) ?></td>
-                <td><?= h((string)($pay['season_name'] ?: ('Season #' . (int)$pay['season_id']))) ?></td>
-                <td class="fw-semibold"><?= gbp($pay['amount']) ?></td>
-                <td><?= h((string)($pay['method'] ?: 'Not recorded')) ?></td>
-                <td><?= h((string)($pay['note'] ?: '')) ?></td>
-                <td class="text-end">
-                  <button type="button" class="btn btn-sm btn-outline-danger sponsor-payment-delete"
-                    data-payment-id="<?= (int)$pay['id'] ?>"
-                    data-amount="<?= h(number_format((float)$pay['amount'], 2)) ?>">Remove</button>
-                </td>
-              </tr>
-            <?php endforeach; ?>
-            <?php if (!$payments): ?>
-              <tr data-placeholder="payments-empty">
-                <td colspan="8" class="text-muted text-center py-4">No payments recorded yet.</td>
-              </tr>
-            <?php endif; ?>
-          </tbody>
-        </table>
-        </div>
-
-        <div class="sponsor-action-panel">
-          <div>
-            <h4>Add payment</h4>
-            <p>Payments can be recorded against active player sponsorships in the selected season.</p>
-          </div>
-          <form method="post" action="sponsor_save.php" class="row g-2 align-items-end" id="paymentForm">
-            <input type="hidden" name="action" value="add_payment">
-            <input type="hidden" name="sponsor_id" value="<?= $id ?>">
-            <input type="hidden" name="season_id" value="<?= $seasonId ?>">
-
-            <div class="col-12 col-lg-4">
-              <label class="form-label small text-muted mb-1" for="sponsorshipSelect">Player / slot</label>
-              <select name="sponsorship_id" id="sponsorshipSelect" class="form-select form-select-sm" required>
-                <option value="">Select Player / Slot</option>
-                <?php foreach ($payableSponsorships as $sp): ?>
-                  <?php
-                  $outstanding = max(0, (float)$sp['amount'] - (float)$sp['paid_total']);
-                  $label = $sp['player_name'] . ' - ' . sponsorProfileSlotLabel($sp['slot']) . ' - ' . gbp($sp['amount']);
-                  $label .= $outstanding > 0 ? ' - Outstanding: ' . gbp($outstanding) : ' - Fully Paid';
-                  ?>
-                  <option value="<?= (int)$sp['id'] ?>" data-outstanding="<?= h(number_format($outstanding, 2, '.', '')) ?>">
-                    <?= h($label) ?>
-                  </option>
-                <?php endforeach; ?>
-              </select>
-            </div>
-
-            <div class="col-12 col-lg-3">
-              <label class="form-label small text-muted mb-1" for="amountInput">Amount</label>
-              <div class="input-group input-group-sm">
-                <span class="input-group-text">&pound;</span>
-                <input type="number" step="0.01" min="0" name="amount" id="amountInput" class="form-control" placeholder="Amount" required>
-                <button type="button" id="fillOutstanding" class="btn btn-outline-secondary" disabled>Due</button>
-              </div>
-            </div>
-
-            <div class="col-6 col-lg-2">
-              <label class="form-label small text-muted mb-1" for="paymentMethod">Method</label>
-              <select name="method" id="paymentMethod" class="form-select form-select-sm">
-                <option value="">Not recorded</option>
-                <option value="Cash">Cash</option>
-                <option value="Bank Transfer">Bank Transfer</option>
-                <option value="Cheque">Cheque</option>
-                <option value="Card">Card</option>
-                <option value="Stripe">Stripe</option>
-                <option value="Other">Other</option>
-              </select>
-            </div>
-
-            <div class="col-6 col-lg-2">
-              <label class="form-label small text-muted mb-1">Note</label>
-              <input type="text" name="note" class="form-control form-control-sm" placeholder="Optional">
-            </div>
-
-            <div class="col-12 col-lg-1 d-grid">
-              <button class="btn btn-sm btn-primary" type="submit" <?= !$payableSponsorships ? 'disabled' : '' ?>>Add</button>
-            </div>
-            <?php if (!$payableSponsorships): ?><div class="col-12"><div class="small text-muted">No active player sponsorships are available for payment in the selected season.</div></div><?php endif; ?>
-          </form>
-        </div>
-
-        <?php
-        $stripeLinkRows = array_values(array_filter($sponsorships, static function (array $sp) use ($seasonId): bool {
-          return empty($sp['ended_at'])
-            && !empty($sp['agreement_id'])
-            && (int)$sp['season_id'] === $seasonId
-            && ((float)$sp['amount'] - (float)$sp['paid_total']) > 0.0001;
-        }));
-        ?>
-        <?php if ($stripeLinkRows): ?>
-          <div class="sponsor-action-panel">
-            <div>
-              <h4>Send a Stripe payment link</h4>
-              <p>Generate a short pay-by-card link for an outstanding player sponsorship, then copy it or email it to the sponsor.</p>
-            </div>
-            <div class="table-responsive">
-              <table class="table table-sm align-middle mb-0">
-                <thead><tr><th>Player / slot</th><th class="text-end">Outstanding</th><th class="text-end">Action</th></tr></thead>
-                <tbody>
-                  <?php foreach ($stripeLinkRows as $sp): ?>
-                    <tr>
-                      <td><?= h($sp['player_name']) ?> &middot; <?= h(sponsorProfileSlotLabel($sp['slot'] ?? '')) ?></td>
-                      <td class="text-end fw-semibold"><?= gbp(max(0, (float)$sp['amount'] - (float)$sp['paid_total'])) ?></td>
-                      <td class="text-end">
-                        <a class="btn btn-sm btn-outline-primary" href="/admin/sponsorship_agreement.php?id=<?= (int)$sp['agreement_id'] ?>#stripePaymentCard">
-                          <i class="fa-brands fa-stripe-s me-1" aria-hidden="true"></i>Stripe link
-                        </a>
-                      </td>
-                    </tr>
-                  <?php endforeach; ?>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        <?php endif; ?>
-
-        <script>
-          (function() {
-            const form = document.getElementById('paymentForm');
-            if (!form) return;
-
-            const select = document.getElementById('sponsorshipSelect');
-            const amountInput = document.getElementById('amountInput');
-            const outstandingBtn = document.getElementById('fillOutstanding');
-            const totals = document.getElementById('paymentTotals');
-            const currentSeasonName = <?= json_encode((string)($season['name'] ?? ('Season #' . $seasonId)), JSON_UNESCAPED_SLASHES) ?>;
-
-            if (select && outstandingBtn) {
-              select.addEventListener('change', function() {
-                const selected = select.selectedOptions[0];
-                if (!selected) {
-                  outstandingBtn.disabled = true;
-                  outstandingBtn.dataset.value = '';
-                  return;
-                }
-                const outstanding = parseFloat(selected.dataset.outstanding || '0');
-                outstandingBtn.disabled = outstanding <= 0;
-                outstandingBtn.dataset.value = outstanding.toFixed(2);
-              });
-            }
-
-            if (outstandingBtn && amountInput) {
-              outstandingBtn.addEventListener('click', function() {
-                if (!outstandingBtn.dataset.value) return;
-                amountInput.value = outstandingBtn.dataset.value;
-                amountInput.focus();
-              });
-            }
-
-            form.addEventListener('submit', function(e) {
-              e.preventDefault();
-              window.hubClearFormError(form);
-              const submitButton = e.submitter || form.querySelector('button[type="submit"]');
-              window.hubSetBusy(submitButton, true);
-
-              const formData = new FormData(form);
-
-              fetch('sponsor_save.php', {
-                  method: 'POST',
-                  body: formData
-                })
-                .then(res => res.json())
-                .then(data => {
-                  if (!data.success) {
-                    window.hubShowFieldError(form, data.field, data.error);
-                    window.hubSetBusy(submitButton, false);
-                    return;
-                  }
-
-                  const tableBody = form.closest('.tab-pane').querySelector('table tbody');
-                  if (tableBody) {
-                    const row = document.createElement('tr');
-                    row.innerHTML = `
-      <td>${data.payment.paid_at}</td>
-      <td>${data.payment.player}</td>
-      <td>${data.payment.slot}</td>
-      <td>${currentSeasonName}</td>
-      <td>&pound;${data.payment.amount}</td>
-      <td>${data.payment.method}</td>
-      <td>${data.payment.note}</td>
-      <td class="text-end"><button type="button" class="btn btn-sm btn-outline-danger sponsor-payment-delete" data-payment-id="${data.payment.id}" data-amount="${data.payment.amount}">Remove</button></td>
-    `;
-                    tableBody.prepend(row);
-                    const placeholder = tableBody.querySelector('[data-placeholder="payments-empty"]');
-                    if (placeholder) {
-                      placeholder.remove();
-                    }
-                  }
-
-                  if (totals) {
-                    totals.innerHTML = `
-      <div><strong>Total Due:</strong> &pound;${data.totals.due}</div>
-      <div><strong>Total Paid:</strong> &pound;${data.totals.paid}</div>
-      <div><strong>Outstanding:</strong> &pound;${data.totals.outstanding}</div>
-    `;
-                  }
-
-                  form.reset();
-                  if (outstandingBtn) {
-                    outstandingBtn.disabled = true;
-                    outstandingBtn.dataset.value = '';
-                  }
-                  window.hubSetBusy(submitButton, false);
-                })
-                .catch(() => {
-                  window.hubShowFormError(form, 'Request failed. Please try again.');
-                  window.hubSetBusy(submitButton, false);
-                });
-            });
-          })();
-        </script>
-
-      </div>
-
-      <div class="tab-pane fade" id="notes">
+      <div class="tab-pane fade" id="notes" role="tabpanel" aria-labelledby="notesTab">
         <div class="sponsor-tab-panel">
           <div class="sponsor-tab-head">
             <div>
@@ -951,6 +512,7 @@ if ($action === 'view') {
 
                 form.reset();
                 window.hubSetBusy(submitButton, false);
+                window.hubToast('Note added.');
               })
               .catch(() => {
                 window.hubShowFormError(form, 'Request failed. Please try again.');
@@ -962,347 +524,6 @@ if ($action === 'view') {
 
     </div>
   </div>
-
-  <div class="modal fade" id="addSponsorshipModal" tabindex="-1" aria-labelledby="addSponsorshipModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-      <div class="modal-content">
-        <form id="addSponsorshipForm">
-          <div class="modal-header">
-            <h5 class="modal-title" id="addSponsorshipModalLabel">Add Sponsorship</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-          </div>
-          <div class="modal-body">
-            <?= csrf_field() ?>
-            <input type="hidden" name="action" value="add_sponsorship">
-            <input type="hidden" name="sponsor_id" value="<?= $id ?>">
-            <input type="hidden" name="season_id" value="<?= $seasonId ?>">
-
-            <div class="mb-3">
-              <label for="sponsorshipPlayer" class="form-label">Player</label>
-              <select name="player_id" id="sponsorshipPlayer" class="form-select" required>
-                <option value="">Select a player</option>
-                <?php foreach ($activePlayers as $player): ?>
-                  <option value="<?= (int)$player['id'] ?>" data-occupied-slots="<?= h((string)($player['occupied_slots'] ?? '')) ?>">
-                    <?= h($player['name']) ?>
-                  </option>
-                <?php endforeach; ?>
-              </select>
-            </div>
-
-            <div class="mb-3">
-              <label for="sponsorshipSlot" class="form-label">Slot</label>
-              <select name="slot" id="sponsorshipSlot" class="form-select" required>
-                <?php foreach ($availableSlots as $slot): ?>
-                  <option value="<?= h($slot) ?>" data-amount="<?= h(number_format($slotAmountMap[$slot] ?? 0, 2, '.', '')) ?>">
-                    <?= strtoupper(h($slot)) ?>
-                  </option>
-                <?php endforeach; ?>
-              </select>
-              <div class="form-text" id="sponsorshipSlotHelp">Choose an available slot for the selected player.</div>
-            </div>
-
-            <div class="mb-3">
-              <label for="sponsorshipAmount" class="form-label">Amount</label>
-              <input type="number" step="0.01" min="0" name="amount" id="sponsorshipAmount" class="form-control" required>
-              <div class="form-text">Defaults to the selected slot pricing for this season.</div>
-            </div>
-
-            <div class="mb-0">
-              <label for="sponsorshipNotes" class="form-label">Notes</label>
-              <textarea name="notes" id="sponsorshipNotes" class="form-control" rows="3" placeholder="Optional notes"></textarea>
-            </div>
-
-            <div class="form-check mt-3">
-              <input class="form-check-input" type="checkbox" id="sponsorshipMarkPaid" name="mark_paid" value="1">
-              <label class="form-check-label" for="sponsorshipMarkPaid">
-                Mark as paid now
-              </label>
-            </div>
-          </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-            <button type="submit" class="btn btn-success">Save Sponsorship</button>
-          </div>
-        </form>
-      </div>
-    </div>
-  </div>
-
-  <div class="modal fade" id="markPaidModal" tabindex="-1" aria-labelledby="markPaidModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-      <div class="modal-content">
-        <form id="markPaidForm">
-          <div class="modal-header">
-            <h5 class="modal-title" id="markPaidModalLabel">Mark Sponsorship Paid</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-          </div>
-          <div class="modal-body">
-            <?= csrf_field() ?>
-            <input type="hidden" name="action" value="add_payment">
-            <input type="hidden" name="sponsor_id" value="<?= $id ?>">
-            <input type="hidden" name="season_id" value="<?= $seasonId ?>">
-            <input type="hidden" name="sponsorship_id" id="markPaidSponsorshipId" value="">
-
-            <div class="mb-3">
-              <div class="small text-muted">Player</div>
-              <div class="fw-semibold" id="markPaidPlayerName">-</div>
-            </div>
-
-            <div class="mb-3">
-              <div class="small text-muted">Slot</div>
-              <div class="fw-semibold" id="markPaidSlotName">-</div>
-            </div>
-
-            <div class="mb-3">
-              <label for="markPaidAmount" class="form-label">Payment Amount</label>
-              <input type="number" step="0.01" min="0" name="amount" id="markPaidAmount" class="form-control" required>
-              <div class="form-text">Defaults to the remaining outstanding amount.</div>
-            </div>
-
-            <div class="mb-3">
-              <label for="markPaidMethod" class="form-label">Method</label>
-              <input type="text" name="method" id="markPaidMethod" class="form-control" placeholder="Optional">
-            </div>
-
-            <div class="mb-0">
-              <label for="markPaidNote" class="form-label">Note</label>
-              <input type="text" name="note" id="markPaidNote" class="form-control" placeholder="Optional">
-            </div>
-          </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-            <button type="submit" class="btn btn-success">Mark Paid</button>
-          </div>
-        </form>
-      </div>
-    </div>
-  </div>
-
-  <script>
-    (function() {
-      const modalEl = document.getElementById('addSponsorshipModal');
-      const form = document.getElementById('addSponsorshipForm');
-      const playerSelect = document.getElementById('sponsorshipPlayer');
-      const slotSelect = document.getElementById('sponsorshipSlot');
-      const amountInput = document.getElementById('sponsorshipAmount');
-      const slotHelp = document.getElementById('sponsorshipSlotHelp');
-      const markPaidCheckbox = document.getElementById('sponsorshipMarkPaid');
-      const markPaidModalEl = document.getElementById('markPaidModal');
-      const markPaidForm = document.getElementById('markPaidForm');
-      const markPaidSponsorshipId = document.getElementById('markPaidSponsorshipId');
-      const markPaidPlayerName = document.getElementById('markPaidPlayerName');
-      const markPaidSlotName = document.getElementById('markPaidSlotName');
-      const markPaidAmount = document.getElementById('markPaidAmount');
-
-      if (!modalEl || !form || !playerSelect || !slotSelect || !amountInput) {
-        return;
-      }
-
-      const syncAmount = () => {
-        const selected = slotSelect.selectedOptions[0];
-        const amount = selected ? selected.getAttribute('data-amount') : '';
-        amountInput.value = amount || '0.00';
-        if (markPaidCheckbox?.checked) {
-          amountInput.value = amount || '0.00';
-        }
-      };
-
-      const syncSlotsForPlayer = () => {
-        const selectedPlayer = playerSelect.selectedOptions[0];
-        const occupied = new Set(
-          (selectedPlayer?.getAttribute('data-occupied-slots') || '')
-            .split(',')
-            .map((slot) => slot.trim().toLowerCase())
-            .filter(Boolean)
-        );
-
-        let firstEnabledOption = null;
-        Array.from(slotSelect.options).forEach((option, index) => {
-          if (index === 0) {
-            option.disabled = false;
-            return;
-          }
-
-          const slot = option.value.toLowerCase();
-          const isTaken = occupied.has(slot);
-          option.disabled = isTaken;
-          if (!isTaken && !firstEnabledOption) {
-            firstEnabledOption = option;
-          }
-        });
-
-        if (!selectedPlayer || !selectedPlayer.value) {
-          slotSelect.disabled = true;
-          amountInput.value = '0.00';
-          if (slotHelp) {
-            slotHelp.textContent = 'Select a player to see available slots.';
-          }
-          return;
-        }
-
-        slotSelect.disabled = false;
-        if (slotHelp) {
-          slotHelp.textContent = occupied.size
-            ? 'Taken slots are disabled for the selected player.'
-            : 'Choose an available slot for the selected player.';
-        }
-
-        if (slotSelect.selectedOptions[0] && slotSelect.selectedOptions[0].disabled) {
-          if (firstEnabledOption) {
-            firstEnabledOption.selected = true;
-          }
-        }
-
-        if (!slotSelect.selectedOptions[0] || slotSelect.selectedOptions[0].disabled) {
-          if (firstEnabledOption) {
-            firstEnabledOption.selected = true;
-          }
-        }
-
-        syncAmount();
-      };
-
-      modalEl.addEventListener('show.bs.modal', () => {
-        form.reset();
-        window.hubClearFormError(form);
-        syncSlotsForPlayer();
-        if (markPaidCheckbox) {
-          markPaidCheckbox.checked = false;
-        }
-      });
-
-      playerSelect.addEventListener('change', syncSlotsForPlayer);
-      slotSelect.addEventListener('change', syncAmount);
-      markPaidCheckbox?.addEventListener('change', syncAmount);
-
-      form.addEventListener('submit', function(e) {
-        e.preventDefault();
-        window.hubClearFormError(form);
-
-        if (slotSelect.disabled) {
-          window.hubShowFieldError(form, 'slot', 'Select a player with an available sponsorship slot.');
-          return;
-        }
-
-        const submitButton = e.submitter || form.querySelector('button[type="submit"]');
-        window.hubSetBusy(submitButton, true);
-
-        const formData = new FormData(form);
-        fetch('sponsor_save.php', {
-          method: 'POST',
-          body: formData
-        })
-          .then(response => response.json())
-          .then(data => {
-            if (!data.success) {
-              window.hubShowFieldError(form, data.field, data.error || 'Unable to add sponsorship.');
-              window.hubSetBusy(submitButton, false);
-              return;
-            }
-
-            window.location = 'sponsor.php?id=<?= $id ?>&assigned=1';
-          })
-          .catch(() => {
-            window.hubShowFormError(form, 'Request failed. Please try again.');
-            window.hubSetBusy(submitButton, false);
-        });
-      });
-
-      markPaidModalEl?.addEventListener('show.bs.modal', (event) => {
-        const button = event.relatedTarget;
-        const sponsorshipId = button?.getAttribute('data-sponsorship-id') || '';
-        const playerName = button?.getAttribute('data-player-name') || '';
-        const slotName = button?.getAttribute('data-slot') || '';
-        const outstanding = button?.getAttribute('data-outstanding') || '0.00';
-
-        if (markPaidSponsorshipId) markPaidSponsorshipId.value = sponsorshipId;
-        if (markPaidPlayerName) markPaidPlayerName.textContent = playerName;
-        if (markPaidSlotName) markPaidSlotName.textContent = slotName;
-        if (markPaidAmount) markPaidAmount.value = outstanding;
-        if (markPaidForm) {
-          markPaidForm.reset();
-          window.hubClearFormError(markPaidForm);
-          if (markPaidSponsorshipId) markPaidSponsorshipId.value = sponsorshipId;
-          if (markPaidPlayerName) markPaidPlayerName.textContent = playerName;
-          if (markPaidSlotName) markPaidSlotName.textContent = slotName;
-          if (markPaidAmount) markPaidAmount.value = outstanding;
-        }
-      });
-
-      markPaidForm?.addEventListener('submit', function(e) {
-        e.preventDefault();
-        window.hubClearFormError(markPaidForm);
-        const submitButton = e.submitter || markPaidForm.querySelector('button[type="submit"]');
-        window.hubSetBusy(submitButton, true);
-        const formData = new FormData(markPaidForm);
-
-        fetch('sponsor_save.php', {
-          method: 'POST',
-          body: formData
-        })
-          .then(response => response.json())
-          .then(data => {
-            if (!data.success) {
-              window.hubShowFieldError(markPaidForm, data.field, data.error || 'Unable to mark paid.');
-              window.hubSetBusy(submitButton, false);
-              return;
-            }
-
-            window.location = 'sponsor.php?id=<?= $id ?>&saved=1';
-          })
-          .catch(() => {
-            window.hubShowFormError(markPaidForm, 'Request failed. Please try again.');
-            window.hubSetBusy(submitButton, false);
-          });
-      });
-
-      syncSlotsForPlayer();
-    })();
-  </script>
-
-  <script>
-    document.addEventListener('DOMContentLoaded', function () {
-      // Reopen a specific tab after a redirect, e.g. ?tab=payments
-      var wantedTab = new URLSearchParams(window.location.search).get('tab');
-      if (wantedTab) {
-        var tabBtn = document.querySelector('.nav-tabs [data-bs-target="#' + wantedTab.replace(/[^a-z0-9_-]/gi, '') + '"]');
-        if (tabBtn && typeof bootstrap !== 'undefined') {
-          try { new bootstrap.Tab(tabBtn).show(); } catch (e) {}
-        }
-      }
-
-      var sponsorId = <?= (int) $id ?>;
-      document.addEventListener('click', function (event) {
-        var btn = event.target.closest('.sponsor-payment-delete');
-        if (!btn) return;
-
-        var paymentId = btn.getAttribute('data-payment-id');
-        var amount = btn.getAttribute('data-amount') || '';
-        if (!paymentId) return;
-        if (!window.confirm('Remove this £' + amount + ' payment? The outstanding balance will go back up.')) return;
-
-        btn.disabled = true;
-        fetch('sponsor_ajax.php', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: 'action=delete_payment&id=' + encodeURIComponent(paymentId)
-        })
-          .then(function (r) { return r.json(); })
-          .then(function (data) {
-            if (data && data.success) {
-              window.location = 'sponsor.php?id=' + sponsorId + '&tab=payments&payment_removed=1';
-            } else {
-              btn.disabled = false;
-              window.alert((data && data.message) ? data.message : 'Could not remove the payment.');
-            }
-          })
-          .catch(function () {
-            btn.disabled = false;
-            window.alert('Request failed. Please try again.');
-          });
-      });
-    });
-  </script>
 
 <?php
   require __DIR__ . '/footer.php';
@@ -1771,7 +992,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </div>
   <?php endif; ?>
 
-  <form method="post" enctype="multipart/form-data" class="card shadow-sm border-0">
+  <form method="post" enctype="multipart/form-data" class="card shadow-sm border-0" data-warn-unsaved>
     <div class="card-body">
       <?= csrf_field() ?>
       <div class="mb-3">

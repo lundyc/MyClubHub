@@ -189,6 +189,20 @@ $(function () {
   });
 
   // === Add new sponsorship ===
+  const addSponsorshipComplimentary = $("#addSponsorshipComplimentary");
+  const addSponsorshipAmountField = $("#addSponsorshipForm .player-edit-amount-field");
+
+  function toggleAddSponsorshipAmount() {
+    const isComplimentary = addSponsorshipComplimentary.is(":checked");
+    addSponsorshipAmountField.toggleClass("is-hidden", isComplimentary);
+    if (isComplimentary) {
+      addSponsorshipAmountField.find("input").val("");
+    }
+  }
+
+  addSponsorshipComplimentary.on("change", toggleAddSponsorshipAmount);
+  toggleAddSponsorshipAmount();
+
   $("#addSponsorshipForm").on("submit", function (e) {
     e.preventDefault();
     const form = $(this);

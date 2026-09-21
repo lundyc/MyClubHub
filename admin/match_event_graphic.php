@@ -420,7 +420,7 @@ if ($isPlayerOfMatchGraphic && $eventPlayer !== '') {
             $playerOfMatchImage = '/uploads/players/' . rawurlencode($playerOfMatchAvatar);
         }
     } catch (Throwable $playerOfMatchError) {
-        error_log('Man of the Match image could not be loaded: ' . $playerOfMatchError->getMessage());
+        error_log('Player of the Match image could not be loaded: ' . $playerOfMatchError->getMessage());
     }
 }
 $substitutionPairs = $event !== null && $match !== null && $eventType === 'substitution'

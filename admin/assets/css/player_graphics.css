@@ -23,7 +23,7 @@
   height: 768px;
   transform: scale(var(--canvas-scale, 1));
   transform-origin: top left;
-  border-radius: .5rem;
+  border-radius: var(--radius-05rem, .5rem);
   box-shadow: 0 10px 30px rgba(0, 0, 0, .08);
   overflow: hidden;
 }
@@ -45,7 +45,7 @@
 .sponsor-graphic__badge {
   height: 64px;
   width: auto;
-  margin-bottom: .6rem;
+  margin-bottom: var(--space-06rem, 0.6rem);
   /* white badge asset, inverted to black so it reads on the cream panel */
   filter: invert(1);
 }
@@ -77,7 +77,7 @@
 .sponsor-graphic__initials {
   position: relative;
   z-index: 1;
-  font-size: 6rem;
+  font-size: var(--fs-6, 6rem);
   font-weight: 900;
   color: var(--graphic-gold);
   letter-spacing: .04em;
@@ -102,7 +102,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: .35rem;
+  gap: var(--space-035rem, .35rem);
   padding: 0 2rem;
   box-sizing: border-box;
   text-align: center;
@@ -113,7 +113,7 @@
   position: absolute;
   top: .9rem;
   right: 1.15rem;
-  font-size: .78rem;
+  font-size: var(--fs-078, .78rem);
   font-weight: 700;
   letter-spacing: .08em;
   text-transform: uppercase;
@@ -130,7 +130,7 @@
 
 .sponsor-graphic__row--name {
   overflow: hidden;
-  padding-inline: 1rem;
+  padding-inline: var(--space-4, 1rem);
   border-left: 10px solid rgba(75, 8, 24);
 }
 
@@ -153,7 +153,7 @@
 }
 
 .sponsor-graphic__firstname {
-  font-size: 1.5rem;
+  font-size: var(--fs-xl, 1.5rem);
   font-weight: 300;
   line-height: 1;
 }
@@ -177,10 +177,10 @@
   flex-direction: column;
   align-items: center;
   justify-content: flex-start;
-  gap: .5rem;
+  gap: var(--space-2, .5rem);
   color: #000;
   text-align: center;
-  padding-top: 2.2rem;
+  padding-top: var(--space-22rem, 2.2rem);
 }
 
 .sponsor-graphic__row--home {
@@ -225,8 +225,8 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: .5rem;
-  padding-top: 2.2rem;
+  gap: var(--space-2, .5rem);
+  padding-top: var(--space-22rem, 2.2rem);
   background: linear-gradient(135deg, rgba(75, 8, 24), rgba(106, 32, 54));
   color: rgba(224, 180, 42);
   border-left: 10px solid rgba(224, 180, 42);
@@ -243,7 +243,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: .25rem;
+  gap: var(--space-1, .25rem);
   min-width: 0;
 }
 
@@ -302,18 +302,18 @@
 }
 
 .sponsor-graphic__available {
-  font-size: 1.5rem;
+  font-size: var(--fs-xl, 1.5rem);
   font-weight: 700;
 }
 
 .sponsor-graphic__price {
-  font-size: 2.4rem;
+  font-size: var(--fs-24, 2.4rem);
   font-weight: 900;
 }
 
 .editor-panel {
   border: 1px solid rgba(18, 78, 102, 0.08);
-  border-radius: 1rem;
+  border-radius: var(--radius-1rem, 1rem);
   background: rgba(255, 255, 255, 0.95);
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.07);
 }
@@ -332,11 +332,11 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 1rem;
-  margin-bottom: 1rem;
+  gap: var(--space-4, 1rem);
+  margin-bottom: var(--space-4, 1rem);
   padding: .8rem 1rem;
   border: 1px solid rgba(75, 8, 24, .09);
-  border-radius: 1rem;
+  border-radius: var(--radius-1rem, 1rem);
   background: rgba(255, 255, 255, .94);
   box-shadow: 0 .35rem 1rem rgba(31, 26, 29, .045);
 }
@@ -344,7 +344,7 @@
 .graphics-context__identity {
   display: flex;
   align-items: center;
-  gap: .6rem;
+  gap: var(--space-06rem, 0.6rem);
   min-width: 0;
 }
 
@@ -354,11 +354,11 @@
   width: 2.4rem;
   height: 2.4rem;
   place-items: center;
-  border-radius: .7rem;
+  border-radius: var(--radius-07rem, .7rem);
   background: rgba(106, 32, 54, .09);
   color: var(--brand-primary);
   text-decoration: none;
-  font-size: .9rem;
+  font-size: var(--fs-09, .9rem);
   transition: background-color .15s ease;
 }
 
@@ -378,7 +378,7 @@
 }
 
 .graphics-context__player-picker .form-select {
-  font-size: 1rem;
+  font-size: var(--fs-base, 1rem);
   font-weight: 750;
   color: var(--brand-darkest);
   border-color: rgba(75, 8, 24, .12);
@@ -387,7 +387,7 @@
 .graphics-canvas-panel__header p {
   margin: 0 0 .1rem;
   color: rgba(31, 26, 29, .5);
-  font-size: .66rem;
+  font-size: var(--fs-066, .66rem);
   font-weight: 750;
   letter-spacing: .09em;
   text-transform: uppercase;
@@ -396,7 +396,7 @@
 .graphics-canvas-panel__header h2 {
   margin: 0;
   color: var(--brand-darkest);
-  font-size: 1rem;
+  font-size: var(--fs-base, 1rem);
   font-weight: 750;
 }
 
@@ -404,19 +404,19 @@
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
-  gap: .45rem;
+  gap: var(--space-045rem, .45rem);
 }
 
 .graphics-context__slots span {
   display: inline-flex;
   align-items: center;
-  gap: .35rem;
+  gap: var(--space-035rem, .35rem);
   padding: .36rem .6rem;
   border: 1px solid rgba(75, 8, 24, .08);
-  border-radius: 999px;
+  border-radius: var(--radius-pill, 999px);
   background: rgba(98, 101, 106, .06);
   color: rgba(31, 26, 29, .48);
-  font-size: .68rem;
+  font-size: var(--fs-068, .68rem);
   font-weight: 700;
 }
 
@@ -428,14 +428,14 @@
 
 .graphics-workspace {
   display: grid;
-  gap: 1rem;
+  gap: var(--space-4, 1rem);
   align-items: start;
 }
 
 .graphics-sidebar {
   overflow: hidden;
   border-color: rgba(75, 8, 24, .09);
-  border-radius: 1rem;
+  border-radius: var(--radius-1rem, 1rem);
   box-shadow: 0 .45rem 1.3rem rgba(31, 26, 29, .055);
 }
 
@@ -447,8 +447,8 @@
 .graphics-control__heading {
   display: flex;
   align-items: center;
-  gap: .65rem;
-  margin-bottom: .75rem;
+  gap: var(--space-065rem, .65rem);
+  margin-bottom: var(--space-3, .75rem);
 }
 
 .graphics-control__step {
@@ -457,10 +457,10 @@
   width: 1.8rem;
   height: 1.8rem;
   place-items: center;
-  border-radius: .58rem;
+  border-radius: var(--radius-58rem, .58rem);
   background: rgba(106, 32, 54, .09);
   color: var(--brand-primary);
-  font-size: .7rem;
+  font-size: var(--fs-07, .7rem);
   font-weight: 800;
 }
 
@@ -468,7 +468,7 @@
 .graphics-output__heading h3 {
   margin: 0;
   color: var(--brand-darkest);
-  font-size: .82rem;
+  font-size: var(--fs-082, .82rem);
   font-weight: 750;
 }
 
@@ -476,20 +476,20 @@
 .graphics-output__heading p {
   margin: .1rem 0 0;
   color: rgba(31, 26, 29, .52);
-  font-size: .66rem;
+  font-size: var(--fs-066, .66rem);
 }
 
 .graphics-sidebar .form-label {
-  margin-bottom: .35rem;
+  margin-bottom: var(--space-035rem, .35rem);
   color: rgba(31, 26, 29, .7);
-  font-size: .68rem;
+  font-size: var(--fs-068, .68rem);
   font-weight: 700;
 }
 
 .graphics-sidebar .form-select {
   min-height: 2.45rem;
   border-color: rgba(75, 8, 24, .12);
-  font-size: .78rem;
+  font-size: var(--fs-078, .78rem);
   box-shadow: none;
 }
 
@@ -501,7 +501,7 @@
 /* Per-sponsor image + text controls — see "2. Sponsor image & text" on
    player_graphics.php. */
 .sponsor-text-control-group {
-  padding-top: .75rem;
+  padding-top: var(--space-3, .75rem);
   border-top: 1px solid rgba(75, 8, 24, .08);
 }
 
@@ -512,7 +512,7 @@
 
 .sponsor-text-control-group__title {
   margin: 0 0 .5rem;
-  font-size: .68rem;
+  font-size: var(--fs-068, .68rem);
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: .06em;
@@ -520,8 +520,8 @@
 }
 
 .sponsor-text-control {
-  padding-top: .5rem;
-  margin-top: .5rem;
+  padding-top: var(--space-2, .5rem);
+  margin-top: var(--space-2, .5rem);
   border-top: 1px dashed rgba(75, 8, 24, .1);
 }
 
@@ -531,7 +531,7 @@
 
 .graphics-button-grid {
   display: grid;
-  gap: .4rem;
+  gap: var(--space-4rem, .4rem);
 }
 
 .graphics-button-grid--two {
@@ -542,10 +542,10 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: .3rem;
+  gap: var(--space-03rem, .3rem);
   min-width: 0;
-  padding-inline: .35rem;
-  font-size: .67rem;
+  padding-inline: var(--space-035rem, .35rem);
+  font-size: var(--fs-067, .67rem);
 }
 
 .graphics-output {
@@ -557,15 +557,15 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: .75rem;
-  margin-bottom: .7rem;
+  gap: var(--space-3, .75rem);
+  margin-bottom: var(--space-07rem, .7rem);
 }
 
 .graphics-canvas-panel {
   min-width: 0;
   overflow: hidden;
   border: 1px solid rgba(75, 8, 24, .09);
-  border-radius: 1rem;
+  border-radius: var(--radius-1rem, 1rem);
   background: rgba(255, 255, 255, .94);
   box-shadow: 0 .45rem 1.3rem rgba(31, 26, 29, .055);
 }
@@ -574,7 +574,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 1rem;
+  gap: var(--space-4, 1rem);
   padding: .8rem 1rem;
   border-bottom: 1px solid rgba(75, 8, 24, .08);
 }
@@ -582,9 +582,9 @@
 .graphics-canvas-panel__header>span {
   display: inline-flex;
   align-items: center;
-  gap: .4rem;
+  gap: var(--space-4rem, .4rem);
   color: rgba(31, 26, 29, .5);
-  font-size: .66rem;
+  font-size: var(--fs-066, .66rem);
 }
 
 @media (min-width: 1450px) {
@@ -634,10 +634,10 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: .35rem;
+  gap: var(--space-035rem, .35rem);
   padding: 1.75rem 1rem;
   border: 2px dashed rgba(75, 8, 24, .25);
-  border-radius: .75rem;
+  border-radius: var(--radius-075rem, .75rem);
   text-align: center;
   cursor: pointer;
   color: rgba(31, 26, 29, .7);
@@ -651,7 +651,7 @@
 }
 
 .sponsor-image-dropzone i {
-  font-size: 1.6rem;
+  font-size: var(--fs-16, 1.6rem);
   color: var(--brand-primary, #6a2036);
 }
 
@@ -663,27 +663,27 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: .75rem;
+  gap: var(--space-3, .75rem);
   margin: 1.25rem 0 .6rem;
   font-weight: 600;
-  font-size: .85rem;
+  font-size: var(--fs-sm, .85rem);
   color: rgba(31, 26, 29, .7);
 }
 
 .sponsor-image-picker-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
-  gap: .6rem;
+  gap: var(--space-06rem, 0.6rem);
   max-height: 360px;
   overflow-y: auto;
-  padding-right: .25rem;
+  padding-right: var(--space-1, .25rem);
 }
 
 .sponsor-image-picker-item {
   display: flex;
   flex-direction: column;
   border: 2px solid transparent;
-  border-radius: .5rem;
+  border-radius: var(--radius-05rem, .5rem);
   overflow: hidden;
   background: rgba(0, 0, 0, .03);
   cursor: pointer;
@@ -707,7 +707,7 @@
 .sponsor-image-picker-item span {
   display: block;
   padding: .3rem .4rem;
-  font-size: .68rem;
+  font-size: var(--fs-068, .68rem);
   line-height: 1.2;
   color: rgba(31, 26, 29, .65);
   overflow: hidden;

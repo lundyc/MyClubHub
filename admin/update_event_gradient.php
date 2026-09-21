@@ -10,6 +10,7 @@ if (!hub_auth_has_capability('content_social')) {
     exit('Access denied.');
 }
 require_once __DIR__ . '/social_auth.php';
+require_once __DIR__ . '/lib/functions.php';
 require_once __DIR__ . '/matches_lib.php';
 require_once __DIR__ . '/event_share_lib.php';
 
@@ -27,6 +28,10 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
 }
 
 auth_require_json();
+
+if (!csrf_check()) {
+    event_gradient_respond(false, 'Your session expired. Please refresh the page and try again.', 400);
+}
 
 $matchId = isset($_POST['match_id']) && is_string($_POST['match_id']) ? trim($_POST['match_id']) : '';
 $eventId = isset($_POST['event_id']) && is_string($_POST['event_id']) ? trim($_POST['event_id']) : '';

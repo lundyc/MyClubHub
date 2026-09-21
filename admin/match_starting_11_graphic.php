@@ -1073,7 +1073,7 @@ $hubDynamicStyleHref1 = hub_dynamic_stylesheet_register($hubDynamicCss1);
       var originalText = downloadButton.textContent;
       var previewWindow = window.open('', '_blank');
       if (!previewWindow) {
-        window.alert('Popup blocked. Allow popups for this site and try again.');
+        window.hubToast('Popup blocked. Allow popups for this site and try again.', 'danger');
         return;
       }
 
@@ -1103,7 +1103,7 @@ $hubDynamicStyleHref1 = hub_dynamic_stylesheet_register($hubDynamicCss1);
     });
 
     socialButtons.forEach(function (button) {
-      button.addEventListener('click', function () {
+      button.addEventListener('click', async function () {
         var platform = button.getAttribute('data-platform') || '';
         if (socialCaptionInput && socialCaptionInput.value.trim() === preparedSocialCaption.trim() && socialCaptions[platform]) {
           preparedSocialCaption = socialCaptions[platform];
@@ -1111,13 +1111,13 @@ $hubDynamicStyleHref1 = hub_dynamic_stylesheet_register($hubDynamicCss1);
         }
         var socialCaption = socialCaptionInput ? socialCaptionInput.value.trim() : (socialCaptions[platform] || '');
         var platformLabel = platform === 'x' ? 'Twitter/X' : platform.charAt(0).toUpperCase() + platform.slice(1);
-        if (confirmBeforeLivePost && !window.confirm('Post this Starting XI to ' + platformLabel + '?')) {
+        if (confirmBeforeLivePost && !(await window.hubConfirm('Post this Starting XI to ' + platformLabel + '?', { actionLabel: 'Post', actionClass: 'btn-primary' }))) {
           return;
         }
 
         var xWindow = platform === 'x' ? window.open('', '_blank') : null;
         if (platform === 'x' && !xWindow) {
-          window.alert('Popup blocked. Allow popups for this site and try again.');
+          window.hubToast('Popup blocked. Allow popups for this site and try again.', 'danger');
           return;
         }
 
@@ -1169,13 +1169,16 @@ $hubDynamicStyleHref1 = hub_dynamic_stylesheet_register($hubDynamicCss1);
               });
             }).then(function (result) {
               if (result.status === 409 && !forceRepost) {
-                var replaceConfirmed = window.confirm(
-                  'This exact Starting XI was posted before. If you deleted the original post, click OK to publish it again.'
-                );
-                if (replaceConfirmed) {
-                  setSocialStatus('info', 'Publishing replacement Starting XI...');
-                  return submitStartingEleven(true);
-                }
+                return window.hubConfirm(
+                  'This exact Starting XI was posted before. If you deleted the original post, click OK to publish it again.',
+                  { actionLabel: 'Publish again', actionClass: 'btn-primary' }
+                ).then(function (replaceConfirmed) {
+                  if (replaceConfirmed) {
+                    setSocialStatus('info', 'Publishing replacement Starting XI...');
+                    return submitStartingEleven(true);
+                  }
+                  return result;
+                });
               }
               return result;
             });

@@ -401,41 +401,68 @@ function updatePerson(PDO $pdo, int $personId, array $data, bool $syncLegacyHold
         throw new InvalidArgumentException('Display name is required.');
     }
 
-    $pdo->prepare('UPDATE people
-        SET display_name = :display_name, date_of_birth = :date_of_birth, email = :email,
-            email_normalized = :email_normalized, phone = :phone, address_line1 = :address_line1,
-            address_line2 = :address_line2, town = :town, postcode = :postcode, country = :country,
-            marketing_opt_in = :marketing_opt_in, is_active = :is_active
-        WHERE id = :id')->execute($params);
-    identityAuditLog($pdo, 'person_updated', 'Updated person #' . $personId);
+    $accountStmt = $pdo->prepare('SELECT id FROM accounts WHERE person_id = ?');
+    $accountStmt->execute([$personId]);
+    $accountId = $accountStmt->fetchColumn();
+    if ($accountId && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        throw new InvalidArgumentException('A valid email is required for a person with a login account.');
+    }
+    $ownsTransaction = !$pdo->inTransaction();
+    if ($ownsTransaction) {
+        $pdo->beginTransaction();
+    }
+    try {
+        if ($accountId) {
+            $pdo->prepare('UPDATE accounts SET email = ?, email_normalized = ? WHERE id = ?')
+                ->execute([$email, people_normalize_email($email), $accountId]);
+            $pdo->prepare('UPDATE season_ticket_holders h JOIN identity_migration_map m ON m.old_holder_id = h.id SET h.email = ?, h.email_normalized = ? WHERE m.person_id = ?')
+                ->execute([$email, people_normalize_email($email), $personId]);
+        }
+        $pdo->prepare('UPDATE people
+            SET display_name = :display_name, date_of_birth = :date_of_birth, email = :email,
+                email_normalized = :email_normalized, phone = :phone, address_line1 = :address_line1,
+                address_line2 = :address_line2, town = :town, postcode = :postcode, country = :country,
+                marketing_opt_in = :marketing_opt_in, is_active = :is_active
+            WHERE id = :id')->execute($params);
+        identityAuditLog($pdo, 'person_updated', 'Updated person #' . $personId);
 
-    if ($syncLegacyHolder) {
-        $holderId = getLegacyHolderIdForPerson($pdo, $personId);
-        if ($holderId !== null) {
-            $holder = getSeasonTicketHolder($pdo, $holderId) ?: [];
-            // Temporary dual-write while season tickets and member pages still
-            // use season_ticket_holders as their compatibility record.
-            saveSeasonTicketHolder($pdo, $holderId, [
-                'name' => $params[':display_name'],
-                'date_of_birth' => $params[':date_of_birth'],
-                'email' => $params[':email'],
-                'phone' => $params[':phone'],
-                'address_line1' => $params[':address_line1'],
-                'address_line2' => $params[':address_line2'],
-                'town' => $params[':town'],
-                'postcode' => $params[':postcode'],
-                'country' => $params[':country'],
-                'profile_image_path' => $holder['profile_image_path'] ?? '',
-                'sponsor_id' => $holder['sponsor_id'] ?? null,
-                'managed_by_holder_id' => $holder['managed_by_holder_id'] ?? null,
-                'marketing_opt_in' => $params[':marketing_opt_in'],
-                'notes' => $holder['notes'] ?? '',
-            ]);
-            if ((int) $params[':is_active'] !== 1) {
-                deleteSeasonTicketHolder($pdo, $holderId);
+        if ($syncLegacyHolder) {
+            $holderId = getLegacyHolderIdForPerson($pdo, $personId);
+            if ($holderId !== null) {
+                $holder = getSeasonTicketHolder($pdo, $holderId) ?: [];
+                // Temporary dual-write while season tickets and member pages still
+                // use season_ticket_holders as their compatibility record.
+                saveSeasonTicketHolder($pdo, $holderId, [
+                    'name' => $params[':display_name'],
+                    'date_of_birth' => $params[':date_of_birth'],
+                    'email' => $params[':email'],
+                    'phone' => $params[':phone'],
+                    'address_line1' => $params[':address_line1'],
+                    'address_line2' => $params[':address_line2'],
+                    'town' => $params[':town'],
+                    'postcode' => $params[':postcode'],
+                    'country' => $params[':country'],
+                    'profile_image_path' => $holder['profile_image_path'] ?? '',
+                    'sponsor_id' => $holder['sponsor_id'] ?? null,
+                    'managed_by_holder_id' => $holder['managed_by_holder_id'] ?? null,
+                    'marketing_opt_in' => $params[':marketing_opt_in'],
+                    'notes' => $holder['notes'] ?? '',
+                ]);
+                if ((int) $params[':is_active'] !== 1) {
+                    deleteSeasonTicketHolder($pdo, $holderId);
+                }
             }
         }
+        if ($ownsTransaction) {
+            $pdo->commit();
+        }
+    } catch (Throwable $e) {
+        if ($ownsTransaction && $pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        throw $e;
     }
+
 }
 
 function archivePerson(PDO $pdo, int $personId): void

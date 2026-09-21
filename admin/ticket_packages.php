@@ -109,7 +109,7 @@ usort($groupOptions, static function (string $a, string $b): int {
             <div class="card-header bg-white"><h2 class="h5 mb-0">Packages</h2></div>
             <div class="card-body p-0">
                 <div class="table-responsive">
-                    <table class="table table-striped align-middle mb-0">
+                    <table class="table table-striped align-middle mb-0 hub-data-table">
                         <thead><tr><th>Name</th><th>Group</th><th>Price</th><th>Admits</th><th>Status</th><th></th></tr></thead>
                         <tbody>
                             <?php foreach ($packages as $package): ?>

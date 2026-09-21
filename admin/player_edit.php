@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/lib/functions.php';
 require_once __DIR__ . '/lib/player_birthdays.php';
@@ -49,6 +50,8 @@ if (!$player) {
 
 $seasonId = getSelectedSeasonId($pdo);
 $season = getSeasonById($pdo, $seasonId);
+$sponsorshipDeadlinePassed = !empty($season['sponsorship_deadline']) && strtotime((string) $season['sponsorship_deadline']) <= time();
+$canEditSponsorships = hub_auth_is_sponsorship_editor() && !$sponsorshipDeadlinePassed;
 $allowedSlots = getAllowedSponsorshipSlots($pdo, $seasonId);
 $playerEditSlots = array_values(array_intersect($allowedSlots, ['home', 'away']));
 $sponsors = getActiveSponsorsForSeason($pdo, $seasonId);
@@ -237,7 +240,7 @@ echo '<script src="/admin/assets/js/player_status_cards.js?v=' . h($playerStatus
                         <div class="player-edit-kicker">Danger zone</div>
                         <p class="player-edit-help mb-0">Delete this player record only when it should be removed from the system.</p>
                     </div>
-                    <a class="btn btn-outline-danger btn-sm" href="players_delete.php?id=<?= (int) $player['id'] ?>" onclick="return confirm('Delete this player? This will also remove assignment history.');"><i class="fa-solid fa-trash" aria-hidden="true"></i><span class="ms-1">Delete player</span></a>
+                    <a class="btn btn-outline-danger btn-sm" href="players_delete.php?id=<?= (int) $player['id'] ?>" data-confirm="Delete this player? This will also remove assignment history." data-confirm-action="Delete"><i class="fa-solid fa-trash" aria-hidden="true"></i><span class="ms-1">Delete player</span></a>
                 </div>
             </div>
             </div>
@@ -249,7 +252,7 @@ echo '<script src="/admin/assets/js/player_status_cards.js?v=' . h($playerStatus
         <div class="card-body">
             <div class="player-edit-kicker">Graphics library</div>
             <h2 class="player-edit-title mb-1">Action shots</h2>
-            <p class="player-edit-help mb-3">Extra photos used when generating Man of the Match, Goal, Player Sponsor and other graphics.</p>
+            <p class="player-edit-help mb-3">Extra photos used when generating Player of the Match, Goal, Player Sponsor and other graphics.</p>
             <div class="player-action-shots-grid">
                 <?php foreach ($actionShots as $shot): ?>
                     <div class="player-action-shot">
@@ -282,6 +285,11 @@ echo '<script src="/admin/assets/js/player_status_cards.js?v=' . h($playerStatus
         <div class="card-body">
             <div class="player-edit-kicker">Commercial</div>
             <h2 class="player-edit-title mb-3">Sponsorships</h2>
+            <?php if ($sponsorshipDeadlinePassed): ?>
+                <div class="alert alert-warning">This season's sponsorship deadline has passed — player sponsorships are locked for everyone and can't be changed.</div>
+            <?php elseif (!$canEditSponsorships): ?>
+                <div class="alert alert-info">Player sponsorships can only be changed by the club owner. The controls below are read-only.</div>
+            <?php endif; ?>
             <?php if ($uniqueSponsors): ?>
                 <?php foreach ($uniqueSponsors as $sponsor): ?>
                     <div class="card player-edit-sponsor-card hub-table-card">
@@ -301,7 +309,7 @@ echo '<script src="/admin/assets/js/player_status_cards.js?v=' . h($playerStatus
                                     <tbody>
                                         <?php
                                         $stmt2 = $pdo->prepare("
-                                            SELECT s.id, s.slot, s.amount, s.notes,
+                                            SELECT s.id, s.slot, s.amount, s.notes, s.complimentary,
                                                    COALESCE(SUM(p.amount),0) AS paid
                                             FROM sponsorships s
                                             LEFT JOIN sponsorship_payments p ON p.sponsorship_id = s.id
@@ -309,26 +317,33 @@ echo '<script src="/admin/assets/js/player_status_cards.js?v=' . h($playerStatus
                                               AND s.season_id = :season_id
                                               AND s.ended_at IS NULL
                                               AND LOWER(s.slot) IN ('home', 'away')
-                                            GROUP BY s.id, s.slot, s.amount, s.notes
+                                            GROUP BY s.id, s.slot, s.amount, s.notes, s.complimentary
                                             ORDER BY FIELD(UPPER(s.slot),'HOME','AWAY')
                                         ");
                                         $stmt2->execute([':pid' => $id, ':sid' => $sponsor['id'], ':season_id' => $seasonId]);
                                         $slots = $stmt2->fetchAll(PDO::FETCH_ASSOC);
                                         foreach ($slots as $slot):
+                                            $isComplimentary = (bool) $slot['complimentary'];
                                         ?>
                                             <tr data-id="<?= (int) $slot['id'] ?>">
                                                 <td data-label="Slot"><?= htmlspecialchars(strtoupper((string) $slot['slot'])) ?></td>
-                                                <td data-label="Amount">£<?= number_format((float) $slot['amount'], 2) ?></td>
-                                                <td data-label="Paid">£<?= number_format((float) $slot['paid'], 2) ?></td>
+                                                <td data-label="Amount">
+                                                    <?php if ($isComplimentary): ?>
+                                                        <span class="badge text-bg-info">Complimentary</span>
+                                                    <?php else: ?>
+                                                        £<?= number_format((float) $slot['amount'], 2) ?>
+                                                    <?php endif; ?>
+                                                </td>
+                                                <td data-label="Paid"><?= $isComplimentary ? '—' : '£' . number_format((float) $slot['paid'], 2) ?></td>
                                                 <td data-label="Notes" class="player-edit-note-cell">
-                                                    <input type="text" class="form-control form-control-sm inline-note" value="<?= htmlspecialchars((string) ($slot['notes'] ?? '')) ?>" data-id="<?= (int) $slot['id'] ?>" data-field="notes">
+                                                    <input type="text" class="form-control form-control-sm inline-note" value="<?= htmlspecialchars((string) ($slot['notes'] ?? '')) ?>" data-id="<?= (int) $slot['id'] ?>" data-field="notes" <?= $canEditSponsorships ? '' : 'disabled' ?>>
                                                 </td>
                                                 <td data-label="Actions" class="player-edit-actions-cell">
                                                   <div class="player-edit-sponsor-actions hub-actions">
-                                                    <?php if ((float) $slot['paid'] < (float) $slot['amount']): ?>
+                                                    <?php if (!$isComplimentary && (float) $slot['paid'] < (float) $slot['amount']): ?>
                                                         <button class="btn btn-sm btn-outline-success mark-paid" data-id="<?= (int) $slot['id'] ?>" data-remaining="<?= (float) $slot['amount'] - (float) $slot['paid'] ?>">Mark paid</button>
                                                     <?php endif; ?>
-                                                    <button class="btn btn-sm btn-outline-danger delete-sponsorship" data-id="<?= (int) $slot['id'] ?>" title="Delete sponsorship" aria-label="Delete sponsorship"><i class="fa-solid fa-trash" aria-hidden="true"></i></button>
+                                                    <button class="btn btn-sm btn-outline-danger delete-sponsorship" data-id="<?= (int) $slot['id'] ?>" title="Delete sponsorship" aria-label="Delete sponsorship" <?= $canEditSponsorships ? '' : 'disabled' ?>><i class="fa-solid fa-trash" aria-hidden="true"></i></button>
                                                   </div>
                                                 </td>
                                             </tr>
@@ -346,44 +361,54 @@ echo '<script src="/admin/assets/js/player_status_cards.js?v=' . h($playerStatus
             <div class="player-edit-add">
             <div class="player-edit-kicker">New assignment</div>
             <h3 class="player-edit-title">Add sponsorship</h3>
-            <form id="addSponsorshipForm" class="player-edit-add-grid hub-form-section">
+            <form id="addSponsorshipForm" class="player-edit-add-form hub-form-section">
                 <input type="hidden" name="player_id" value="<?= (int) $id ?>">
                 <input type="hidden" name="season_id" value="<?= (int) $seasonId ?>">
-                <label>
-                    <span class="form-label">Sponsor</span>
-                    <select name="sponsor_id" class="form-select" required>
-                        <option value="">Select sponsor</option>
-                        <?php foreach ($sponsors as $sp): ?>
-                            <option value="<?= (int) $sp['id'] ?>"><?= htmlspecialchars((string) $sp['name']) ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                </label>
-                <label>
-                    <span class="form-label">Kit slot</span>
-                    <select name="slot" class="form-select" required>
-                        <?php
-                        $playerHasSponsorship = count(array_intersect($activeSlots, $playerEditSlots)) > 0;
-                        $freeSlots = $playerHasSponsorship ? [] : array_diff($playerEditSlots, $activeSlots);
-                        ?>
-                        <?php if ($freeSlots): ?>
-                            <?php foreach ($freeSlots as $slot): ?>
-                                <option value="<?= h($slot) ?>"><?= h(ucfirst($slot)) ?></option>
+                <div class="player-edit-add-row1">
+                    <label class="player-edit-add-field">
+                        <span class="form-label">Sponsor</span>
+                        <select name="sponsor_id" class="form-select" required <?= $canEditSponsorships ? '' : 'disabled' ?>>
+                            <option value="">Select sponsor</option>
+                            <?php foreach ($sponsors as $sp): ?>
+                                <option value="<?= (int) $sp['id'] ?>"><?= htmlspecialchars((string) $sp['name']) ?></option>
                             <?php endforeach; ?>
-                        <?php else: ?>
-                            <option value="">Player already has a sponsorship</option>
-                        <?php endif; ?>
-                    </select>
-                </label>
-                <label>
-                    <span class="form-label">Amount</span>
-                    <input type="number" step="0.01" min="0" name="amount" class="form-control" placeholder="£0.00">
-                </label>
-                <label>
-                    <span class="form-label">Notes</span>
-                    <input type="text" name="notes" class="form-control" placeholder="Optional notes">
-                </label>
-                <div class="player-edit-add-button d-grid">
-                    <button type="submit" class="btn btn-brand" <?= $freeSlots ? '' : 'disabled' ?>><i class="fa-solid fa-plus" aria-hidden="true"></i><span class="ms-1">Add</span></button>
+                        </select>
+                    </label>
+                    <label class="player-edit-add-field">
+                        <span class="form-label">Kit slot</span>
+                        <select name="slot" class="form-select" required <?= $canEditSponsorships ? '' : 'disabled' ?>>
+                            <?php
+                            $freeSlots = array_diff($playerEditSlots, $activeSlots);
+                            ?>
+                            <?php if ($freeSlots): ?>
+                                <?php foreach ($freeSlots as $slot): ?>
+                                    <option value="<?= h($slot) ?>"><?= h(ucfirst($slot)) ?></option>
+                                <?php endforeach; ?>
+                            <?php else: ?>
+                                <option value="">Player already has a sponsorship</option>
+                            <?php endif; ?>
+                        </select>
+                    </label>
+                    <div class="player-edit-add-field player-edit-complimentary-field">
+                        <span class="form-label">Complimentary</span>
+                        <div class="form-check form-switch player-edit-complimentary-switch">
+                            <input type="checkbox" name="complimentary" value="1" class="form-check-input" id="addSponsorshipComplimentary" role="switch" <?= $canEditSponsorships ? '' : 'disabled' ?>>
+                            <label class="form-check-label" for="addSponsorshipComplimentary">Free sponsorship</label>
+                        </div>
+                    </div>
+                    <label class="player-edit-add-field player-edit-amount-field">
+                        <span class="form-label">Amount</span>
+                        <input type="number" step="0.01" min="0" name="amount" class="form-control" placeholder="£0.00" <?= $canEditSponsorships ? '' : 'disabled' ?>>
+                    </label>
+                    <div class="player-edit-add-button d-grid">
+                        <button type="submit" class="btn btn-brand" <?= ($freeSlots && $canEditSponsorships) ? '' : 'disabled' ?>><i class="fa-solid fa-plus" aria-hidden="true"></i><span class="ms-1">Add</span></button>
+                    </div>
+                </div>
+                <div class="player-edit-add-row2">
+                    <label class="player-edit-add-field player-edit-notes-field">
+                        <span class="form-label">Notes</span>
+                        <input type="text" name="notes" class="form-control" placeholder="Optional notes" <?= $canEditSponsorships ? '' : 'disabled' ?>>
+                    </label>
                 </div>
             </form>
             </div>
@@ -397,7 +422,7 @@ echo '<script src="/admin/assets/js/player_status_cards.js?v=' . h($playerStatus
                     <input type="hidden" name="season_id" value="<?= (int) $seasonId ?>">
                     <label class="player-edit-transfer-select">
                         <span class="form-label">Replacement player</span>
-                        <select name="replacement_player_id" class="form-select" required>
+                        <select name="replacement_player_id" class="form-select" required <?= $canEditSponsorships ? '' : 'disabled' ?>>
                             <option value="">Select replacement player</option>
                             <?php foreach ($activePlayers as $replacementPlayer): ?>
                                 <?php if ((int) $replacementPlayer['id'] === $id) continue; ?>
@@ -406,7 +431,7 @@ echo '<script src="/admin/assets/js/player_status_cards.js?v=' . h($playerStatus
                         </select>
                     </label>
                     <div class="player-edit-transfer-button-wrap">
-                        <button type="submit" class="btn btn-warning player-edit-transfer-button" title="Transfer sponsorships" aria-label="Transfer sponsorships"><i class="fa-solid fa-right-left" aria-hidden="true"></i></button>
+                        <button type="submit" class="btn btn-warning player-edit-transfer-button" title="Transfer sponsorships" aria-label="Transfer sponsorships" <?= $canEditSponsorships ? '' : 'disabled' ?>><i class="fa-solid fa-right-left" aria-hidden="true"></i></button>
                     </div>
                 </form>
             </div>

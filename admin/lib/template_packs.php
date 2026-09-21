@@ -93,8 +93,8 @@ function template_packs_action_registry(): array
         ],
         'player_of_match' => [
             'key' => 'player_of_match',
-            'label' => 'Man of the Match',
-            'description' => 'Man of the match announcement.',
+            'label' => 'Player of the Match',
+            'description' => 'Player of the match announcement.',
             'default_width' => 1080,
             'default_height' => 1080,
         ],

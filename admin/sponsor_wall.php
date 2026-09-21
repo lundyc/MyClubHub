@@ -3,6 +3,13 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/lib/sponsor_wall.php';
+require_once __DIR__ . '/account_auth.php';
+
+// Gate here, before any of the POST handling below, rather than relying on
+// header.php's require further down — that require used to come after the
+// upload/delete/settings actions ran, so those write actions executed for
+// anyone who could POST to this file, authenticated or not.
+hub_auth_require_capability('content_social');
 
 $messageType = '';
 $message = '';

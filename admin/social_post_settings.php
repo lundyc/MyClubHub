@@ -58,7 +58,7 @@ function social_post_content_definitions(string $channel): array
     $facebookLiveTemplates = [
         'kickoff' => "⚽ 𝗞𝗜𝗖𝗞-𝗢𝗙𝗙\n\nWe're underway at {Ground}!\n\n{Score Full}",
         'goal' => "⚽ {Minute} GOAL | {Score Full}",
-        'player_of_match' => "MAN OF THE MATCH ⭐\n\n{Player}\n\n{Score}",
+        'player_of_match' => "PLAYER OF THE MATCH ⭐\n\n{Player}\n\n{Score}",
         'half_time' => "⏱️ 𝗛𝗔𝗟𝗙-𝗧𝗜𝗠𝗘\n\n{Score Full}\n\nHalf-time at {Ground}.",
         'second_half' => "⏱️ 𝗦𝗘𝗖𝗢𝗡𝗗 𝗛𝗔𝗟𝗙\n\nWe're back underway at {Ground}.\n\n{Score Full}",
         'full_time' => "⏱️ 𝗙𝗨𝗟𝗟-𝗧𝗜𝗠𝗘\n\n{Score Full}\n\n{Scorer Credits}",
@@ -75,7 +75,7 @@ function social_post_content_definitions(string $channel): array
     $xLiveTemplates = [
         'kickoff' => "⚽ KICK-OFF\n\n{Home Team} v {Away Team}",
         'goal' => "⚽ {Minute} GOAL!\n\n{Score Full}\n\n{Player}",
-        'player_of_match' => "⭐ MAN OF THE MATCH\n\n{Player}",
+        'player_of_match' => "⭐ PLAYER OF THE MATCH\n\n{Player}",
         'half_time' => "⏱️ HT\n\n{Score Full}",
         'second_half' => "⏱️ Back underway.\n\n{Score Full}",
         'full_time' => "⏱️ FT\n\n{Score Full}",
@@ -96,7 +96,7 @@ function social_post_content_definitions(string $channel): array
         'starting_xi' => ['label' => 'Starting XI', 'default' => "Today's Starting XI against {Opponent}"],
         'kickoff' => ['label' => 'Kick Off', 'default' => $liveTemplates['kickoff']],
         'goal' => ['label' => 'Goal', 'default' => $liveTemplates['goal']],
-        'player_of_match' => ['label' => 'Man of the Match', 'default' => $liveTemplates['player_of_match']],
+        'player_of_match' => ['label' => 'Player of the Match', 'default' => $liveTemplates['player_of_match']],
         'half_time' => ['label' => 'Half Time', 'default' => $liveTemplates['half_time']],
         'second_half' => ['label' => 'Second Half', 'default' => $liveTemplates['second_half']],
         'full_time' => ['label' => 'Full Time', 'default' => $liveTemplates['full_time']],

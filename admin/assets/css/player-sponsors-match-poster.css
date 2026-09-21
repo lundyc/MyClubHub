@@ -7,7 +7,7 @@
     position: relative;
     width: 100%;
     overflow: hidden;
-    border-radius: .75rem;
+    border-radius: var(--radius-075rem, .75rem);
     background: #dfe3e8;
     box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .08);
   }
@@ -16,7 +16,7 @@
     position: relative;
     width: 794px;
     height: 1123px;
-    padding: 34px;
+    padding: var(--space-34px, 34px);
     color: #050505;
     background: #fff;
     font-family: Arial, Helvetica, sans-serif;
@@ -32,7 +32,7 @@
   .match-poster__teams {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 100px minmax(0, 1fr);
-    gap: 16px;
+    gap: var(--space-16px, 16px);
     align-items: center;
   }
   .match-poster__team {
@@ -69,20 +69,20 @@
   }
   .match-poster__team-name {
     min-height: 66px;
-    margin-top: 8px;
+    margin-top: var(--space-8px, 8px);
     font-size: 28px;
     font-weight: 800;
     line-height: 1.08;
     text-transform: uppercase;
   }
   .match-poster__versus {
-    padding-top: 8px;
+    padding-top: var(--space-8px, 8px);
     font-size: 34px;
     font-weight: 900;
     white-space: nowrap;
   }
   .match-poster__competition {
-    margin-top: 14px;
+    margin-top: var(--space-14px, 14px);
     padding: 16px 8px 0;
     border-top: 6px solid var(--poster-yellow);
     font-size: 26px;
@@ -91,7 +91,7 @@
     text-align: center;
   }
   .match-poster__fixture {
-    margin-top: 96px;
+    margin-top: var(--space-96px, 96px);
     text-align: center;
   }
   .match-poster__date {
@@ -106,13 +106,13 @@
     vertical-align: text-top;
   }
   .match-poster__kickoff {
-    margin-top: 22px;
+    margin-top: var(--space-22px, 22px);
     font-size: 39px;
     line-height: 1.05;
   }
   .match-poster__kickoff strong { font-weight: 900; }
   .match-poster__venue {
-    margin-top: 78px;
+    margin-top: var(--space-78px, 78px);
     text-align: center;
   }
   .match-poster__venue-name {
@@ -122,7 +122,7 @@
     text-transform: uppercase;
   }
   .match-poster__venue-address {
-    margin-top: 22px;
+    margin-top: var(--space-22px, 22px);
     padding: 0 20px;
     font-size: 30px;
     line-height: 1.2;
@@ -130,14 +130,14 @@
   }
   .match-poster__admission {
     margin-top: auto;
-    padding-bottom: 32px;
+    padding-bottom: var(--space-32px, 32px);
     font-size: 33px;
     line-height: 1.35;
     text-align: center;
   }
   .match-poster__admission strong { font-weight: 900; }
   .match-poster__note {
-    margin-top: 5px;
+    margin-top: var(--space-5px, 5px);
     font-size: 21px;
     font-weight: 800;
   }

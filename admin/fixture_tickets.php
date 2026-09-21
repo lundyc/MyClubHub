@@ -99,7 +99,7 @@ foreach ($fixturePackages as $row) {
         </div>
         <div class="card-body p-0">
             <div class="table-responsive">
-                <table class="table align-middle mb-0">
+                <table class="table align-middle mb-0 hub-data-table">
                     <thead><tr><th>Package</th><th style="width:160px;">Price</th><th style="width:170px;">Online allocation</th><th style="width:120px;">Sold</th><th style="width:100px;">Active</th></tr></thead>
                     <tbody>
                         <?php foreach ($packages as $package): ?>

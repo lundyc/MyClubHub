@@ -6,7 +6,7 @@
 .hub-index-page {
         display: flex;
         flex-direction: column;
-        gap: 1.5rem;
+        gap: var(--space-6, 1.5rem);
     }
 
     .hub-index-page > .hub-section-commandbar {
@@ -15,7 +15,7 @@
     }
 
     .hub-index-section__header {
-        margin-bottom: 0.85rem;
+        margin-bottom: var(--space-085rem, 0.85rem);
     }
 
     .hub-index-section__header h2 {
@@ -33,11 +33,11 @@
     .hub-index-page .hub-metric-card__icon {
         width: 2.3rem;
         height: 2.3rem;
-        font-size: 0.88rem;
+        font-size: var(--fs-088, 0.88rem);
     }
 
     .hub-index-page .hub-metric-card__value {
-        font-size: 1.28rem;
+        font-size: var(--fs-128, 1.28rem);
     }
 
     @media (min-width: 768px) {
@@ -46,49 +46,66 @@
         }
     }
 
-    /*
-     * Match day: one grid, five tiles. Default grid stretch makes fixtures,
-     * results and league table snap to the same row height — that alignment
-     * is what reads as "a dashboard" rather than two uneven stacked columns.
-     */
+    /* League position and recent results share the available width. */
     .hub-index-matchday {
         display: grid;
-        grid-template-columns: repeat(12, minmax(0, 1fr));
-        gap: 1.1rem;
-    }
-
-    .hub-index-matchday__fixtures { grid-column: span 5; }
-    .hub-index-matchday__results  { grid-column: span 4; }
-    .hub-index-matchday__league   { grid-column: span 3; }
-    .hub-index-matchday__birthdays { grid-column: span 6; }
-    .hub-index-matchday__charts    { grid-column: span 6; }
-
-    @media (max-width: 1199.98px) {
-        .hub-index-matchday__fixtures,
-        .hub-index-matchday__results,
-        .hub-index-matchday__league {
-            grid-column: span 6;
-        }
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: var(--space-11rem, 1.1rem);
     }
 
     @media (max-width: 767.98px) {
         .hub-index-matchday {
             grid-template-columns: 1fr;
         }
+    }
 
-        .hub-index-matchday__fixtures,
-        .hub-index-matchday__results,
-        .hub-index-matchday__league,
-        .hub-index-matchday__birthdays,
-        .hub-index-matchday__charts {
-            grid-column: 1 / -1;
-        }
+    /*
+     * Money section: Stripe activity list beside the season charts, so
+     * finance content shares one row instead of each taking a full-width
+     * section on its own. flex (not a fixed grid) so either panel alone —
+     * e.g. charts with no Stripe capability, or Stripe with no chart data —
+     * still fills the row cleanly instead of leaving half of it empty.
+     */
+    .hub-index-money {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-11rem, 1.1rem);
+        align-items: stretch;
+    }
+
+    .hub-index-money__stripe,
+    .hub-index-money__charts {
+        flex: 2 1 340px;
+        min-width: 0;
+    }
+
+    /* Recent-activity feed is capped to 3 rows at source (see index.php) so
+       it naturally matches the other columns' height — no scrolling. */
+
+    /* Money metric cards ride along the right of the same row, stacked in a
+       single column instead of the usual multi-column metric grid. */
+    .hub-index-money__metrics {
+        flex: 1 1 240px;
+        min-width: 0;
+    }
+
+    .hub-index-money__metrics .hub-metric-grid {
+        display: flex;
+        flex-direction: column;
+        grid-template-columns: none;
+        gap: var(--space-065rem, 0.65rem);
+        height: 100%;
+        margin-bottom: 0;
+    }
+
+    .hub-index-money__metrics .hub-metric-card {
+        flex: 1 1 auto;
     }
 
     .dashboard-season-charts {
         display: flex;
         flex-direction: column;
-        gap: 1.1rem;
+        gap: var(--space-11rem, 1.1rem);
     }
 
     .dashboard-season-charts--row {
@@ -97,12 +114,12 @@
     }
 
     .dashboard-season-charts--row .dashboard-season-charts__block {
-        flex: 1 1 12rem;
-        min-width: 12rem;
+        flex: 1 1 9rem;
+        min-width: 9rem;
     }
 
     .dashboard-season-charts__block + .dashboard-season-charts__block {
-        padding-top: 1.1rem;
+        padding-top: var(--space-11rem, 1.1rem);
         border-top: 1px solid var(--hub-line, rgba(75, 8, 24, 0.13));
     }
 
@@ -114,18 +131,18 @@
     .dashboard-season-charts__label {
         margin: 0 0 0.6rem;
         color: var(--hub-muted, #675f62);
-        font-size: 0.78rem;
+        font-size: var(--fs-078, 0.78rem);
         font-weight: 700;
     }
 
     .dashboard-chart-wrap--rail {
-        height: 11rem;
+        height: 14.4rem;
     }
 
     .dashboard-command-centre {
         display: grid;
         grid-template-columns: minmax(0, 1.45fr) minmax(19rem, 0.9fr);
-        gap: 0.9rem;
+        gap: var(--space-9rem, 0.9rem);
     }
 
     .dashboard-command-centre__main,
@@ -142,8 +159,8 @@
 
     .dashboard-command-centre__side {
         display: grid;
-        gap: 0.75rem;
-        padding: 0.85rem;
+        gap: var(--space-3, 0.75rem);
+        padding: var(--space-085rem, 0.85rem);
     }
 
     .dashboard-command-centre h2 {
@@ -162,19 +179,19 @@
     .dashboard-command-centre__actions {
         display: flex;
         flex-wrap: wrap;
-        gap: 0.5rem;
-        margin-top: 0.9rem;
+        gap: var(--space-2, 0.5rem);
+        margin-top: var(--space-9rem, 0.9rem);
     }
 
     .dashboard-next-fixture {
         display: grid;
         grid-template-columns: minmax(6rem, auto) minmax(0, 1fr) auto;
-        gap: 0.85rem;
+        gap: var(--space-085rem, 0.85rem);
         align-items: center;
-        margin-top: 0.9rem;
-        padding: 0.85rem;
+        margin-top: var(--space-9rem, 0.9rem);
+        padding: var(--space-085rem, 0.85rem);
         border: 1px solid rgba(75, 8, 24, 0.12);
-        border-radius: 0.72rem;
+        border-radius: var(--radius-072rem, 0.72rem);
         background: linear-gradient(135deg, rgba(246, 236, 222, 0.78), rgba(255, 255, 255, 0.92));
         color: var(--hub-ink, #1f1a1d);
         text-decoration: none;
@@ -194,39 +211,51 @@
     }
 
     .dashboard-next-fixture__date {
-        padding-right: 0.85rem;
+        padding-right: var(--space-085rem, 0.85rem);
         border-right: 1px solid rgba(75, 8, 24, 0.12);
     }
 
     .dashboard-next-fixture__date strong {
-        font-size: 1rem;
+        font-size: var(--fs-base, 1rem);
         font-weight: 800;
     }
 
     .dashboard-next-fixture__date small,
     .dashboard-next-fixture__body small {
         color: var(--hub-muted, #675f62);
-        font-size: 0.78rem;
+        font-size: var(--fs-078, 0.78rem);
     }
 
     .dashboard-next-fixture__body strong {
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
-        font-size: 1.05rem;
+        font-size: var(--fs-105, 1.05rem);
+    }
+
+    /* Competition names ("West of Scotland Football League Third Division")
+       are long enough to blow out this compact row — clip with an ellipsis
+       and let the title attribute carry the full name on hover. */
+    .dashboard-next-fixture__competition {
+        display: inline-block;
+        max-width: 14rem;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        vertical-align: bottom;
     }
 
     .dashboard-attention-score {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        gap: 0.75rem;
+        gap: var(--space-3, 0.75rem);
         padding: 0.15rem 0.1rem 0;
     }
 
     .dashboard-attention-score span {
         color: var(--hub-muted, #675f62);
-        font-size: 0.72rem;
+        font-size: var(--fs-072, 0.72rem);
         font-weight: 800;
         letter-spacing: 0.08em;
         text-transform: uppercase;
@@ -237,22 +266,22 @@
         min-width: 2.25rem;
         height: 2.25rem;
         place-items: center;
-        border-radius: 999px;
+        border-radius: var(--radius-pill, 999px);
         background: var(--brand-primary);
         color: #fff;
-        font-size: 1rem;
+        font-size: var(--fs-base, 1rem);
     }
 
     .dashboard-attention__list--compact {
-        gap: 0.5rem;
+        gap: var(--space-2, 0.5rem);
     }
 
 .hub-index__league-card {
         display: flex;
         align-items: center;
-        gap: 1rem;
+        gap: var(--space-4, 1rem);
         padding: 1rem 1.05rem;
-        border-radius: 1rem;
+        border-radius: var(--radius-1rem, 1rem);
         background: linear-gradient(135deg, rgba(75, 8, 24, 0.07), rgba(224, 180, 42, 0.12));
         border: 1px solid rgba(75, 8, 24, 0.08);
     }
@@ -260,7 +289,7 @@
     .hub-index__league-pos {
         width: 3.2rem;
         height: 3.2rem;
-        border-radius: 999px;
+        border-radius: var(--radius-pill, 999px);
         background: linear-gradient(135deg, var(--brand-primary), var(--brand-dark));
         color: var(--brand-light);
         display: inline-flex;
@@ -273,24 +302,24 @@
 
     .hub-index__fact-list {
         display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 0.75rem;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: var(--space-3, 0.75rem);
     }
 
     .hub-index__fact {
         display: flex;
         flex-direction: column;
         align-items: center;
-        gap: 0.15rem;
-        padding: 0.85rem 1rem;
+        gap: var(--space-015rem, 0.15rem);
+        padding: 0.85rem 0.25rem;
         text-align: center;
-        border-radius: 0.9rem;
+        border-radius: var(--radius-09rem, 0.9rem);
         background: rgba(246, 236, 222, 0.78);
         border: 1px solid rgba(75, 8, 24, 0.07);
     }
 
     .hub-index__fact-label {
-        font-size: 0.72rem;
+        font-size: var(--fs-072, 0.72rem);
         font-weight: 700;
         letter-spacing: 0.08em;
         text-transform: uppercase;
@@ -305,8 +334,8 @@
     .hub-index__result {
         display: inline-flex;
         align-items: center;
-        gap: 0.4rem;
-        font-size: 0.78rem;
+        gap: var(--space-4rem, 0.4rem);
+        font-size: var(--fs-078, 0.78rem);
         font-weight: 700;
     }
 
@@ -330,19 +359,38 @@
         color: #dc3545;
     }
 
+    /* Competition icon — its own leading column on a result row, same
+       treatment as the Needs-attention icons, rather than sitting inline
+       with the date/time text. */
+    .hub-index-result__icon {
+        display: grid;
+        flex: 0 0 auto;
+        width: 2.35rem;
+        height: 2.35rem;
+        place-items: center;
+        border-radius: var(--radius-07rem, 0.7rem);
+        background: rgba(106, 32, 54, 0.1);
+        color: var(--brand-primary);
+        font-size: var(--fs-095, 0.95rem);
+    }
+
+    .min-w-0 {
+        min-width: 0;
+    }
+
     .dashboard-attention__list {
         display: grid;
-        gap: 0.65rem;
+        gap: var(--space-065rem, 0.65rem);
     }
 
     .dashboard-attention__item {
         display: grid;
         grid-template-columns: 2.35rem minmax(0, 1fr) auto;
-        gap: 0.75rem;
+        gap: var(--space-3, 0.75rem);
         align-items: center;
-        padding: 0.8rem;
+        padding: var(--space-08rem, 0.8rem);
         border: 1px solid rgba(75, 8, 24, 0.08);
-        border-radius: 0.85rem;
+        border-radius: var(--radius-085rem, 0.85rem);
         color: var(--brand-darkest);
         text-decoration: none;
         background: rgba(246, 236, 222, 0.45);
@@ -360,7 +408,7 @@
         width: 2.35rem;
         height: 2.35rem;
         place-items: center;
-        border-radius: 0.7rem;
+        border-radius: var(--radius-07rem, 0.7rem);
         background: rgba(106, 32, 54, 0.1);
         color: var(--brand-primary);
     }
@@ -371,23 +419,24 @@
     }
 
     .dashboard-attention__item small {
-        margin-top: 0.1rem;
+        margin-top: var(--space-01rem, 0.1rem);
         color: rgba(31, 26, 29, 0.65);
     }
 
     .dashboard-birthdays__list {
         display: grid;
-        gap: 0.65rem;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: var(--space-065rem, 0.65rem);
     }
 
     .dashboard-birthdays__item {
         display: grid;
         grid-template-columns: 4.2rem minmax(0, 1fr);
         align-items: center;
-        gap: 0.9rem;
-        padding: 0.65rem;
+        gap: var(--space-9rem, 0.9rem);
+        padding: var(--space-065rem, 0.65rem);
         border: 1px solid rgba(75, 8, 24, 0.08);
-        border-radius: 0.9rem;
+        border-radius: var(--radius-09rem, 0.9rem);
         background: rgba(246, 236, 222, 0.45);
         color: var(--brand-darkest);
         text-decoration: none;
@@ -405,7 +454,7 @@
         align-content: center;
         width: 4.2rem;
         height: 4.2rem;
-        border-radius: 1rem;
+        border-radius: var(--radius-1rem, 1rem);
         background: linear-gradient(135deg, var(--brand-primary), var(--brand-dark));
         color: var(--brand-light);
         box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.18);
@@ -413,14 +462,14 @@
     }
 
     .dashboard-birthdays__days strong {
-        font-size: 1.85rem;
+        font-size: var(--fs-185, 1.85rem);
         font-weight: 800;
         line-height: 1;
     }
 
     .dashboard-birthdays__days small {
-        margin-top: 0.15rem;
-        font-size: 0.62rem;
+        margin-top: var(--space-015rem, 0.15rem);
+        font-size: var(--fs-062, 0.62rem);
         font-weight: 700;
         letter-spacing: 0.06em;
         text-transform: uppercase;
@@ -433,13 +482,13 @@
     }
 
     .dashboard-birthdays__days--today strong {
-        font-size: 1.6rem;
+        font-size: var(--fs-16, 1.6rem);
     }
 
     .dashboard-birthdays__info {
         display: grid;
         min-width: 0;
-        gap: 0.15rem;
+        gap: var(--space-015rem, 0.15rem);
     }
 
     .dashboard-birthdays__name {
@@ -453,9 +502,9 @@
         color: var(--hub-muted, #675f62);
     }
 
+    /* Chart.js sizes the canvas to its positioned wrapper. */
     .dashboard-chart-wrap {
         position: relative;
-        height: 15rem;
     }
 
     @media (max-width: 991.98px) {
@@ -476,7 +525,7 @@
 
         .dashboard-next-fixture__date {
             padding-right: 0;
-            padding-bottom: 0.65rem;
+            padding-bottom: var(--space-065rem, 0.65rem);
             border-right: 0;
             border-bottom: 1px solid rgba(75, 8, 24, 0.12);
         }

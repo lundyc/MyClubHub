@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 // PHASE3B_GUARD_MARKER
 require_once __DIR__ . '/auth.php';
-if (!hub_auth_has_capability('football_ops')) {
+if (!hub_auth_has_capability('matchday')) {
     http_response_code(403);
     exit('Access denied.');
 }
@@ -158,7 +158,7 @@ $overviewEventLabels = [
                         </form>
                       <?php endif; ?>
                     <?php endforeach; ?>
-                    <form method="post" action="/admin/matchday_staffing_action.php" class="d-inline" onsubmit="return confirm('Remove this staffing assignment?');">
+                    <form method="post" action="/admin/matchday_staffing_action.php" class="d-inline" data-confirm="Remove this staffing assignment?" data-confirm-action="Remove">
                       <?= csrf_field() ?>
                       <input type="hidden" name="fixture_id" value="<?= (int) $fixture['id'] ?>">
                       <input type="hidden" name="season_id" value="<?= (int) $seasonId ?>">

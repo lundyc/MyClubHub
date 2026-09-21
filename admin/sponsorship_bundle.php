@@ -231,7 +231,8 @@ if($id>0&&$bundle){
 
   document.querySelectorAll('.bundle-stripe-cancel-btn').forEach((btn)=>{
     btn.addEventListener('click',async()=>{
-      if(!confirm('Cancel this combined payment link? It covers every item on it — none of them will be payable through this link once cancelled.'))return;
+      const confirmed=await window.hubConfirm('Cancel this combined payment link? It covers every item on it — none of them will be payable through this link once cancelled.',{actionLabel:'Cancel link'});
+      if(!confirmed)return;
       btn.disabled=true;
       const original=btn.textContent;
       btn.textContent='Cancelling…';
@@ -246,7 +247,7 @@ if($id>0&&$bundle){
         if(!response.ok||!json||!json.ok){throw new Error((json&&json.error)?json.error:'Could not cancel the link.');}
         window.location.reload();
       }catch(error){
-        alert(error.message||'Could not cancel the link.');
+        window.hubToast(error.message||'Could not cancel the link.','danger');
         btn.disabled=false;
         btn.textContent=original;
       }

@@ -76,6 +76,9 @@ function ensureSeasonSchema(PDO $pdo): void
           if (!isset($columns['transferred_from_sponsorship_id'])) {
                     $pdo->exec("ALTER TABLE sponsorships ADD COLUMN transferred_from_sponsorship_id INT UNSIGNED DEFAULT NULL AFTER transferred_to_player_id");
           }
+          if (!isset($columns['complimentary'])) {
+                    $pdo->exec("ALTER TABLE sponsorships ADD COLUMN complimentary TINYINT(1) NOT NULL DEFAULT 0 AFTER amount");
+          }
 
           $seasonColumns = [];
           $stmt = $pdo->query("SHOW COLUMNS FROM seasons");
@@ -96,6 +99,11 @@ function ensureSeasonSchema(PDO $pdo): void
           }
           if (!isset($seasonColumns['season_ticket_terms'])) {
                     $pdo->exec("ALTER TABLE seasons ADD COLUMN season_ticket_terms LONGTEXT NULL AFTER competition_id");
+          }
+          if (!isset($seasonColumns['sponsorship_deadline'])) {
+                    // Past this date, player sponsorships are locked for everyone —
+                    // see assertSponsorshipEditable() in lib/sponsorship_catalog.php.
+                    $pdo->exec("ALTER TABLE seasons ADD COLUMN sponsorship_deadline DATE NULL DEFAULT NULL AFTER is_locked");
           }
 
           $paymentColumns = [];
@@ -372,6 +380,7 @@ function getSeasons(PDO $pdo): array
                               s.end_date,
                               s.is_current,
                               s.is_locked,
+                              s.sponsorship_deadline,
                               s.competition_id,
                               s.season_ticket_terms,
                               s.player_home_amount,
@@ -396,6 +405,7 @@ function getSeasonById(PDO $pdo, int $seasonId): ?array
                               s.end_date,
                               s.is_current,
                               s.is_locked,
+                              s.sponsorship_deadline,
                               s.competition_id,
                               s.season_ticket_terms,
                               s.player_home_amount,
@@ -424,6 +434,7 @@ function getCurrentSeason(PDO $pdo): ?array
                               s.end_date,
                               s.is_current,
                               s.is_locked,
+                              s.sponsorship_deadline,
                               s.competition_id,
                               s.season_ticket_terms,
                               s.player_home_amount,
@@ -449,6 +460,7 @@ function getCurrentSeason(PDO $pdo): ?array
                               s.end_date,
                               s.is_current,
                               s.is_locked,
+                              s.sponsorship_deadline,
                               s.competition_id,
                               s.season_ticket_terms,
                               s.player_home_amount,
