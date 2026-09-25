@@ -16,6 +16,7 @@ require_once __DIR__ . '/lib/people.php';
 require_once __DIR__ . '/lib/accounts.php';
 require_once __DIR__ . '/lib/positions.php';
 require_once __DIR__ . '/lib/access_roles.php';
+require_once __DIR__ . '/lib/affiliations.php';
 require_once __DIR__ . '/lib/season.php';
 require_once __DIR__ . '/lib/season_tickets.php';
 require_once __DIR__ . '/lib/match_tickets.php';
@@ -290,6 +291,11 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                 club_person_redirect($personId, 'account_saved');
             }
 
+            if ($action === 'save_person_tags') {
+                set_person_tags($pdo, $personId, isset($_POST['person_tags']) && is_array($_POST['person_tags']) ? $_POST['person_tags'] : []);
+                club_person_redirect($personId, 'person_tags_saved');
+            }
+
             if ($action === 'add_access_override') {
                 setPersonAccessOverride(
                     $pdo,
@@ -420,6 +426,8 @@ $personPositions = $person ? getPersonPositions($pdo, $personId) : [];
 $currentPersonPositions = $person ? getCurrentPersonPositions($pdo, $personId) : [];
 $allAccessRoles = getAccessRoles($pdo);
 $personAccessOverrides = $person ? getPersonAccessOverrides($pdo, $personId) : [];
+$personAffiliations = $person ? person_affiliations($pdo, $personId) : [];
+$personTagKeys = $person ? person_tag_keys($pdo, $personId) : [];
 $accessCapabilityCatalog = getCapabilitiesCatalog($pdo);
 $accessCapabilityLabels = array_column($accessCapabilityCatalog, 'label', 'slug');
 $personAccessEffective = $person ? access_explain($pdo, $personId, false) : null;
@@ -457,6 +465,7 @@ $statusMessages = [
     'relationship_added' => 'Dependant relationship added.',
     'relationship_removed' => 'Relationship removed.',
     'access_roles_saved' => 'Access templates saved.',
+    'person_tags_saved' => 'Tags saved.',
     'access_override_saved' => 'Individual access change saved.',
     'access_override_removed' => 'Individual access change removed.',
 ];
@@ -538,6 +547,7 @@ $data = array_merge([
                 </div>
                 <div class="people-account__badges" aria-label="Person status">
                     <span class="people-status-pill <?= (int) $data['is_active'] === 1 ? 'people-status-pill--success' : 'people-status-pill--danger' ?>"><?= (int) $data['is_active'] === 1 ? 'Active person' : 'Inactive person' ?></span>
+                    <?php foreach ($personAffiliations as $affiliation): ?><span class="people-status-pill people-status-pill--muted" title="<?= h($affiliation['detail'] !== '' ? $affiliation['detail'] : 'Label only — grants no access') ?>"><?= h($affiliation['label']) ?></span><?php endforeach; ?>
                 </div>
             </div>
             <div class="people-tab-panel__body">
@@ -608,7 +618,7 @@ $data = array_merge([
                 <div class="people-account__badges" aria-label="Account status">
                     <?php if ($account): ?>
                         <span class="people-status-pill <?= (int) $account['is_active'] === 1 ? 'people-status-pill--success' : 'people-status-pill--danger' ?>"><?= (int) $account['is_active'] === 1 ? 'Active account' : 'Disabled account' ?></span>
-                        <span class="people-status-pill <?= $isAdminAccount ? 'people-status-pill--admin' : 'people-status-pill--muted' ?>"><?= $isAdminAccount ? 'Site Administrator' : 'Position-based access' ?></span>
+                        <span class="people-status-pill <?= ($personAccessEffective['bypass'] ?? false) ? 'people-status-pill--admin' : 'people-status-pill--muted' ?>"><?= ($personAccessEffective['bypass'] ?? false) ? 'Administrator' : (($personAccessEffective['capabilities'] ?? []) !== [] ? 'Access templates' : 'No admin access') ?></span>
                     <?php else: ?>
                         <span class="people-status-pill people-status-pill--warning">No login account</span>
                     <?php endif; ?>
@@ -815,6 +825,20 @@ $data = array_merge([
                             <div class="col-md-3"><label class="form-label small" for="ovNote">Note (optional)</label>
                                 <input class="form-control" type="text" id="ovNote" name="override_note" maxlength="255" placeholder="Why?"></div>
                             <div class="col-md-1"><button class="btn btn-brand w-100" type="submit">Add</button></div>
+                        </form>
+                    </div>
+
+                    <div class="people-form-section mt-4">
+                        <h3>Club labels</h3>
+                        <p class="text-muted small">Committee, football staff, volunteer and season ticket holder are worked out automatically from their club roles and tickets. These extra tags are labels only &mdash; they never give access.</p>
+                        <form method="post" class="d-flex flex-wrap gap-3 align-items-center">
+                            <input type="hidden" name="csrf_token" value="<?= h(hub_auth_csrf_token()) ?>">
+                            <input type="hidden" name="person_id" value="<?= (int) $personId ?>">
+                            <input type="hidden" name="action" value="save_person_tags">
+                            <?php foreach (PERSON_TAG_CATALOG as $tagKey => $tagLabel): ?>
+                                <label class="form-check"><input class="form-check-input" type="checkbox" name="person_tags[]" value="<?= h($tagKey) ?>" <?= in_array($tagKey, $personTagKeys, true) ? 'checked' : '' ?>> <span class="form-check-label"><?= h($tagLabel) ?></span></label>
+                            <?php endforeach; ?>
+                            <button class="btn btn-outline-secondary btn-sm" type="submit">Save tags</button>
                         </form>
                     </div>
 
