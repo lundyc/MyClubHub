@@ -22,6 +22,15 @@ $wosflTableUrlOverride = is_array($leagueEdition)
 if ($wosflTableUrlOverride === '' && is_array($leagueCompetition) && !empty($leagueCompetition['is_league'])) {
     $wosflTableUrlOverride = trim((string) ($leagueCompetition['league_url'] ?? ''));
 }
+// The scrape below writes a cache file and shells out, so gate before it runs
+// rather than relying on header.php further down.
+require_once __DIR__ . '/auth.php';
+if (!hub_auth_is_authenticated()) {
+    header('Location: /admin/login.php');
+    exit;
+}
+hub_auth_require_capability('publishing');
+
 require_once __DIR__ . '/wosfl-table.php';
 
 if (!isset($teams) || !is_array($teams)) {

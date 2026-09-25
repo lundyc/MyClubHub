@@ -17,7 +17,7 @@ require_once __DIR__ . '/lib/season.php';
 require_once __DIR__ . '/lib/match_sponsorship.php';
 require_once __DIR__ . '/lib/match_poster_render_config.php';
 
-if (!hash_equals(MATCH_POSTER_RENDER_SECRET, (string)($_GET['_token'] ?? ''))) {
+if (MATCH_POSTER_RENDER_SECRET === '' || !hash_equals(MATCH_POSTER_RENDER_SECRET, (string)($_GET['_token'] ?? ''))) {
     http_response_code(403);
     exit('Forbidden');
 }

@@ -5,6 +5,14 @@ require_once __DIR__ . '/lib/sponsorship_catalog.php';
 require_once __DIR__ . '/sync_social_directory.php';
 require_once __DIR__ . '/lib/audit.php';
 
+// Explicit guard: the writes below run before header.php, and the only check
+// so far was sync_social_directory.php's unrelated content_social gate.
+if (!hub_auth_is_authenticated()) {
+    header('Location: /admin/login.php');
+    exit;
+}
+hub_auth_require_capability('matchday');
+
 $id = (int)($_GET['id'] ?? 0);
 if ($id <= 0) {
           echo '<div><div class="alert alert-danger">Invalid player ID.</div></div>';

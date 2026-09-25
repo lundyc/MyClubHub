@@ -2,8 +2,15 @@
 
 declare(strict_types=1);
 
+// Included by league_table.php, league_table_graphic.php, refresh.php and the
+// cron script — never a page in its own right. It scrapes and shells out, so a
+// direct web request must not reach it.
+if (PHP_SAPI !== 'cli' && basename((string) ($_SERVER['SCRIPT_FILENAME'] ?? '')) === 'wosfl-table.php') {
+    http_response_code(404);
+    exit;
+}
+
 error_reporting(E_ALL);
-ini_set('display_errors', '1');
 
 require_once __DIR__ . '/env.php';
 require_once __DIR__ . '/lib/league_table_form.php';
