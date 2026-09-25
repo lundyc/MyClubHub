@@ -5,7 +5,8 @@ declare(strict_types=1);
  * Access snapshot — records every person's EFFECTIVE Hub access, and where it
  * comes from, using the same rules hub_auth_has_capability() applies today.
  *
- *   php admin/database/access_snapshot.php snapshot <label>   write /root/backups/access-snapshot-<label>.json
+ *   php admin/database/access_snapshot.php snapshot <label> [--core]   write /root/backups/access-snapshot-<label>.json
+ *                                       (--core computes via lib/access.php instead of the legacy rules)
  *   php admin/database/access_snapshot.php compare <a> <b>    diff two snapshots (exit 1 if anything differs)
  *
  * Used by the access-control refactor: snapshot before, snapshot after each
@@ -117,7 +118,12 @@ foreach ($personIds as $personId) {
 
     $effective = [];
     if ($canLogIn) {
-        $effective = ($isAdmin || $bypass) ? $capabilitySlugs : array_keys($sources);
+        if (in_array('--core', $argv, true)) {
+            // Ask the real access core (lib/access.php) instead of replaying the old rules.
+            $effective = access_effective($pdo, $personId, $isAdmin)['capabilities'];
+        } else {
+            $effective = ($isAdmin || $bypass) ? $capabilitySlugs : array_keys($sources);
+        }
         sort($effective);
     }
 

@@ -24,6 +24,7 @@ require_once __DIR__ . '/lib/positions.php';
 require_once __DIR__ . '/lib/accounts.php';
 require_once __DIR__ . '/lib/permissions.php';
 require_once __DIR__ . '/lib/access_roles.php';
+require_once __DIR__ . '/lib/access.php';
 require_once __DIR__ . '/lib/people.php';
 require_once __DIR__ . '/lib/season.php';
 
@@ -351,38 +352,14 @@ function hub_auth_current_access_roles(): array
 }
 
 /**
- * The single check every capability-gated page calls. Admin always passes
- * (capabilities are a way to delegate a slice of admin-only pages to
- * specific roles, not a ceiling on what admin can see). Everyone else
- * passes if EITHER of two independent grant sources says yes:
- *
- * - the WordPress-style access-roles grant matrix (access_role_capabilities,
- *   editable via admin/access_roles.php) for any role assigned to them, or
- * - a legacy committee position's capabilities JSON (hub_positions), kept
- *   so existing position assignments keep working during the transition.
+ * The check every capability-gated page calls. The rules (admin bypass, access
+ * templates, individual overrides) live in lib/access.php; see access_can().
  */
 function hub_auth_has_capability(string $capability): bool
 {
-    if (hub_auth_is_admin()) {
-        return true;
-    }
-    foreach (hub_auth_current_access_roles() as $role) {
-        if ((int) ($role['bypass_all'] ?? 0) === 1) {
-            return true;
-        }
-    }
-    global $pdo;
-    foreach (hub_auth_current_access_roles() as $role) {
-        if (in_array($capability, getAccessRoleCapabilitySlugs($pdo, (int) $role['id']), true)) {
-            return true;
-        }
-    }
-    foreach (hub_auth_current_positions() as $position) {
-        if (in_array($capability, hub_position_capabilities($pdo, $position), true)) {
-            return true;
-        }
-    }
-    return false;
+    // Thin wrapper: the rules live in lib/access.php (access_can()). Kept so
+    // the ~180 existing call sites keep working while they migrate.
+    return access_can($capability);
 }
 
 /**
