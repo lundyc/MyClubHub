@@ -6,7 +6,7 @@ if (!hub_auth_has_any_capability(['sponsorship', 'finance_manage'])) {
     http_response_code(403);
     exit('Access denied.');
 }
-$canRecordPayments = hub_auth_has_capability('finance_manage');
+$canRecordPayments = hub_auth_has_any_capability(['finance_manage', 'sponsorship_payments']);
 // sponsor_save.php — handle sponsor actions (AJAX-friendly)
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/lib/functions.php';

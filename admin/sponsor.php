@@ -182,7 +182,7 @@ if ($action === 'view') {
       if (!csrf_check()) throw new RuntimeException('Your session expired. Please try again.');
       $workspaceAction = (string)$_POST['workspace_action'];
       $paymentAction = in_array($workspaceAction, ['add_payment', 'mark_paid', 'edit_payment', 'delete_payment'], true);
-      if (!hub_auth_has_capability($paymentAction ? 'finance_manage' : 'sponsorship')) throw new RuntimeException('You do not have permission to make this change.');
+      if (!($paymentAction ? hub_auth_has_any_capability(['finance_manage', 'sponsorship_payments']) : hub_auth_has_capability('sponsorship'))) throw new RuntimeException('You do not have permission to make this change.');
       if (in_array($workspaceAction, ['archive_sponsor', 'restore_sponsor'], true)) {
         $isActive = $workspaceAction === 'restore_sponsor' ? 1 : 0;
         $pdo->prepare('UPDATE sponsors SET is_active = :active WHERE id = :id')->execute([':active' => $isActive, ':id' => $id]);

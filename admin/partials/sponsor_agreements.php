@@ -1,7 +1,7 @@
 <?php
 // Included by sponsor.php after the sponsor and catalogue have been loaded.
 $canManageAgreements = hub_auth_has_capability('sponsorship');
-$canManagePayments = hub_auth_has_capability('finance_manage');
+$canManagePayments = hub_auth_has_any_capability(['finance_manage', 'sponsorship_payments']);
 $workspacePackages = getSponsorshipPackages($pdo, false);
 $workspaceSeasons = $pdo->query('SELECT id,name,start_date,end_date FROM seasons ORDER BY start_date DESC')->fetchAll(PDO::FETCH_ASSOC);
 $workspacePlayers = $pdo->query('SELECT id,name,active FROM players ORDER BY active DESC,name')->fetchAll(PDO::FETCH_ASSOC);

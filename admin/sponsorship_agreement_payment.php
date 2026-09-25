@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 // PHASE3B_GUARD_MARKER
 require_once __DIR__ . '/auth.php';
-if (!hub_auth_has_capability('finance_manage')) {
+if (!hub_auth_has_any_capability(['finance_manage', 'sponsorship_payments'])) {
     http_response_code(403);
     exit('Access denied.');
 }

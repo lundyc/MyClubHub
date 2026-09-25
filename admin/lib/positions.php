@@ -132,9 +132,9 @@ const HUB_PAGE_CAPABILITIES = [
     'hidden_team_games.php' => ['fundraising'],
 
     // Finance — payments not already covered above
-    'match_payment_delete.php' => ['finance_manage'],
-    'payment_add.php' => ['finance_manage'],
-    'payment_edit.php' => ['finance_manage'],
+    'match_payment_delete.php' => ['finance_manage', 'sponsorship_payments'],
+    'payment_add.php' => ['finance_manage', 'sponsorship_payments'],
+    'payment_edit.php' => ['finance_manage', 'sponsorship_payments'],
 
     // Ticketing & gate operations — includes the pages that used to sit on
     // the separate RBAC permission layer (lib/permissions.php); that layer
