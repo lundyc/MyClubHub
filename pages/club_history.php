@@ -223,7 +223,7 @@ seo_breadcrumbs([['Club', url('club/history')], ['History', url('club/history')]
     <?php if ($officials === []): ?>
       <div class="emptystate"><p>Committee details will be published here soon.</p></div>
     <?php else: ?>
-      <div class="staff-grid"<?= $officialsIntro !== '' ? ' style="margin-top:1.6rem"' : '' ?>>
+      <div class="staff-grid staff-grid--four"<?= $officialsIntro !== '' ? ' style="margin-top:1.6rem"' : '' ?>>
         <?php foreach ($officials as $person): ?>
           <div class="staffcard">
             <div class="staffcard__photo"><?= pub_staff_photo_html($person) ?></div>

@@ -5331,6 +5331,13 @@ a.pp-sponsor:hover {
   margin-bottom: .5rem;
 }
 
+/* Club history page: committee shown four to a row on desktop. */
+@media (min-width: 900px) {
+  .staff-grid--four {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
 .staffcard {
   background: var(--paper);
   border: 1px solid var(--line);
