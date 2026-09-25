@@ -255,30 +255,16 @@ function hub_auth_is_developer(): bool
 }
 
 /**
- * True only for the configured sponsorship editor (HUB_SPONSORSHIP_EDITOR_EMAIL)
- * — not every admin. Player sponsorships feed printed graphics; an admin
- * changing a slot after the graphic is made means redoing it, so this is
- * deliberately not a capability (hub_auth_has_capability() always returns
- * true for admin accounts, which defeats the point). Same fail-closed shape
- * as hub_auth_is_developer(): empty/unmatched email denies everyone.
+ * May the current user assign sponsors to players / move the sponsorship
+ * deadline? Player sponsorships feed printed graphics, so this is a deliberate
+ * grant (the sponsorship_assign capability), not something every area holder
+ * gets. Administrators pass like every other capability.
  */
 function hub_auth_is_sponsorship_editor(): bool
 {
-    global $pdo;
-    if (!defined('SPONSORSHIP_EDITOR_EMAIL') || SPONSORSHIP_EDITOR_EMAIL === '') {
-        return false;
-    }
-    static $editorHolderId = null;
-    if ($editorHolderId === null) {
-        $stmt = $pdo->prepare("SELECT id FROM season_ticket_holders WHERE email_normalized = :email AND role IN ('staff','admin') LIMIT 1");
-        $stmt->execute([':email' => seasonTicketNormalizeEmail(SPONSORSHIP_EDITOR_EMAIL)]);
-        $editorHolderId = (int) ($stmt->fetchColumn() ?: 0);
-    }
-    if ($editorHolderId <= 0) {
-        return false;
-    }
-    $user = hub_auth_current_user();
-    return $user !== null && (int) ($user['id'] ?? 0) === $editorHolderId;
+    // Now the sponsorship_assign capability (lib/access.php), grantable to a
+    // template or a person; it was a single configured email address before.
+    return access_can('sponsorship_assign');
 }
 
 /**
