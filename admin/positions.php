@@ -3,10 +3,10 @@ declare(strict_types=1);
 
 $pageHero = [
     'eyebrow' => 'Administration',
-    'title' => 'Roles & Positions',
-    'subtitle' => 'Club titles with season-dated history. Each links to a Roles & Capabilities role, which is what actually grants Hub access.',
+    'title' => 'Club roles',
+    'subtitle' => 'Club roles with season-dated history. They are labels only and grant no access.',
     'actions' => [
-        ['label' => 'Roles & Capabilities', 'href' => '/admin/access_roles.php', 'class' => 'btn btn-outline-light btn-sm'],
+        ['label' => 'Access templates', 'href' => '/admin/access_roles.php', 'class' => 'btn btn-outline-light btn-sm'],
     ],
 ];
 
@@ -15,7 +15,7 @@ require_once __DIR__ . '/lib/access_roles.php';
 
 if (!hub_auth_has_capability('admin_settings')) {
     http_response_code(403);
-    echo '<div><div class="alert alert-danger">You do not have permission to manage positions.</div></div>';
+    echo '<div><div class="alert alert-danger">You do not have permission to manage club roles.</div></div>';
     require __DIR__ . '/footer.php';
     exit;
 }
@@ -43,12 +43,12 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
             $accessRoleId = (int) ($_POST['access_role_id'] ?? 0);
 
             if ($name === '') {
-                $formErrors[] = 'Enter a position name.';
+                $formErrors[] = 'Enter a club role name.';
             } else {
                 $duplicate = $pdo->prepare('SELECT COUNT(*) FROM hub_positions WHERE name = :name AND id <> :id');
                 $duplicate->execute([':name' => $name, ':id' => $positionId]);
                 if ((int) $duplicate->fetchColumn() > 0) {
-                    $formErrors[] = 'A position with that name already exists.';
+                    $formErrors[] = 'A club role with that name already exists.';
                 }
             }
 
@@ -66,9 +66,9 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
 }
 
 $statusMessages = [
-    'created' => 'Position created successfully.',
-    'updated' => 'Position updated successfully.',
-    'deleted' => 'Position deleted successfully.',
+    'created' => 'Club role created successfully.',
+    'updated' => 'Club role updated successfully.',
+    'deleted' => 'Club role deleted successfully.',
 ];
 $statusKey = isset($_GET['status']) && is_string($_GET['status']) ? $_GET['status'] : '';
 $statusMessage = $statusMessages[$statusKey] ?? '';
@@ -111,8 +111,8 @@ foreach ($accessRoles as $role) {
     <?php endif; ?>
 
     <div class="hub-section-commandbar">
-        <div><h2>Club Positions</h2><p>Assign these to people from <a href="/admin/club_people.php">People &amp; Users</a>, with season dates. Each position's Hub access comes from the <a href="/admin/access_roles.php">Access Role</a> it's linked to below.</p></div>
-        <div class="hub-local-actions"><button class="btn btn-brand" type="button" id="addPositionBtn" data-bs-toggle="modal" data-bs-target="#positionEditorModal"><i class="fa-solid fa-plus me-1" aria-hidden="true"></i>Add position</button></div>
+        <div><h2>Club roles</h2><p>Assign these to people from <a href="/admin/club_people.php">People &amp; Users</a>, with season dates. Club roles are labels only — they do not give anyone access to the Hub. Set access for each person under Admin access on their profile.</p></div>
+        <div class="hub-local-actions"><button class="btn btn-brand" type="button" id="addPositionBtn" data-bs-toggle="modal" data-bs-target="#positionEditorModal"><i class="fa-solid fa-plus me-1" aria-hidden="true"></i>Add club role</button></div>
     </div>
 
     <div class="d-grid gap-4">
@@ -121,14 +121,14 @@ foreach ($accessRoles as $role) {
             <div class="card shadow-sm border-0 hub-table-card">
                 <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center gap-2 px-4 pt-4 pb-2">
                     <h3 class="h5 mb-0"><?= htmlspecialchars($departmentLabel, ENT_QUOTES, 'UTF-8') ?></h3>
-                    <span class="badge text-bg-light"><?= count($departmentPositions) ?> position<?= count($departmentPositions) === 1 ? '' : 's' ?></span>
+                    <span class="badge text-bg-light"><?= count($departmentPositions) ?> club role<?= count($departmentPositions) === 1 ? '' : 's' ?></span>
                 </div>
                 <div class="table-responsive">
                     <table class="table table-striped hub-data-table align-middle mb-0">
                         <thead>
                             <tr>
-                                <th>Position</th>
-                                <th>Access role</th>
+                                <th>Club role</th>
+                                <th>Suggested access template</th>
                                 <th>People</th>
                                 <th class="text-end">Actions</th>
                             </tr>
@@ -136,7 +136,7 @@ foreach ($accessRoles as $role) {
                         <tbody>
                             <?php if ($departmentPositions === []): ?>
                                 <tr>
-                                    <td colspan="4" class="text-muted">No positions in this department yet.</td>
+                                    <td colspan="4" class="text-muted">No club roles in this department yet.</td>
                                 </tr>
                             <?php else: ?>
                                 <?php foreach ($departmentPositions as $position): ?>
@@ -145,7 +145,7 @@ foreach ($accessRoles as $role) {
                                         <td><?= htmlspecialchars((string) $position['name'], ENT_QUOTES, 'UTF-8') ?></td>
                                         <td>
                                             <?php if ($accessRoleId <= 0 || !isset($accessRoleNameById[$accessRoleId])): ?>
-                                                <span class="text-muted">None — no Hub access</span>
+                                                <span class="text-muted">None — no suggestion</span>
                                             <?php else: ?>
                                                 <span class="badge text-bg-secondary"><?= htmlspecialchars($accessRoleNameById[$accessRoleId], ENT_QUOTES, 'UTF-8') ?></span>
                                             <?php endif; ?>
@@ -164,14 +164,14 @@ foreach ($accessRoles as $role) {
                                                         'department' => (string) ($position['department'] ?? 'other'),
                                                         'access_role_id' => $accessRoleId,
                                                     ], JSON_UNESCAPED_SLASHES), ENT_QUOTES, 'UTF-8') ?>"
-                                                    title="Edit position"
+                                                    title="Edit club role"
                                                 ><i class="fa-solid fa-pen" aria-hidden="true"></i></button>
                                                 <?php if (($holderCounts[(int) $position['id']] ?? 0) === 0): ?>
-                                                    <form method="post" data-confirm="This cannot be undone." data-confirm-title="Delete this position?" data-confirm-action="Delete">
+                                                    <form method="post" data-confirm="This cannot be undone." data-confirm-title="Delete this club role?" data-confirm-action="Delete">
                                                         <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(hub_auth_csrf_token(), ENT_QUOTES, 'UTF-8') ?>">
                                                         <input type="hidden" name="action" value="delete">
                                                         <input type="hidden" name="position_id" value="<?= (int) $position['id'] ?>">
-                                                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete position"><i class="fa-solid fa-trash" aria-hidden="true"></i></button>
+                                                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete club role"><i class="fa-solid fa-trash" aria-hidden="true"></i></button>
                                                     </form>
                                                 <?php endif; ?>
                                             </div>
@@ -192,7 +192,7 @@ foreach ($accessRoles as $role) {
         <div class="modal-content hub-form-card">
             <form method="post" id="positionEditorForm" novalidate>
                 <div class="modal-header">
-                    <h2 class="modal-title fs-5" id="positionEditorModalTitle">Add position</h2>
+                    <h2 class="modal-title fs-5" id="positionEditorModalTitle">Add club role</h2>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
@@ -211,23 +211,23 @@ foreach ($accessRoles as $role) {
                                 <option value="<?= htmlspecialchars($deptKey, ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($deptLabel, ENT_QUOTES, 'UTF-8') ?></option>
                             <?php endforeach; ?>
                         </select>
-                        <div class="form-text">Groups this position on People &amp; Users. Site Admin access is set per-person on the Account tab, not here.</div>
+                        <div class="form-text">Groups this club role on People &amp; Users. Site Admin access is set per-person on the Account tab, not here.</div>
                     </div>
                     <div class="mb-2">
-                        <label class="form-label" for="positionEditorAccessRole">Access role</label>
+                        <label class="form-label" for="positionEditorAccessRole">Suggested access template (only a suggestion when this role is assigned; it grants nothing by itself)</label>
                         <select class="form-select" id="positionEditorAccessRole" name="access_role_id">
-                            <option value="0">None — no Hub access</option>
+                            <option value="0">None — no suggestion</option>
                             <?php foreach ($accessRoles as $role): ?>
                                 <?php if ((int) $role['bypass_all'] === 1) { continue; } ?>
                                 <option value="<?= (int) $role['id'] ?>"><?= htmlspecialchars((string) $role['name'], ENT_QUOTES, 'UTF-8') ?></option>
                             <?php endforeach; ?>
                         </select>
-                        <div class="form-text">What this position grants — edit the role's own capabilities on <a href="/admin/access_roles.php" target="_blank" rel="noopener">Roles &amp; Capabilities</a>.</div>
+                        <div class="form-text">Edit what a template includes on <a href="/admin/access_roles.php" target="_blank" rel="noopener">Access templates</a>.</div>
                     </div>
                 </div>
                 <div class="modal-footer hub-actions">
                     <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-brand">Save position</button>
+                    <button type="submit" class="btn btn-brand">Save club role</button>
                 </div>
             </form>
         </div>
@@ -247,7 +247,7 @@ foreach ($accessRoles as $role) {
         function resetEditor() {
             form.reset();
             idInput.value = '0';
-            title.textContent = 'Add position';
+            title.textContent = 'Add club role';
         }
 
         if (addButton) {
@@ -262,7 +262,7 @@ foreach ($accessRoles as $role) {
                 nameInput.value = position.name || '';
                 departmentInput.value = position.department || 'other';
                 accessRoleInput.value = String(position.access_role_id || 0);
-                title.textContent = 'Edit position';
+                title.textContent = 'Edit club role';
             });
         });
     }());

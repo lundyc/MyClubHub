@@ -41,7 +41,7 @@ if (in_array($currentRole, ['volunteer', 'staff'], true) && !in_array($currentSc
         echo '<!doctype html><html lang="en"><head><meta charset="utf-8"><title>No access yet</title></head>'
             . '<body style="font-family:system-ui,sans-serif;max-width:32rem;margin:4rem auto;padding:0 1.5rem;color:#2d2b2c;">'
             . '<h1 style="font-size:1.3rem;">No areas assigned yet</h1>'
-            . '<p>Your account doesn\'t have access to any Hub pages yet. Ask an admin to assign you a committee position under Positions.</p>'
+            . '<p>Your account doesn\'t have access to any Hub pages yet. Ask an admin to assign you an access template under Admin access on your profile.</p>'
             . '<p><a href="/admin/logout.php">Log out</a></p>'
             . '</body></html>';
         exit;
@@ -181,7 +181,7 @@ function hub_default_page_hero(string $script): array
             'title' => 'People & Users',
             'subtitle' => 'One record per person: supporters, staff, volunteers and committee. Login access, positions and season tickets attach to the person.',
             'actions' => [
-                ['label' => 'Roles & Positions', 'href' => '/positions.php', 'class' => 'btn btn-outline-light btn-sm'],
+                ['label' => 'Club roles', 'href' => '/positions.php', 'class' => 'btn btn-outline-light btn-sm'],
             ],
         ],
         'club_person.php' => [
@@ -712,7 +712,7 @@ $documentTitle = $documentTitle !== '' ? $documentTitle . ' – ' . APP_NAME : A
                     <?php if (hub_auth_has_capability('admin_settings')): ?>
                         <?php if (hub_navigation_group_available('admin')): ?>
 <section class="nav-section">
-                            <?php $adminActive = activeGroup(['match_photos.php', 'media.php', 'facebook_photo_import.php', 'people.php', 'photo_albums.php', 'photo_album.php', 'settings.php', 'social_post_settings.php', 'club_people.php', 'club_person.php', 'positions.php', 'access_roles.php', 'access_role_edit.php']); ?>
+                            <?php $adminActive = activeGroup(['match_photos.php', 'media.php', 'facebook_photo_import.php', 'people.php', 'photo_albums.php', 'photo_album.php', 'settings.php', 'social_post_settings.php', 'club_people.php', 'club_person.php', 'positions.php', 'access_roles.php', 'access_role_edit.php', 'access_review.php']); ?>
                             <button class="nav-section-toggle <?= $adminActive ?>" type="button" data-bs-toggle="collapse" data-bs-target="#hubAdminNavigation" data-nav-section="admin" aria-expanded="<?= $adminActive === 'active' ? 'true' : 'false' ?>" aria-controls="hubAdminNavigation">
                                 <span>Admin</span><i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
                             </button>
@@ -722,8 +722,9 @@ $documentTitle = $documentTitle !== '' ? $documentTitle . ' – ' . APP_NAME : A
                                 <?php if (hub_navigation_item_visible('admin.photo_albums')): ?><li class="nav-item"><a class="nav-link <?= activeGroup(['photo_albums.php', 'photo_album.php']) ?>"<?= hub_nav_current(['photo_albums.php', 'photo_album.php']) ?> href="/admin/photo_albums.php"><i class="fa-solid fa-images me-1" aria-hidden="true"></i>Photo albums</a></li><?php endif; ?>
                                 <?php if (hub_navigation_item_visible('admin.settings')): ?><li class="nav-item"><a class="nav-link <?= activeGroup(['settings.php', 'social_post_settings.php']) ?>"<?= hub_nav_current(['settings.php', 'social_post_settings.php']) ?> href="/admin/settings.php"><i class="fa-solid fa-gear me-1" aria-hidden="true"></i>Settings</a></li><?php endif; ?>
                                 <?php if (hub_navigation_item_visible('admin.club_people')): ?><li class="nav-item"><a class="nav-link <?= activeGroup(['club_people.php', 'club_person.php']) ?>"<?= hub_nav_current(['club_people.php', 'club_person.php']) ?> href="/admin/club_people.php"><i class="fa-solid fa-address-book me-1" aria-hidden="true"></i>People &amp; Users</a></li><?php endif; ?>
-                                <?php if (hub_navigation_item_visible('admin.positions')): ?><li class="nav-item"><a class="nav-link <?= activePage('positions.php') ?>"<?= hub_nav_current(['positions.php']) ?> href="/admin/positions.php"><i class="fa-solid fa-sitemap me-1" aria-hidden="true"></i>Roles &amp; Positions</a></li><?php endif; ?>
-                                <?php if (hub_navigation_item_visible('admin.access_roles')): ?><li class="nav-item"><a class="nav-link <?= activeGroup(['access_roles.php', 'access_role_edit.php']) ?>"<?= hub_nav_current(['access_roles.php', 'access_role_edit.php']) ?> href="/admin/access_roles.php"><i class="fa-solid fa-table-cells me-1" aria-hidden="true"></i>Roles &amp; Capabilities</a></li><?php endif; ?>
+                                <?php if (hub_navigation_item_visible('admin.positions')): ?><li class="nav-item"><a class="nav-link <?= activePage('positions.php') ?>"<?= hub_nav_current(['positions.php']) ?> href="/admin/positions.php"><i class="fa-solid fa-sitemap me-1" aria-hidden="true"></i>Club roles</a></li><?php endif; ?>
+                                <?php if (hub_navigation_item_visible('admin.access_roles')): ?><li class="nav-item"><a class="nav-link <?= activeGroup(['access_roles.php', 'access_role_edit.php']) ?>"<?= hub_nav_current(['access_roles.php', 'access_role_edit.php']) ?> href="/admin/access_roles.php"><i class="fa-solid fa-table-cells me-1" aria-hidden="true"></i>Access templates</a></li><?php endif; ?>
+                                <?php if (hub_navigation_item_visible('admin.access_review')): ?><li class="nav-item"><a class="nav-link <?= activeGroup(['access_review.php']) ?>"<?= hub_nav_current(['access_review.php']) ?> href="/admin/access_review.php"><i class="fa-solid fa-clipboard-check me-1" aria-hidden="true"></i>Access review</a></li><?php endif; ?>
                             </ul>
                         </section>
                     <?php endif; ?>

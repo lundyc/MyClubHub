@@ -449,14 +449,20 @@ function hub_navigation_definitions(): array
                     'caps' => ['admin_settings'],
                 ],
                 'positions' => [
-                    'label' => 'Roles & Positions',
+                    'label' => 'Club roles',
                     'href' => '/admin/positions.php',
                     'default' => true,
                     'caps' => ['admin_settings'],
                 ],
                 'access_roles' => [
-                    'label' => 'Roles & Capabilities',
+                    'label' => 'Access templates',
                     'href' => '/admin/access_roles.php',
+                    'default' => true,
+                    'caps' => ['admin_settings'],
+                ],
+                'access_review' => [
+                    'label' => 'Access review',
+                    'href' => '/admin/access_review.php',
                     'default' => true,
                     'caps' => ['admin_settings'],
                 ],

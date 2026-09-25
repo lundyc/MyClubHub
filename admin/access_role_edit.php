@@ -6,7 +6,7 @@ require_once __DIR__ . '/lib/access_roles.php';
 
 if (!hub_auth_has_capability('admin_settings')) {
     http_response_code(403);
-    echo '<div><div class="alert alert-danger">You do not have permission to manage roles & capabilities.</div></div>';
+    echo '<div><div class="alert alert-danger">You do not have permission to manage access templates.</div></div>';
     require __DIR__ . '/footer.php';
     exit;
 }
@@ -16,7 +16,7 @@ $isNew = $roleId <= 0;
 $role = $isNew ? null : getAccessRole($pdo, $roleId);
 if (!$isNew && $role === null) {
     http_response_code(404);
-    echo '<div><div class="alert alert-danger">That role no longer exists.</div></div>';
+    echo '<div><div class="alert alert-danger">That access template no longer exists.</div></div>';
     require __DIR__ . '/footer.php';
     exit;
 }
@@ -37,7 +37,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
 
         if ($isNew) {
             if ($name === '') {
-                $formErrors[] = 'Enter a role name.';
+                $formErrors[] = 'Enter an access template name.';
             } else {
                 $newRoleId = createAccessRole($pdo, $name);
                 setAccessRoleCapabilities($pdo, $newRoleId, $capabilityIds);
@@ -46,7 +46,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
             }
         } else {
             if (!$isSystem && $name === '') {
-                $formErrors[] = 'Enter a role name.';
+                $formErrors[] = 'Enter an access template name.';
             } elseif ($bypassAll) {
                 header('Location: access_roles.php?status=saved');
                 exit;
@@ -83,10 +83,10 @@ $roleName = isset($_POST['name']) && is_string($_POST['name']) ? $_POST['name'] 
 
 $pageHero = [
     'eyebrow' => 'Administration',
-    'title' => $isNew ? 'Add role' : 'Edit role: ' . $roleName,
-    'subtitle' => 'Tick a capability to grant it to this role; leave it unticked to deny it.',
+    'title' => $isNew ? 'Add access template' : 'Edit access template: ' . $roleName,
+    'subtitle' => 'Tick a capability to grant it to this template; leave it unticked to deny it.',
     'actions' => [
-        ['label' => 'Back to Roles', 'href' => '/admin/access_roles.php', 'class' => 'btn btn-outline-light btn-sm'],
+        ['label' => 'Back to Access templates', 'href' => '/admin/access_roles.php', 'class' => 'btn btn-outline-light btn-sm'],
     ],
 ];
 ?>
@@ -104,7 +104,7 @@ $pageHero = [
     <?php endif; ?>
 
     <?php if ($bypassAll): ?>
-        <div class="alert alert-info">The Administrator role always has every capability — there's nothing to grant or deny here.</div>
+        <div class="alert alert-info">The Administrator template always has every capability — there's nothing to grant or deny here.</div>
     <?php endif; ?>
 
     <form method="post">
@@ -113,7 +113,7 @@ $pageHero = [
 
         <div class="card shadow-sm border-0 hub-form-card mb-4">
             <div class="card-body">
-                <label class="form-label" for="roleName">Role name</label>
+                <label class="form-label" for="roleName">Access template name</label>
                 <input
                     class="form-control"
                     type="text"
@@ -124,7 +124,7 @@ $pageHero = [
                     <?= $isSystem ? 'readonly' : 'required' ?>
                 >
                 <?php if ($isSystem): ?>
-                    <div class="form-text">System roles keep their name — it's tied to how login access works.</div>
+                    <div class="form-text">System templates keep their name — it's tied to how login access works.</div>
                 <?php endif; ?>
             </div>
         </div>
@@ -171,7 +171,7 @@ $pageHero = [
         <?php if (!$bypassAll): ?>
             <div class="hub-actions justify-content-end mt-3">
                 <a class="btn btn-outline-secondary" href="/admin/access_roles.php">Cancel</a>
-                <button type="submit" class="btn btn-brand"><?= $isNew ? 'Create role' : 'Save role' ?></button>
+                <button type="submit" class="btn btn-brand"><?= $isNew ? 'Create access template' : 'Save access template' ?></button>
             </div>
         <?php endif; ?>
     </form>

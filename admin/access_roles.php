@@ -3,10 +3,10 @@ declare(strict_types=1);
 
 $pageHero = [
     'eyebrow' => 'Administration',
-    'title' => 'Roles & Capabilities',
-    'subtitle' => 'Each role grants a set of capabilities, WordPress-style. Assign roles to a person from their People & Users page.',
+    'title' => 'Access templates',
+    'subtitle' => 'Each access template is a named set of Hub permissions. Assign templates to a person from their People & Users page.',
     'actions' => [
-        ['label' => 'Roles & Positions', 'href' => '/admin/positions.php', 'class' => 'btn btn-outline-light btn-sm'],
+        ['label' => 'Club roles', 'href' => '/admin/positions.php', 'class' => 'btn btn-outline-light btn-sm'],
     ],
 ];
 
@@ -15,7 +15,7 @@ require_once __DIR__ . '/lib/access_roles.php';
 
 if (!hub_auth_has_capability('admin_settings')) {
     http_response_code(403);
-    echo '<div><div class="alert alert-danger">You do not have permission to manage roles & capabilities.</div></div>';
+    echo '<div><div class="alert alert-danger">You do not have permission to manage access templates.</div></div>';
     require __DIR__ . '/footer.php';
     exit;
 }
@@ -42,9 +42,9 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
 }
 
 $statusMessages = [
-    'saved' => 'Role saved.',
-    'created' => 'Role created.',
-    'deleted' => 'Role deleted.',
+    'saved' => 'Access template saved.',
+    'created' => 'Access template created.',
+    'deleted' => 'Access template deleted.',
 ];
 $statusKey = isset($_GET['status']) && is_string($_GET['status']) ? $_GET['status'] : '';
 $statusMessage = $statusMessages[$statusKey] ?? '';
@@ -69,9 +69,9 @@ $roles = getAccessRoles($pdo);
     <?php endif; ?>
 
     <div class="hub-section-commandbar">
-        <div><h2>Roles</h2><p>Click a role to grant or deny each of the <?= $capabilityCount ?> capabilities it has.</p></div>
+        <div><h2>Access templates</h2><p>Click a template to grant or deny each of the <?= $capabilityCount ?> capabilities. An access template is a named set of Hub permissions. People are linked to a template (not copied from it), so changing a template changes it for everyone on it.</p></div>
         <div class="hub-local-actions">
-            <a class="btn btn-brand" href="/admin/access_role_edit.php"><i class="fa-solid fa-plus me-1" aria-hidden="true"></i>Add role</a>
+            <a class="btn btn-brand" href="/admin/access_role_edit.php"><i class="fa-solid fa-plus me-1" aria-hidden="true"></i>Add access template</a>
         </div>
     </div>
 
@@ -80,10 +80,10 @@ $roles = getAccessRoles($pdo);
             <table class="table table-striped hub-data-table align-middle mb-0">
                 <thead>
                     <tr>
-                        <th>Role</th>
+                        <th>Access template</th>
                         <th>Capabilities</th>
                         <th>People</th>
-                        <th>Positions</th>
+                        <th>Club roles</th>
                         <th class="text-end">Actions</th>
                     </tr>
                 </thead>
@@ -112,13 +112,13 @@ $roles = getAccessRoles($pdo);
                             <td><?= (int) $usage['positions'] ?></td>
                             <td class="text-end">
                                 <div class="d-inline-flex gap-2 hub-actions hub-actions--end">
-                                    <a class="btn btn-sm btn-outline-primary" href="/admin/access_role_edit.php?id=<?= $roleId ?>" title="Edit role"><i class="fa-solid fa-pen" aria-hidden="true"></i></a>
+                                    <a class="btn btn-sm btn-outline-primary" href="/admin/access_role_edit.php?id=<?= $roleId ?>" title="Edit access template"><i class="fa-solid fa-pen" aria-hidden="true"></i></a>
                                     <?php if (!$isSystem): ?>
-                                        <form method="post" data-confirm="This cannot be undone." data-confirm-title="Delete this role?" data-confirm-action="Delete">
+                                        <form method="post" data-confirm="This cannot be undone." data-confirm-title="Delete this access template?" data-confirm-action="Delete">
                                             <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(hub_auth_csrf_token(), ENT_QUOTES, 'UTF-8') ?>">
                                             <input type="hidden" name="action" value="delete_role">
                                             <input type="hidden" name="role_id" value="<?= $roleId ?>">
-                                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete role"><i class="fa-solid fa-trash" aria-hidden="true"></i></button>
+                                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete access template"><i class="fa-solid fa-trash" aria-hidden="true"></i></button>
                                         </form>
                                     <?php endif; ?>
                                 </div>

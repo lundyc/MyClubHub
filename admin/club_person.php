@@ -290,6 +290,24 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                 club_person_redirect($personId, 'account_saved');
             }
 
+            if ($action === 'add_access_override') {
+                setPersonAccessOverride(
+                    $pdo,
+                    $personId,
+                    (int) ($_POST['override_capability_id'] ?? 0),
+                    (string) ($_POST['override_effect'] ?? ''),
+                    (string) ($_POST['override_expires_at'] ?? ''),
+                    (string) ($_POST['override_note'] ?? ''),
+                    (int) (hub_auth_current_user()['person_id'] ?? 0) ?: null
+                );
+                club_person_redirect($personId, 'access_override_saved');
+            }
+
+            if ($action === 'remove_access_override') {
+                removePersonAccessOverride($pdo, $personId, (int) ($_POST['override_id'] ?? 0));
+                club_person_redirect($personId, 'access_override_removed');
+            }
+
             if ($action === 'save_access_roles') {
                 $roleIds = isset($_POST['access_role_ids']) && is_array($_POST['access_role_ids'])
                     ? array_map('intval', $_POST['access_role_ids'])
@@ -401,6 +419,21 @@ $positions = getHubPositions($pdo);
 $personPositions = $person ? getPersonPositions($pdo, $personId) : [];
 $currentPersonPositions = $person ? getCurrentPersonPositions($pdo, $personId) : [];
 $allAccessRoles = getAccessRoles($pdo);
+$personAccessOverrides = $person ? getPersonAccessOverrides($pdo, $personId) : [];
+$accessCapabilityCatalog = getCapabilitiesCatalog($pdo);
+$accessCapabilityLabels = array_column($accessCapabilityCatalog, 'label', 'slug');
+$personAccessEffective = $person ? access_explain($pdo, $personId, false) : null;
+// Club roles never grant access; a role may only SUGGEST a template.
+$suggestedTemplateIds = [];
+if ($person) {
+    $suggestStmt = $pdo->prepare('SELECT DISTINCT cr.access_template_id, cr.name
+        FROM person_club_roles pcr JOIN club_roles cr ON cr.id = pcr.club_role_id
+        WHERE pcr.person_id = :p AND cr.access_template_id IS NOT NULL');
+    $suggestStmt->execute([':p' => $personId]);
+    foreach ($suggestStmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        $suggestedTemplateIds[(int) $row['access_template_id']][] = (string) $row['name'];
+    }
+}
 $personAccessRoleIds = $person ? array_column(getPersonAccessRoles($pdo, $personId), 'id') : [];
 $dependents = $person ? getPersonDependents($pdo, $personId) : [];
 $managers = $person ? getPersonManagers($pdo, $personId) : [];
@@ -423,7 +456,9 @@ $statusMessages = [
     'password_set' => 'Password set.',
     'relationship_added' => 'Dependant relationship added.',
     'relationship_removed' => 'Relationship removed.',
-    'access_roles_saved' => 'Access roles saved.',
+    'access_roles_saved' => 'Access templates saved.',
+    'access_override_saved' => 'Individual access change saved.',
+    'access_override_removed' => 'Individual access change removed.',
 ];
 $statusMessage = $statusMessages[(string) ($_GET['status'] ?? '')] ?? '';
 
@@ -483,7 +518,7 @@ $data = array_merge([
 <ul class="nav nav-tabs mb-4" id="clubPersonTabs" role="tablist">
     <li class="nav-item" role="presentation"><button class="nav-link active" id="tab-details-btn" data-bs-toggle="tab" data-bs-target="#tab-details" type="button" role="tab">Details</button></li>
     <li class="nav-item" role="presentation"><button class="nav-link" id="tab-account-btn" data-bs-toggle="tab" data-bs-target="#tab-account" type="button" role="tab">Account</button></li>
-    <li class="nav-item" role="presentation"><button class="nav-link" id="tab-roles-btn" data-bs-toggle="tab" data-bs-target="#tab-roles" type="button" role="tab">Roles</button></li>
+    <li class="nav-item" role="presentation"><button class="nav-link" id="tab-roles-btn" data-bs-toggle="tab" data-bs-target="#tab-roles" type="button" role="tab">Admin access</button></li>
     <li class="nav-item" role="presentation"><button class="nav-link" id="tab-positions-btn" data-bs-toggle="tab" data-bs-target="#tab-positions" type="button" role="tab">Club Position(s)</button></li>
     <li class="nav-item" role="presentation"><button class="nav-link" id="tab-relationships-btn" data-bs-toggle="tab" data-bs-target="#tab-relationships" type="button" role="tab">Relationships</button></li>
     <li class="nav-item" role="presentation"><button class="nav-link" id="tab-history-btn" data-bs-toggle="tab" data-bs-target="#tab-history" type="button" role="tab">History</button></li>
@@ -646,7 +681,7 @@ $data = array_merge([
                                 $allAccessRoles
                             )));
                             ?>
-                            <div class="people-account-note">Roles: <strong><?= $assignedRoleNames !== [] ? h(implode(', ', $assignedRoleNames)) : 'None' ?></strong> — <a href="#tab-roles" data-bs-toggle="tab" data-bs-target="#tab-roles">change on the Roles tab</a>.</div>
+                            <div class="people-account-note">Roles: <strong><?= $assignedRoleNames !== [] ? h(implode(', ', $assignedRoleNames)) : 'None' ?></strong> — <a href="#tab-roles" data-bs-toggle="tab" data-bs-target="#tab-roles">change on the Admin access tab</a>.</div>
                         </form>
                     </div>
 
@@ -702,8 +737,8 @@ $data = array_merge([
                 <div class="people-account__title">
                     <span class="people-account__icon"><i class="fa-solid fa-user-shield" aria-hidden="true"></i></span>
                     <div>
-                        <h2>Roles</h2>
-                        <p>What this person can do in the Hub, WordPress-style. Administrator grants everything; the others grant whatever's ticked for them on <a href="/admin/access_roles.php">Roles &amp; Capabilities</a>.</p>
+                        <h2>Admin access</h2>
+                        <p>What this person can do in the Hub. It is set here only &mdash; their club roles (Treasurer, Volunteer &hellip;) never grant access. Tick the access templates they should follow (they stay linked, so editing a template changes it for everyone on it; manage them under <a href="/admin/access_roles.php">Access templates</a>), then add individual extras or removals below.</p>
                     </div>
                 </div>
             </div>
@@ -724,15 +759,81 @@ $data = array_merge([
                             ?>
                             <label class="people-choice-row" for="accessRole<?= (int) $role['id'] ?>">
                                 <input class="form-check-input" type="checkbox" id="accessRole<?= (int) $role['id'] ?>" name="access_role_ids[]" value="<?= (int) $role['id'] ?>" <?= $checked ? 'checked' : '' ?>>
-                                <span><strong><?= h((string) $role['name']) ?></strong><?php if ((int) $role['bypass_all'] === 1): ?><small>Full access across the Hub, bypassing everything else below.</small><?php endif; ?></span>
+                                <span><strong><?= h((string) $role['name']) ?></strong><?php if ((int) $role['bypass_all'] === 1): ?><small>Full access across the Hub, bypassing everything else below.</small><?php endif; ?><?php if (isset($suggestedTemplateIds[(int) $role['id']]) && !$checked): ?><small>Suggested for their club role: <?= h(implode(', ', $suggestedTemplateIds[(int) $role['id']])) ?></small><?php endif; ?></span>
                             </label>
                         <?php endforeach; ?>
                         <?php if ($currentPersonPositions !== []): ?>
-                            <div class="people-account-note">Also currently has legacy Club Position access via: <?= h(implode(', ', array_column($currentPersonPositions, 'name'))) ?> (see the Club Position(s) tab).</div>
+                            <div class="people-account-note">Club roles held: <?= h(implode(', ', array_column($currentPersonPositions, 'name'))) ?>. These are labels only &mdash; they do not give Hub access.</div>
                         <?php endif; ?>
                     </form>
                     <div class="people-account-action-row">
-                        <button class="btn btn-brand" type="submit" form="accessRolesForm">Save roles</button>
+                        <button class="btn btn-brand" type="submit" form="accessRolesForm">Save templates</button>
+                    </div>
+
+                    <div class="people-form-section mt-4">
+                        <h3>Individual extras and removals</h3>
+                        <p class="text-muted small">On top of the templates above: give this person one extra permission, or take one away from them. Optional end date &mdash; it switches itself off. Not needed for Administrators.</p>
+                        <?php if ($personAccessOverrides === []): ?>
+                            <p class="text-muted">None &mdash; access is exactly what the templates give.</p>
+                        <?php else: ?>
+                            <div class="table-responsive"><table class="table table-sm align-middle">
+                                <thead><tr><th>Permission</th><th>Change</th><th>Ends</th><th>Note</th><th></th></tr></thead>
+                                <tbody>
+                                <?php foreach ($personAccessOverrides as $override): ?>
+                                    <tr<?= (int) $override['is_expired'] === 1 ? ' class="text-muted"' : '' ?>>
+                                        <td><?= h((string) $override['label']) ?></td>
+                                        <td><?= $override['effect'] === 'grant' ? '<span class="badge text-bg-success">Extra</span>' : '<span class="badge text-bg-danger">Removed</span>' ?></td>
+                                        <td><?= $override['expires_at'] ? h((string) $override['expires_at']) . ((int) $override['is_expired'] === 1 ? ' <span class="badge text-bg-secondary">expired</span>' : '') : 'No end date' ?></td>
+                                        <td><?= h((string) ($override['note'] ?? '')) ?></td>
+                                        <td class="text-end">
+                                            <form method="post" class="d-inline" onsubmit="return confirm('Remove this individual change?');">
+                                                <input type="hidden" name="csrf_token" value="<?= h(hub_auth_csrf_token()) ?>">
+                                                <input type="hidden" name="person_id" value="<?= (int) $personId ?>">
+                                                <input type="hidden" name="action" value="remove_access_override">
+                                                <input type="hidden" name="override_id" value="<?= (int) $override['id'] ?>">
+                                                <button class="btn btn-outline-secondary btn-sm" type="submit">Remove</button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                                </tbody>
+                            </table></div>
+                        <?php endif; ?>
+                        <form method="post" class="row g-2 align-items-end">
+                            <input type="hidden" name="csrf_token" value="<?= h(hub_auth_csrf_token()) ?>">
+                            <input type="hidden" name="person_id" value="<?= (int) $personId ?>">
+                            <input type="hidden" name="action" value="add_access_override">
+                            <div class="col-md-4"><label class="form-label small" for="ovCap">Permission</label>
+                                <select class="form-select" id="ovCap" name="override_capability_id" required>
+                                    <option value="">Choose&hellip;</option>
+                                    <?php foreach ($accessCapabilityCatalog as $cap): ?><option value="<?= (int) $cap['id'] ?>"><?= h((string) $cap['label']) ?></option><?php endforeach; ?>
+                                </select></div>
+                            <div class="col-md-2"><label class="form-label small" for="ovEffect">Change</label>
+                                <select class="form-select" id="ovEffect" name="override_effect"><option value="grant">Give extra</option><option value="deny">Take away</option></select></div>
+                            <div class="col-md-2"><label class="form-label small" for="ovEnds">Ends (optional)</label>
+                                <input class="form-control" type="date" id="ovEnds" name="override_expires_at"></div>
+                            <div class="col-md-3"><label class="form-label small" for="ovNote">Note (optional)</label>
+                                <input class="form-control" type="text" id="ovNote" name="override_note" maxlength="255" placeholder="Why?"></div>
+                            <div class="col-md-1"><button class="btn btn-brand w-100" type="submit">Add</button></div>
+                        </form>
+                    </div>
+
+                    <div class="people-form-section mt-4">
+                        <h3>What they can actually do</h3>
+                        <?php if ($personAccessEffective['bypass'] ?? false): ?>
+                            <p class="mb-0"><span class="badge text-bg-primary">Administrator</span> Full access across the Hub.</p>
+                        <?php elseif (($personAccessEffective['capabilities'] ?? []) === []): ?>
+                            <p class="text-muted mb-0">No admin areas. (They can still sign in if they follow a template such as Volunteer, but no admin pages are open to them.)</p>
+                        <?php else: ?>
+                            <ul class="list-unstyled mb-0">
+                                <?php foreach ($personAccessEffective['sources'] as $slug => $srcs): ?>
+                                    <li><strong><?= h((string) ($accessCapabilityLabels[$slug] ?? $slug)) ?></strong> <small class="text-muted">&mdash; <?= h(implode(', ', $srcs)) ?></small></li>
+                                <?php endforeach; ?>
+                            </ul>
+                        <?php endif; ?>
+                        <?php if (!empty($personAccessEffective['denied'])): ?>
+                            <p class="small text-muted mt-2 mb-0">Taken away: <?= h(implode(', ', array_map(static fn($s) => (string) ($accessCapabilityLabels[$s] ?? $s), $personAccessEffective['denied']))) ?></p>
+                        <?php endif; ?>
                     </div>
                 <?php endif; ?>
             </div>

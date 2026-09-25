@@ -193,3 +193,56 @@ function setPersonAccessRoles(PDO $pdo, int $personId, array $roleIds): void
     }
     identityAuditLog($pdo, 'person_access_roles_changed', 'Updated access roles for person #' . $personId);
 }
+
+
+/**
+ * A person's individual overrides — an extra grant or an explicit removal of one
+ * capability on top of their access templates, with an optional expiry.
+ *
+ * @return list<array<string, mixed>>
+ */
+function getPersonAccessOverrides(PDO $pdo, int $personId): array
+{
+    $stmt = $pdo->prepare('SELECT o.id, o.effect, o.expires_at, o.note, o.created_at,
+            c.id AS capability_id, c.slug, c.label,
+            (o.expires_at IS NOT NULL AND o.expires_at < CURDATE()) AS is_expired
+        FROM person_access_overrides o
+        JOIN capabilities c ON c.id = o.capability_id
+        WHERE o.person_id = :person_id
+        ORDER BY c.sort_order, c.label');
+    $stmt->execute([':person_id' => $personId]);
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
+/** Add or replace the override for one capability (one per person + capability). */
+function setPersonAccessOverride(PDO $pdo, int $personId, int $capabilityId, string $effect, ?string $expiresAt, string $note, ?int $byPersonId = null): void
+{
+    if (!in_array($effect, ['grant', 'deny'], true)) {
+        throw new InvalidArgumentException('Invalid override type.');
+    }
+    $expiresAt = $expiresAt !== null && trim($expiresAt) !== '' ? trim($expiresAt) : null;
+    if ($expiresAt !== null && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $expiresAt)) {
+        throw new InvalidArgumentException('Expiry must be a date.');
+    }
+    $stmt = $pdo->prepare('SELECT slug FROM capabilities WHERE id = :id');
+    $stmt->execute([':id' => $capabilityId]);
+    $slug = $stmt->fetchColumn();
+    if ($slug === false) {
+        throw new InvalidArgumentException('Unknown permission.');
+    }
+    $pdo->prepare('INSERT INTO person_access_overrides (person_id, capability_id, effect, expires_at, note, created_by_person_id)
+        VALUES (:person, :cap, :effect, :expires, :note, :by)
+        ON DUPLICATE KEY UPDATE effect = VALUES(effect), expires_at = VALUES(expires_at), note = VALUES(note), created_by_person_id = VALUES(created_by_person_id)')
+        ->execute([
+            ':person' => $personId, ':cap' => $capabilityId, ':effect' => $effect, ':expires' => $expiresAt,
+            ':note' => mb_substr(trim($note), 0, 255) ?: null, ':by' => $byPersonId,
+        ]);
+    identityAuditLog($pdo, 'person_access_override_set', ($effect === 'grant' ? 'Granted extra' : 'Removed') . " '{$slug}' for person #{$personId}" . ($expiresAt ? " until {$expiresAt}" : ''));
+}
+
+function removePersonAccessOverride(PDO $pdo, int $personId, int $overrideId): void
+{
+    $pdo->prepare('DELETE FROM person_access_overrides WHERE id = :id AND person_id = :person')
+        ->execute([':id' => $overrideId, ':person' => $personId]);
+    identityAuditLog($pdo, 'person_access_override_removed', "Removed access override #{$overrideId} for person #{$personId}");
+}
