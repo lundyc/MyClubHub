@@ -114,15 +114,9 @@ if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
 
-// Baseline response headers for every request that reaches PHP (admin and
-// public alike, since both funnel through this file — see bootstrap.php).
-// HSTS and CSP are deliberately left out here: HSTS is effectively
-// irreversible for visitors once cached, and even a report-only CSP needs a
-// real report-uri/report-to collector and a pass over every inline
-// script/style and third-party embed to be worth shipping, so both need a
-// deliberate rollout rather than a default in shared bootstrap code.
-if (!headers_sent() && PHP_SAPI !== 'cli') {
-    header('X-Content-Type-Options: nosniff');
-    header('X-Frame-Options: SAMEORIGIN');
-    header('Referrer-Policy: strict-origin-when-cross-origin');
-}
+// X-Content-Type-Options, X-Frame-Options, Referrer-Policy, HSTS and CSP
+// (both enforced and report-only) are already applied to every response at
+// the Nginx/Plesk layer in front of PHP — confirmed live on both admin and
+// public pages. Setting them again here would only produce duplicate,
+// possibly conflicting header lines, so this file intentionally does not
+// repeat them.

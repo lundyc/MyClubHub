@@ -16,7 +16,10 @@ $html = pub_club_page_html($page);
 set_meta([
     'title' => $page['title'],
     'description' => excerpt(strip_tags($html), 180),
+    // /privacy is the primary route for this page; avoid a duplicate index entry.
+    'canonical' => ($page['slug'] ?? '') === 'privacy' ? url('privacy') : '',
 ]);
+seo_breadcrumbs([['Club', url('club/history')], [(string) $page['title'], url('club/' . ($page['slug'] ?? ''))]]);
 ?>
 <?php partial('page_hero', ['eyebrow' => 'The club', 'title' => $page['title']]); ?>
 

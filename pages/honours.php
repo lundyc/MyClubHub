@@ -146,7 +146,7 @@ $tidyAward = static function (string $s): string {
 $seasonLabel = static fn (string $s): string => preg_replace('/^(\d{4})\D+\d{2}(\d{2})$/', '$1/$2', $s) ?: $s;
 
 set_meta([
-    'title' => 'Honours & awards',
+    'title' => club('club_name') . ' Honours & Trophies',
     'description' => trim(club('club_name') . ' honours — ' . $totalTrophies . ' trophies'
         . ($firstYear && $lastYear ? ' won between ' . $firstYear . ' and ' . $lastYear : ''))
         . '. End-of-season player award winners.',

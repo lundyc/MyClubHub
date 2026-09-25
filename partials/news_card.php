@@ -8,7 +8,7 @@ $slug = (string) ($article['slug'] ?? '');
 $href = $slug !== '' ? url('news/' . $slug) : url('news');
 $hero = trim((string) ($article['hero_image_path'] ?? ''));
 $category = trim((string) ($article['category'] ?? ''));
-$date = format_date($article['published_at'] ?? ($article['created_at'] ?? ''), 'l j F Y');
+$date = format_date($article['published_at'] ?? ($article['created_at'] ?? ''), 'D j M Y');
 ?>
 <article class="newscard">
   <a href="<?= e($href) ?>">

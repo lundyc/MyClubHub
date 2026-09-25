@@ -43,6 +43,8 @@ try {
 
 require __DIR__ . '/helpers.php';
 require __DIR__ . '/router.php';
+require __DIR__ . '/lib/seo.php';
+require __DIR__ . '/lib/imgopt.php';
 
 // Read-only view-model queries for the public pages.
 require __DIR__ . '/lib/fixtures.php';

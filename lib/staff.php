@@ -13,7 +13,7 @@ declare(strict_types=1);
 function pub_staff_rank(string $position): int
 {
     $order = [
-        'chairman' => 0, 'vice chairman' => 1, 'secretary' => 2, 'treasurer' => 3,
+        'chairman' => 0, 'vice chairman' => 1, 'secretary' => 2, 'assistant secretary' => 3, 'treasurer' => 4,
         'manager' => 0, 'assistant manager' => 1, 'coach' => 2, 'goalkeeping coach' => 3,
     ];
     return $order[strtolower($position)] ?? 50;
@@ -21,12 +21,12 @@ function pub_staff_rank(string $position): int
 
 /**
  * Current holders of positions in the given department.
- * @return list<array{name:string,position:string}>
+ * @return list<array{name:string,position:string,label:string,image:string}>
  */
 function pub_staff_in_department(string $department): array
 {
     $stmt = db()->prepare(
-        "SELECT p.display_name, hp.name AS position, hp.sort_order
+        "SELECT p.display_name, p.profile_image_path, hp.name AS position, hp.sort_order
          FROM person_positions pp
          JOIN hub_positions hp ON hp.id = pp.position_id
          JOIN people p ON p.id = pp.person_id
@@ -39,7 +39,15 @@ function pub_staff_in_department(string $department): array
     $stmt->execute([':dept' => $department]);
     $people = [];
     foreach ($stmt->fetchAll() as $r) {
-        $people[] = ['name' => (string) $r['display_name'], 'position' => (string) $r['position']];
+        $position = (string) $r['position'];
+        // Public wording: the hub position is "Secretary"; the club presents it as below.
+        $label = match (strtolower($position)) {
+            'secretary' => 'Club / Match Secretary',
+            'assistant secretary' => 'Club / Match Assistant Secretary',
+            default => $position,
+        };
+        $people[] = ['name' => (string) $r['display_name'], 'position' => $position, 'label' => $label,
+            'image' => trim((string) ($r['profile_image_path'] ?? ''))];
     }
     usort($people, static fn ($a, $b) => pub_staff_rank($a['position']) <=> pub_staff_rank($b['position'])
         ?: strcmp($a['name'], $b['name']));
@@ -56,4 +64,14 @@ function pub_staff_management(): array
 function pub_staff_officials(): array
 {
     return pub_staff_in_department('committee');
+}
+
+/** Inner HTML for a staff card's round photo: the profile picture, else the initial. */
+function pub_staff_photo_html(array $person): string
+{
+    $image = (string) ($person['image'] ?? '');
+    if ($image !== '' && is_file(PUBLIC_ROOT . '/' . ltrim($image, '/'))) {
+        return '<img src="' . e('/' . ltrim($image, '/')) . '" alt="' . e((string) $person['name']) . '" loading="lazy">';
+    }
+    return '<span aria-hidden="true">' . e(mb_strtoupper(mb_substr((string) $person['name'], 0, 1))) . '</span>';
 }

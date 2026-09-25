@@ -46,7 +46,7 @@ $qs = static function (array $overrides) use ($seasonId, $seasonAll, $competitio
     return $params ? '?' . http_build_query($params) : '';
 };
 ?>
-<?php partial('page_hero', ['eyebrow' => 'First team', 'title' => $mode === 'results' ? 'Results' : 'Fixtures']); ?>
+<?php partial('page_hero', ['eyebrow' => 'Matches', 'title' => club('club_short_name', club('club_name')) . ($mode === 'results' ? ' Results' : ' Fixtures'), 'sub' => $mode === 'results' ? 'Every result, filterable by season and competition.' : 'Upcoming games, kick-off times and match tickets.']); ?>
 
 <div class="page">
   <div class="container">

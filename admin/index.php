@@ -555,6 +555,7 @@ if (hub_index_can(['sponsorship', 'finance', 'tickets_ops'])) {
                             </a>
                         <?php endforeach; ?>
                     </div>
+                    <div class="text-end mt-2"><a href="/admin/club_birthdays.php" class="small">View all</a></div>
                 <?php endif; ?>
             </div>
         </div>

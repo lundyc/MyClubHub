@@ -171,7 +171,7 @@ if ($history['duplicate']) {
           );
 }
 
-$publicImageUrl = 'https://lundy.me.uk/export/matches/' . rawurlencode($fileName) . '?v=' . time();
+$publicImageUrl = APP_ORIGIN . '/admin/export/matches/' . rawurlencode($fileName) . '?v=' . time();
 $command = escapeshellarg($phpBinary)
           . ' ' . escapeshellarg($socialDir . '/post_to_instagram.php')
           . ' ' . escapeshellarg($exportPath)

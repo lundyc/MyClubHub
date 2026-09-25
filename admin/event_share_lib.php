@@ -5,6 +5,8 @@ declare(strict_types=1);
 require_once __DIR__ . '/matches_lib.php';
 require_once __DIR__ . '/render_lib.php';
 require_once __DIR__ . '/social_post_settings.php';
+require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/lib/render_access_token.php';
 
 /**
  * @param array<string, mixed> $match
@@ -892,7 +894,7 @@ function event_share_export_dir(): string
 
 function event_share_export_public_base_url(): string
 {
-    return 'https://lundy.me.uk/export/matches/events';
+    return APP_ORIGIN . '/admin/export/matches/events';
 }
 
 function event_share_background_dir(): string
@@ -1092,10 +1094,11 @@ function event_share_generate_image(array $match, array $event): array
 
     $basename = $basePrefix . '-' . event_share_unique_suffix();
     $outputPath = $exportDir . '/' . $basename . '.png';
-    $renderUrl = 'https://lundy.me.uk/match_event_graphic.php?id='
+    $renderUrl = APP_ORIGIN . '/admin/match_event_graphic.php?id='
         . rawurlencode((string) ($match['id'] ?? ''))
         . '&event_id=' . rawurlencode((string) ($event['id'] ?? ''))
-        . '&render=1&v=' . rawurlencode((string) time());
+        . '&render=1&_token=' . rawurlencode(RENDER_ACCESS_TOKEN)
+        . '&v=' . rawurlencode((string) time());
 
     $renderWidth = 1080;
     $renderHeight = 1080;

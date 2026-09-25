@@ -11,8 +11,10 @@ if (!hub_auth_has_capability('content_social')) {
 }
 require_once __DIR__ . '/matches_lib.php';
 require_once __DIR__ . '/render_lib.php';
+require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/lib/render_access_token.php';
 
-$socialBaseUrl = 'https://lundy.me.uk/hub';
+$socialBaseUrl = APP_ORIGIN . '/admin';
 $matchId = isset($_GET['id']) && is_string($_GET['id']) ? trim($_GET['id']) : '';
 $match = $matchId !== '' ? matches_find_by_id(matches_load_all(), $matchId) : null;
 
@@ -25,7 +27,8 @@ if ($match === null) {
 
 $baseName = matches_slugify(matches_fixture_label($match)) . '-' . ((string) ($match['match_date'] ?? date('Y-m-d')));
 $outputPath = MATCHES_EXPORT_DIR . '/' . $baseName . '.png';
-$renderUrl = $socialBaseUrl . '/match_graphic.php?id=' . rawurlencode((string) $match['id']) . '&render=1';
+$renderUrl = $socialBaseUrl . '/match_graphic.php?id=' . rawurlencode((string) $match['id'])
+    . '&render=1&_token=' . rawurlencode(RENDER_ACCESS_TOKEN);
 $result = render_capture_image($renderUrl, $outputPath, '.match-preview-wrap', 1080, 1080, '.match-preview-wrap');
 if (!$result['ok']) {
     http_response_code(500);

@@ -5,7 +5,11 @@ declare(strict_types=1);
 
 // PHASE3B_GUARD_MARKER
 require_once __DIR__ . '/auth.php';
-if (!hub_auth_has_capability('content_social')) {
+require_once __DIR__ . '/lib/render_access_token.php';
+$isTokenRender = RENDER_ACCESS_TOKEN !== ''
+    && ($_GET['render'] ?? '') === '1'
+    && hash_equals(RENDER_ACCESS_TOKEN, (string) ($_GET['_token'] ?? ''));
+if (!$isTokenRender && !hub_auth_has_capability('content_social')) {
     http_response_code(403);
     exit('Access denied.');
 }

@@ -63,7 +63,22 @@ function render_capture_image(
     }
 
     $renderScript = __DIR__ . '/render.js';
-    $command = 'node '
+    // Uses an isolated Node.js runtime under /opt rather than the system
+    // `node` on PATH (Node 18), which several other services on this shared
+    // box also depend on (Plesk's own Node hosting support, plus two
+    // unrelated live systemd services outside this app). Keeping this app's
+    // Node version separate means it can be upgraded — as it was here, to
+    // pick up puppeteer-core 25.x's security fixes — without any risk to
+    // those other things.
+    // Deliberately not existence-checked with is_file()/is_executable(): this
+    // path sits outside the FPM pool's open_basedir
+    // (/var/www/vhosts/myclubhub.co.uk/:/tmp/), so those checks always
+    // report false under real web requests regardless of whether the binary
+    // is actually there — open_basedir restricts PHP's own filesystem calls,
+    // not the process exec() below launches. If this hardcoded path is ever
+    // wrong, exec()'s own non-zero exit status (handled below) catches it.
+    $nodeBinary = '/opt/myclubhub-node24/bin/node';
+    $command = escapeshellarg($nodeBinary) . ' '
         . escapeshellarg($renderScript)
         . ' ' . escapeshellarg($url)
         . ' ' . escapeshellarg($tempPath)

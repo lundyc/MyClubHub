@@ -852,3 +852,38 @@ function pub_our_form(int $limit = 5): array
     }
     return array_reverse($out);
 }
+
+/**
+ * Crawlable neighbours for a match page: the previous and next indexable match
+ * (played, or still to come) and up to 6 other meetings with the same opponent.
+ * @return array{prev:?array,next:?array,meetings:list<array>}
+ */
+function pub_fixture_links(array $f): array
+{
+    $indexable = '(f.status = "played" OR f.full_time_home_score IS NOT NULL OR f.match_date >= CURDATE())';
+    $when = 'CONCAT(f.match_date, " ", COALESCE(f.kickoff_time, "00:00:00"))';
+    $here = (string) $f['match_date'] . ' ' . ((string) ($f['kickoff_time'] ?? '') ?: '00:00:00');
+    $one = static function (string $cmp, string $order) use ($indexable, $when, $here, $f): ?array {
+        $stmt = db()->prepare(pub_fixture_select() . " WHERE $indexable AND f.id <> :id AND $when $cmp :here ORDER BY $when $order LIMIT 1");
+        $stmt->execute([':id' => $f['id'], ':here' => $here]);
+        return $stmt->fetch() ?: null;
+    };
+    $meetings = [];
+    $opp = trim((string) ($f['opponent'] ?? ''));
+    if ($opp !== '') {
+        $stmt = db()->prepare(pub_fixture_select() . " WHERE $indexable AND f.id <> :id AND f.opponent = :opp ORDER BY f.match_date DESC LIMIT 6");
+        $stmt->execute([':id' => $f['id'], ':opp' => $opp]);
+        $meetings = $stmt->fetchAll();
+    }
+    return ['prev' => $one('<', 'DESC'), 'next' => $one('>', 'ASC'), 'meetings' => $meetings];
+}
+
+/** One-line label for a match link: "12 Sep 2026 · Saltcoats Vics 3–1 Opponent". */
+function pub_fixture_link_label(array $f): string
+{
+    $t = pub_fixture_teams($f);
+    $mid = pub_fixture_is_played($f)
+        ? (int) $f['full_time_home_score'] . '–' . (int) $f['full_time_away_score']
+        : 'v';
+    return format_date($f['match_date'], 'j M Y') . ' · ' . $t['home'] . ' ' . $mid . ' ' . $t['away'];
+}

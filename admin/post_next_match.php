@@ -150,7 +150,7 @@ $history = hub_publishing_history_start($pdo, [
 if ($history['duplicate']) {
           nextMatchPostRespond(false, "This $postTypeLabel post has already been published to " . ucfirst($target) . '.', 409);
 }
-$publicImageUrl = 'https://lundy.me.uk/export/matches/' . rawurlencode($fileName) . '?v=' . time();
+$publicImageUrl = APP_ORIGIN . '/admin/export/matches/' . rawurlencode($fileName) . '?v=' . time();
 $command = escapeshellarg($phpBinary)
           . ' ' . escapeshellarg($socialDir . '/post_to_instagram.php')
           . ' ' . escapeshellarg($exportPath)

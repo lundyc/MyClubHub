@@ -580,6 +580,11 @@ const MEMBER_AUTH_HOLDER_ID_KEY = 'member_holder_id';
 const MEMBER_AUTH_ACCOUNT_ID_KEY = 'member_account_id';
 const MEMBER_AUTH_PERSON_ID_KEY = 'member_person_id';
 const MEMBER_AUTH_CSRF_KEY = 'member_csrf_token';
+// Same credential-binding pattern as HUB_AUTH_CREDENTIAL_KEY: a hash of the
+// password hash in force when this member session was issued, checked on
+// every member_auth_current_account_id() call so a password change/reset
+// revokes every other member session for that account.
+const MEMBER_AUTH_CREDENTIAL_KEY = 'member_credential_hash';
 const MEMBER_AUTH_COOKIE_LIFETIME = 2592000;
 const MEMBER_RESET_TOKEN_TTL = 3600;
 const MEMBER_AUTH_THROTTLE_WINDOW_SECONDS = 900;
@@ -699,40 +704,66 @@ function member_auth_current_account_id(): ?int
 {
     member_auth_start_session();
     $accountId = (int) ($_SESSION[MEMBER_AUTH_ACCOUNT_ID_KEY] ?? 0);
-    if ($accountId > 0) {
-        return $accountId;
-    }
 
-    $holderId = (int) ($_SESSION[MEMBER_AUTH_HOLDER_ID_KEY] ?? 0);
-    if ($holderId > 0) {
+    if ($accountId <= 0) {
+        $holderId = (int) ($_SESSION[MEMBER_AUTH_HOLDER_ID_KEY] ?? 0);
+        if ($holderId <= 0) {
+            return null;
+        }
         $account = getAccountByLegacyHolderId($GLOBALS['pdo'], $holderId);
-        if ($account) {
-            $_SESSION[MEMBER_AUTH_ACCOUNT_ID_KEY] = (string) $account['id'];
-            $_SESSION[MEMBER_AUTH_PERSON_ID_KEY] = (string) $account['person_id'];
-            return (int) $account['id'];
+        if (!$account) {
+            return null;
+        }
+        $accountId = (int) $account['id'];
+    } else {
+        $account = getAccount($GLOBALS['pdo'], $accountId);
+        if (!$account) {
+            return null;
         }
     }
 
-    return null;
+    $sessionCredential = (string) ($_SESSION[MEMBER_AUTH_CREDENTIAL_KEY] ?? '');
+    $currentCredential = hash('sha256', (string) ($account['password_hash'] ?? ''));
+    if ($sessionCredential === '' || !hash_equals($currentCredential, $sessionCredential)) {
+        // Password changed (or reset) since this session was issued, or this
+        // session predates credential binding — treat it as revoked rather
+        // than silently trusting a stale identity.
+        unset($_SESSION[MEMBER_AUTH_ACCOUNT_ID_KEY], $_SESSION[MEMBER_AUTH_PERSON_ID_KEY], $_SESSION[MEMBER_AUTH_HOLDER_ID_KEY], $_SESSION[MEMBER_AUTH_CREDENTIAL_KEY]);
+        return null;
+    }
+
+    $_SESSION[MEMBER_AUTH_ACCOUNT_ID_KEY] = (string) $accountId;
+    $_SESSION[MEMBER_AUTH_PERSON_ID_KEY] = (string) $account['person_id'];
+
+    return $accountId;
 }
 
 function member_auth_current_person_id(): ?int
 {
     member_auth_start_session();
-    $personId = (int) ($_SESSION[MEMBER_AUTH_PERSON_ID_KEY] ?? 0);
-    if ($personId > 0) {
-        return $personId;
-    }
 
+    // Must go through member_auth_current_account_id() first rather than
+    // trusting a cached $_SESSION[MEMBER_AUTH_PERSON_ID_KEY] directly — that
+    // function is where the session's credential binding is checked, and it
+    // clears the cached person id along with everything else once a session
+    // is revoked. Reading the cache here first would silently bypass that.
     $accountId = member_auth_current_account_id();
     if ($accountId !== null) {
+        $personId = (int) ($_SESSION[MEMBER_AUTH_PERSON_ID_KEY] ?? 0);
+        if ($personId > 0) {
+            return $personId;
+        }
         $personId = personIdFromAccountId($GLOBALS['pdo'], $accountId) ?? 0;
         if ($personId > 0) {
             $_SESSION[MEMBER_AUTH_PERSON_ID_KEY] = (string) $personId;
             return $personId;
         }
+        return null;
     }
 
+    // No accounts-table row bound to this session (a bare legacy holder
+    // record that never had a password) — nothing for credential binding to
+    // apply to either way, so this path is unaffected by it.
     $holderId = (int) ($_SESSION[MEMBER_AUTH_HOLDER_ID_KEY] ?? 0);
     if ($holderId > 0) {
         $personId = personIdFromLegacyHolderId($GLOBALS['pdo'], $holderId) ?? 0;
@@ -769,12 +800,17 @@ function member_auth_current_legacy_holder_id(): ?int
     global $pdo;
     member_auth_start_session();
 
+    // Validate the session first (this clears MEMBER_AUTH_HOLDER_ID_KEY
+    // along with everything else if the session's credential binding no
+    // longer matches — see member_auth_current_account_id()) before
+    // trusting any cached holder id below.
+    $personId = member_auth_current_person_id();
+
     $holderId = (int) ($_SESSION[MEMBER_AUTH_HOLDER_ID_KEY] ?? 0);
     if ($holderId > 0) {
         return $holderId;
     }
 
-    $personId = member_auth_current_person_id();
     if ($personId === null) {
         return null;
     }
@@ -910,6 +946,8 @@ function member_auth_login_account(int $accountId, int $personId, int $holderId)
     if ($holderId > 0) {
         $_SESSION[MEMBER_AUTH_HOLDER_ID_KEY] = (string) $holderId;
     }
+    $account = getAccount($GLOBALS['pdo'], $accountId);
+    $_SESSION[MEMBER_AUTH_CREDENTIAL_KEY] = hash('sha256', (string) ($account['password_hash'] ?? ''));
 }
 
 /**
@@ -927,6 +965,7 @@ function member_auth_login_session(int $holderId): void
     if ($account) {
         $_SESSION[MEMBER_AUTH_ACCOUNT_ID_KEY] = (string) $account['id'];
         $_SESSION[MEMBER_AUTH_PERSON_ID_KEY] = (string) $account['person_id'];
+        $_SESSION[MEMBER_AUTH_CREDENTIAL_KEY] = hash('sha256', (string) ($account['password_hash'] ?? ''));
     }
 }
 

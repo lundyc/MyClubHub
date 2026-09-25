@@ -8,11 +8,12 @@ if (PHP_SAPI !== 'cli') {
 
 require_once __DIR__ . '/matches_lib.php';
 require_once __DIR__ . '/social_post_settings.php';
+require_once __DIR__ . '/config.php';
 
 $baseDir = __DIR__;
 $envPath = $baseDir . '/.env';
 $imagePath = $baseDir . '/export/latest_wosfl.png';
-$publicImageUrl = 'https://lundy.me.uk/export/latest_wosfl.png';
+$publicImageUrl = APP_ORIGIN . '/admin/export/latest_wosfl.png';
 $logDir = $baseDir . '/logs';
 $logFile = $logDir . '/instagram_post.log';
 $graphicType = 'league_table';

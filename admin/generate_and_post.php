@@ -12,10 +12,12 @@ require_once __DIR__ . '/social_auth.php';
 require_once __DIR__ . '/matches_lib.php';
 require_once __DIR__ . '/render_lib.php';
 require_once __DIR__ . '/lib/facebook_publisher.php';
+require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/lib/render_access_token.php';
 
-$socialBaseUrl = 'https://lundy.me.uk/hub';
+$socialBaseUrl = APP_ORIGIN . '/admin';
 $exportPath = __DIR__ . '/export/latest_wosfl.png';
-$url = 'https://lundy.me.uk/league_table_graphic.php?render=1';
+$url = $socialBaseUrl . '/league_table_graphic.php?render=1&_token=' . rawurlencode(RENDER_ACCESS_TOKEN);
 $publicImageUrl = $socialBaseUrl . '/export/latest_wosfl.png';
 $isCli = PHP_SAPI === 'cli';
 $defaultTarget = 'facebook';
@@ -215,6 +217,9 @@ if (!$isCli && ($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
 
 if (!$isCli) {
     auth_require_json();
+    if (!auth_verify_csrf_token(isset($_POST['csrf_token']) && is_string($_POST['csrf_token']) ? $_POST['csrf_token'] : null)) {
+        respond(false, false, 'Your session expired. Please reload the page and try again.', [], 419);
+    }
 }
 
 if ($graphicType === 'match') {
@@ -230,7 +235,8 @@ if ($graphicType === 'match') {
     $baseName = matches_slugify(matches_fixture_label($match)) . '-' . ((string) ($match['match_date'] ?? date('Y-m-d')));
     $exportPath = MATCHES_EXPORT_DIR . '/' . $baseName . '.png';
     $publicImageUrl = $socialBaseUrl . '/export/matches/' . rawurlencode($baseName) . '.png';
-    $renderUrl = $socialBaseUrl . '/match_graphic.php?id=' . rawurlencode((string) $match['id']) . '&render=1';
+    $renderUrl = $socialBaseUrl . '/match_graphic.php?id=' . rawurlencode((string) $match['id'])
+        . '&render=1&_token=' . rawurlencode(RENDER_ACCESS_TOKEN);
     $renderSelector = '.match-preview-wrap';
     $renderWidth = 1080;
     $renderHeight = 1080;

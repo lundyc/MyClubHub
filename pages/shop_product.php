@@ -78,17 +78,38 @@ set_meta([
     'description' => (string) ($product['summary'] ?: $product['name']),
     'image' => $mainImg !== '' ? $mainImg : '',
 ]);
+seo_breadcrumbs([['Club shop', url('shop')], [(string) $product['name'], url('shop/p/' . $product['slug'])]]);
+pub_jsonld([
+    '@type' => 'Product',
+    'name' => $product['name'],
+    'description' => trim(strip_tags((string) ($product['summary'] ?: $product['description'] ?: $product['name']))),
+    'sku' => 'P' . (int) $product['id'],
+    'image' => array_values(array_map(static fn (array $g): string => seo_absolute((string) $g['path']), $gallery)),
+    'brand' => ['@type' => 'Brand', 'name' => club('club_name')],
+    'offers' => [
+        '@type' => 'Offer',
+        'url' => seo_absolute(url('shop/p/' . $product['slug'])),
+        'priceCurrency' => 'GBP',
+        'price' => number_format((float) $product['price'], 2, '.', ''),
+        'availability' => $orderable
+            ? ((int) ($product['is_preorder'] ?? 0) === 1 ? 'https://schema.org/PreOrder' : 'https://schema.org/InStock')
+            : 'https://schema.org/OutOfStock',
+        'seller' => ['@type' => 'Organization', 'name' => club('club_name')],
+    ],
+]);
 ?>
-<?php partial('shop_bar', ['basketCount' => shop_basket_count()]); ?>
+<?php partial('shop_bar', [
+    'basketCount' => shop_basket_count(),
+    'showSearch'  => true,
+    'crumbs'      => [
+        ['Shop', url('shop')],
+        [(string) $product['category_name'], url('shop') . '?category=' . (int) $product['category_id']],
+        [(string) $product['name'], null],
+    ],
+]); ?>
 
 <div class="page">
   <div class="container">
-    <nav class="crumbs" aria-label="Breadcrumb">
-      <a href="<?= e(url('shop')) ?>">Shop</a> ›
-      <a href="<?= e(url('shop') . '?category=' . (int) $product['category_id']) ?>"><?= e((string) $product['category_name']) ?></a> ›
-      <span><?= e((string) $product['name']) ?></span>
-    </nav>
-
     <div class="pdp">
       <div class="pdp__gallery">
         <div class="pdp__main<?= $mainImg === '' ? ' is-placeholder' : '' ?>" data-gallery-main

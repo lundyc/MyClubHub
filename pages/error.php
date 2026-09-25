@@ -12,6 +12,15 @@ set_meta(['title' => $title ?? 'Page not found']);
 
 <div class="page">
   <div class="container">
-    <p><a class="linkarrow" href="<?= e(url()) ?>">Back to home</a></p>
+    <p class="notfound__lead">Try one of these instead:</p>
+    <div class="notfound__links">
+      <a href="<?= e(url('fixtures')) ?>"><b>Fixtures</b><span>Upcoming games &amp; tickets</span></a>
+      <a href="<?= e(url('results')) ?>"><b>Results</b><span>Latest scores</span></a>
+      <a href="<?= e(url('table')) ?>"><b>League table</b><span>Current standings</span></a>
+      <a href="<?= e(url('news')) ?>"><b>News</b><span>Club updates &amp; match reports</span></a>
+      <a href="<?= e(url('team')) ?>"><b>First team</b><span>Squad &amp; management</span></a>
+      <a href="<?= e(url('shop')) ?>"><b>Club shop</b><span>Official merchandise</span></a>
+    </div>
+    <p class="notfound__home"><a class="linkarrow" href="<?= e(url()) ?>">Back to home</a></p>
   </div>
 </div>

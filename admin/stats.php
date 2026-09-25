@@ -263,13 +263,13 @@ $badge = static fn(string $result): string => ['W' => 'success', 'D' => 'seconda
         $oppErrorMessages = hub_opposition_report_error_messages();
         $oppReports = hub_opposition_report_list();
         ?>
-        <?php if ($oppUploaded): ?><div class="alert alert-success">Report uploaded. Click the PDF icon below to generate it.</div><?php endif; ?>
+        <?php if ($oppUploaded): ?><div class="alert alert-success">Report uploaded. Use the PDF or PowerPoint icons below to generate it.</div><?php endif; ?>
         <?php if ($oppDeleted): ?><div class="alert alert-success">Report deleted.</div><?php endif; ?>
         <?php if ($oppError !== ''): ?><div class="alert alert-danger"><?= $esc($oppErrorMessages[$oppError] ?? 'Something went wrong.') ?></div><?php endif; ?>
 
         <div class="card card-body shadow-sm mb-4">
             <h2 class="h5">Upload an opponent report</h2>
-            <p class="text-muted small">Drag and drop a COMET matches export (JSON) for an upcoming opponent, or click to browse. Once uploaded, download it as a formatted PDF scouting report below.</p>
+            <p class="text-muted small">Drag and drop a COMET matches export (JSON) for an upcoming opponent, or click to browse. Once uploaded, download it as a formatted PDF or PowerPoint scouting report below.</p>
             <form id="oppUploadForm" method="post" action="/admin/opposition_report_upload.php" enctype="multipart/form-data">
                 <?= csrf_field() ?>
                 <input type="hidden" name="action" value="upload">
@@ -310,6 +310,8 @@ $badge = static fn(string $result): string => ['W' => 'success', 'D' => 'seconda
                                 <td><div><?= $esc(date('j M Y', $rep['modified'])) ?></div><div class="text-muted small"><?= $esc(date('H:i', $rep['modified'])) ?></div></td>
                                 <td class="text-end">
                                     <button type="button" class="btn btn-sm btn-outline-primary opp-preview-btn <?= $rep['valid'] ? '' : 'disabled' ?>" data-file="<?= $esc($rep['file']) ?>" title="Preview report" aria-label="Preview report"><i class="fa-solid fa-file-pdf" aria-hidden="true"></i></button>
+                                    <a class="btn btn-sm btn-outline-secondary <?= $rep['valid'] ? '' : 'disabled' ?>" href="/admin/opposition_report_pptx.php?file=<?= $esc(rawurlencode($rep['file'])) ?>" title="Download PowerPoint" aria-label="Download PowerPoint"><i class="fa-solid fa-file-powerpoint" aria-hidden="true"></i></a>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary opp-video-btn <?= $rep['valid'] ? '' : 'disabled' ?>" data-file="<?= $esc($rep['file']) ?>" title="Create video (MP4)" aria-label="Create video (MP4)"><i class="fa-solid fa-film" aria-hidden="true"></i></button>
                                     <form method="post" action="/admin/opposition_report_upload.php" class="d-inline" data-confirm="Delete this report?" data-confirm-action="Delete">
                                         <?= csrf_field() ?>
                                         <input type="hidden" name="action" value="delete">
@@ -326,9 +328,57 @@ $badge = static fn(string $result): string => ['W' => 'success', 'D' => 'seconda
             </div>
         </section>
 
+        <div id="oppVideoStatus" class="alert alert-info align-items-center gap-2 mt-4 mb-0" role="status" hidden></div>
         <div id="oppPreview" class="card shadow-sm mt-4" hidden>
             <div class="card-body" id="oppPreviewBody"></div>
         </div>
+        <script>
+        (function () {
+            var box = document.getElementById('oppVideoStatus');
+            var token = <?= json_encode($_SESSION['csrf_token'] ?? '', JSON_UNESCAPED_SLASHES) ?>;
+            var timer = null;
+            function show(cls, html) {
+                box.hidden = false;
+                box.className = 'alert alert-' + cls + ' d-flex align-items-center gap-2 mt-4 mb-0';
+                box.innerHTML = html;
+            }
+            function esc(t) { var d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
+            function poll(file) {
+                fetch('/admin/opposition_report_video.php?action=status&file=' + encodeURIComponent(file), { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+                    .then(function (r) { return r.json(); })
+                    .then(function (st) {
+                        if (st.state === 'running') {
+                            show('info', '<span class="spinner-border spinner-border-sm" aria-hidden="true"></span><span>Creating video&hellip; ' + esc(st.step || '') + ' (about a minute — you can leave this page open)</span>');
+                            timer = setTimeout(function () { poll(file); }, 3000);
+                        } else if (st.state === 'done') {
+                            show('success', '<i class="fa-solid fa-circle-check" aria-hidden="true"></i><span>Your video is ready.</span><a class="btn btn-sm btn-success ms-auto" href="/admin/opposition_report_video.php?action=download&file=' + encodeURIComponent(file) + '"><i class="fa-solid fa-download me-1" aria-hidden="true"></i>Download MP4</a>');
+                        } else {
+                            show('danger', '<i class="fa-solid fa-circle-xmark" aria-hidden="true"></i><span>' + esc(st.message || 'The video could not be created.') + '</span>');
+                        }
+                    })
+                    .catch(function () { timer = setTimeout(function () { poll(file); }, 5000); });
+            }
+            document.addEventListener('click', function (e) {
+                var btn = e.target.closest('.opp-video-btn');
+                if (!btn || btn.classList.contains('disabled')) return;
+                var file = btn.getAttribute('data-file');
+                clearTimeout(timer);
+                show('info', '<span class="spinner-border spinner-border-sm" aria-hidden="true"></span><span>Starting&hellip;</span>');
+                box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                var fd = new FormData();
+                fd.append('action', 'start');
+                fd.append('file', file);
+                fd.append('csrf_token', token);
+                fetch('/admin/opposition_report_video.php', { method: 'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+                    .then(function (r) { return r.json(); })
+                    .then(function (res) {
+                        if (!res.ok) { show('danger', '<i class="fa-solid fa-circle-xmark" aria-hidden="true"></i><span>' + esc(res.message || 'Could not start the video.') + '</span>'); return; }
+                        poll(file);
+                    })
+                    .catch(function () { show('danger', '<span>Could not start the video. Please try again.</span>'); });
+            });
+        })();
+        </script>
         <style>
         .opp-dropzone { border: 2px dashed #ced4da; border-radius: .5rem; padding: 2rem 1rem; text-align: center; cursor: pointer; transition: border-color .15s ease, background-color .15s ease; }
         .opp-dropzone:hover, .opp-dropzone:focus-visible { border-color: #86b7fe; background: #f8f9fa; outline: none; }
@@ -492,7 +542,7 @@ $badge = static fn(string $result): string => ['W' => 'success', 'D' => 'seconda
 
                 html += '<div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">';
                 html += '<div><h2 class="h5 mb-1">' + esc(report.team || 'Opposition') + '</h2><div class="text-muted small">' + esc(report.competition) + (report.competition ? ' &middot; ' : '') + report.total_matches + ' match' + (report.total_matches === 1 ? '' : 'es') + ' analysed</div></div>';
-                html += '<a class="btn btn-primary" href="/admin/opposition_report_pdf.php?file=' + encodeURIComponent(file) + '" target="_blank" rel="noopener"><i class="fa-solid fa-file-pdf me-1" aria-hidden="true"></i>Download PDF</a>';
+                html += '<a class="btn btn-primary" href="/admin/opposition_report_pdf.php?file=' + encodeURIComponent(file) + '" target="_blank" rel="noopener"><i class="fa-solid fa-file-pdf me-1" aria-hidden="true"></i>Download PDF</a> <a class="btn btn-outline-secondary" href="/admin/opposition_report_pptx.php?file=' + encodeURIComponent(file) + '"><i class="fa-solid fa-file-powerpoint me-1" aria-hidden="true"></i>Download PowerPoint</a> <button type="button" class="btn btn-outline-secondary opp-video-btn" data-file="' + esc(file) + '"><i class="fa-solid fa-film me-1" aria-hidden="true"></i>Create video (MP4)</button>';
                 html += '</div>';
 
                 html += '<div class="table-responsive mb-3"><table class="table table-sm table-bordered text-center mb-0 hub-data-table"><thead class="table-dark"><tr><th>P</th><th>W</th><th>D</th><th>L</th><th>GF</th><th>GA</th><th>GD</th><th>CS</th></tr></thead><tbody><tr>'

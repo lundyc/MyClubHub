@@ -9,6 +9,12 @@ declare(strict_types=1);
 
 require __DIR__ . '/bootstrap.php';
 
+// Optimised image variants: /img/{width}/uploads/... (see lib/imgopt.php).
+if (preg_match('#^img(j?)/(\d+)/((?:uploads|badges)/.+)$#', public_request_path(), $im)) {
+    header_remove('Set-Cookie');
+    imgopt_serve((int) $im[2], $im[3], $im[1] === 'j' ? 'jpg' : 'webp');
+}
+
 [$handler, $params] = public_router_match(public_request_path());
 
 /*
@@ -24,6 +30,25 @@ if (($handler['status'] ?? 200) === 404) {
         header('Location: /admin/' . $requested, true, 301);
         exit;
     }
+}
+
+// /RESULTS -> /results: only when the lower-cased path is a real route.
+$reqPath = public_request_path();
+if (($handler['status'] ?? 200) === 404 && $reqPath !== strtolower($reqPath)
+    && (public_router_match(strtolower($reqPath))[0]['status'] ?? 404) === 200) {
+    header('Location: /' . strtolower($reqPath), true, 301);
+    exit;
+}
+
+/*
+ * One URL per page: /team/ -> /team (301, query string preserved). Only for
+ * matched public routes; the root and real files/directories never reach here.
+ */
+$rawPath = (string) strtok((string) ($_SERVER['REQUEST_URI'] ?? '/'), '?');
+if ($rawPath !== '/' && str_ends_with($rawPath, '/') && ($handler['status'] ?? 200) === 200) {
+    $qs = (string) ($_SERVER['QUERY_STRING'] ?? '');
+    header('Location: ' . rtrim($rawPath, '/') . ($qs !== '' ? '?' . $qs : ''), true, 301);
+    exit;
 }
 
 public_render($handler, $params);

@@ -24,36 +24,49 @@ if ($searchQuery !== '') {
 $products = $shopEnabled ? shop_get_products(db(), $filters) : [];
 $basketCount = shop_basket_count();
 
-set_meta([
-    'title' => 'Club shop',
-    'description' => (string) ($settings['shop_intro'] ?? 'Official ' . club('club_name') . ' merchandise.'),
-]);
-?>
-<?php partial('shop_bar', ['basketCount' => $basketCount, 'categories' => $categories, 'activeCategoryId' => $activeCategoryId]); ?>
+// Heading for the product list: the category being browsed, or a search / "all" title.
+$activeCategoryName = '';
+foreach ($categories as $c) {
+    if ((int) $c['id'] === $activeCategoryId) { $activeCategoryName = (string) $c['name']; break; }
+    foreach (($c['children'] ?? []) as $sub) {
+        if ((int) $sub['id'] === $activeCategoryId) { $activeCategoryName = (string) $sub['name']; break 2; }
+    }
+}
+$listTitle = $searchQuery !== '' ? "Results for “" . $searchQuery . "”" : ($activeCategoryName !== '' ? $activeCategoryName : 'All products');
+$listEyebrow = $searchQuery !== '' ? 'Search' : ($activeCategoryName !== '' ? 'Category' : 'Browse');
 
+$shopIntro = trim((string) ($settings['shop_intro'] ?? ''));
+set_meta([
+    'title' => ($activeCategoryName !== '' ? $activeCategoryName . ' | ' : '') . 'Official Club Shop',
+    'description' => mb_strlen($shopIntro) >= 60
+        ? $shopIntro
+        : 'Buy official ' . club('club_name') . ' merchandise from the club shop — kits, clothing and more. Every purchase supports the club.',
+    'canonical' => $activeCategoryId > 0 || $searchQuery !== '' ? url('shop') : '',
+    'robots' => $searchQuery !== '' ? 'noindex, follow' : '',
+]);
+seo_breadcrumbs([['Club shop', url('shop')]]);
+?>
 <?php partial('page_hero', [
-    'eyebrow' => club('club_name'),
-    'title'   => (string) ($settings['shop_name'] ?? 'Club shop'),
-    'sub'     => (string) ($settings['shop_intro'] ?? 'Official club merchandise. Every order is made to order by our kit manufacturer.'),
+    'eyebrow' => 'Official merchandise',
+    'title'   => 'Club Shop',
+    'sub'     => 'Support the Seasiders every day of the week. Every purchase helps the club.',
 ]); ?>
+
+<?php partial('shop_bar', ['basketCount' => $basketCount, 'categories' => $categories, 'activeCategoryId' => $activeCategoryId, 'showSearch' => $shopEnabled, 'searchQuery' => $searchQuery]); ?>
 
 <div class="page">
   <div class="container">
+    <?php if ($shopEnabled): ?>
+      <div class="band__head shoplist-head">
+        <div><span class="eyebrow"><?= e($listEyebrow) ?></span><h2><?= e($listTitle) ?></h2></div>
+      </div>
+    <?php endif; ?>
     <?php if (function_exists('shop_render_preorder_notice')): ?>
       <div class="shopnote">
         <?php ob_start(); shop_render_preorder_notice($settings, 'full'); $raw = ob_get_clean();
           // strip the live shop's own markup wrappers, keep the sentences
           echo strip_tags($raw, '<p><strong>'); ?>
       </div>
-    <?php endif; ?>
-
-    <?php if ($shopEnabled): ?>
-      <form class="shopsearch" method="get" action="<?= e(url('shop')) ?>" role="search">
-        <?php if ($activeCategoryId > 0): ?><input type="hidden" name="category" value="<?= (int) $activeCategoryId ?>"><?php endif; ?>
-        <input type="search" name="q" value="<?= e($searchQuery) ?>" placeholder="Search products&hellip;" aria-label="Search products">
-        <button type="submit" class="btn btn--sm">Search</button>
-        <?php if ($searchQuery !== ''): ?><a class="shopsearch__clear" href="<?= e(url('shop') . ($activeCategoryId > 0 ? '?category=' . (int) $activeCategoryId : '')) ?>">Clear</a><?php endif; ?>
-      </form>
     <?php endif; ?>
 
     <?php if (!$shopEnabled): ?>

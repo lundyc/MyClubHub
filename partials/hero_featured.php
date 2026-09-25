@@ -18,14 +18,14 @@ $card = static function (array $a, bool $large) {
     <a class="hcard <?= $large ? 'hcard--lead' : '' ?>" href="<?= e($href) ?>">
       <span class="hcard__imgwrap">
         <?php if ($img !== ''): ?>
-          <img class="hcard__img" src="<?= e($img) ?>" alt="" loading="lazy">
+          <img class="hcard__img" src="<?= e($img) ?>" alt=""<?= $large ? ' fetchpriority="high" decoding="async"' : ' loading="lazy" decoding="async"' ?>>
         <?php endif; ?>
         <span class="hcard__scrim"></span>
       </span>
       <span class="hcard__inner">
         <span class="hcard__cat"><?= e($a['category'] ?? 'News') ?></span>
         <span class="hcard__title"><?= e($a['title'] ?? '') ?></span>
-        <?php if (($d = format_date($a['published_at'] ?? '', 'j M Y')) !== ''): ?>
+        <?php if (($d = format_date($a['published_at'] ?? '', 'D j M Y')) !== ''): ?>
           <span class="hcard__date"><?= e($d) ?></span>
         <?php endif; ?>
       </span>

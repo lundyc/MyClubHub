@@ -7,9 +7,12 @@ $hasAny = array_sum(array_map('count', $groups)) > 0;
 $labels = ['GK' => 'Goalkeepers', 'DEF' => 'Defenders', 'MID' => 'Midfielders', 'FWD' => 'Forwards'];
 
 set_meta([
-    'title' => 'First team',
-    'description' => 'The ' . club('club_name') . ' first-team squad.',
+    'title' => club('club_short_name', club('club_name')) . ' Squad' . (seo_season_label() !== '' ? ' ' . seo_season_label() : '') . ' | Players & Management | ' . club('club_name'),
+    'title_full' => '1',
+    'description' => 'Meet the ' . club('club_name') . ' first-team squad' . (seo_season_label() !== '' ? ' for ' . seo_season_label() : '')
+        . ' — goalkeepers, defenders, midfielders and forwards, with player profiles.',
 ]);
+seo_breadcrumbs([['First team', url('team')]]);
 ?>
 <?php partial('page_hero', ['eyebrow' => 'Team', 'title' => 'First team']); ?>
 

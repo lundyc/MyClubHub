@@ -505,7 +505,7 @@ function league_table_render_row(array $team): string
 </div>
 
 <script>
-    (function() {
+    document.addEventListener('DOMContentLoaded', function() {
         var selectedTableStyle = 'compact';
         var leagueTableCard = document.getElementById('leagueTableCard');
         var leagueBanner = leagueTableCard ? leagueTableCard.querySelector('.banner-img') : null;
@@ -536,6 +536,7 @@ function league_table_render_row(array $team): string
         });
 
         var postComposerPresets = <?= json_encode($postComposerPresets, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
+        var postComposerCsrfToken = <?= json_encode((string) ($_SESSION['csrf_token'] ?? ''), JSON_UNESCAPED_SLASHES) ?>;
         var postComposerConfigs = {
             facebook: {
                 buttonId: 'postToFacebookBtn',
@@ -665,6 +666,7 @@ function league_table_render_row(array $team): string
         function buildRequestBody(config, caption, confirmBurst) {
             var params = new URLSearchParams();
             params.set('graphic', 'league_table');
+            params.set('csrf_token', postComposerCsrfToken);
             params.set('table_style', selectedTableStyle);
             if (config.requestTarget) {
                 params.set('target', config.requestTarget);
@@ -787,7 +789,7 @@ function league_table_render_row(array $team): string
                 downloadButton.disabled = false;
             }, 1500);
         });
-    })();
+    });
 </script>
 
 <?php require_once __DIR__ . '/footer.php'; ?>

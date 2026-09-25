@@ -30,7 +30,11 @@ set_meta([
         ? $article['meta_description']
         : ($article['excerpt'] !== '' ? $article['excerpt'] : excerpt(strip_tags($bodyHtml), 180)),
     'image' => $heroUrl !== '' ? (current_url_origin() . $heroUrl) : '',
+    'og_type' => 'article',
+    'article_published' => $article['published_at'] ? date('c', strtotime((string) $article['published_at'])) : '',
+    'article_modified' => !empty($article['updated_at']) ? date('c', strtotime((string) $article['updated_at'])) : '',
 ]);
+seo_breadcrumbs([['News', url('news')], [(string) $article['title'], url('news/' . $article['slug'])]]);
 
 pub_jsonld([
     '@type' => 'NewsArticle',
@@ -38,9 +42,10 @@ pub_jsonld([
     'datePublished' => $article['published_at'] ? date('c', strtotime((string) $article['published_at'])) : null,
     'dateModified' => !empty($article['updated_at']) ? date('c', strtotime((string) $article['updated_at'])) : null,
     'author' => ['@type' => 'Organization', 'name' => trim((string) $article['author_name']) ?: club('club_name')],
-    'publisher' => ['@type' => 'Organization', 'name' => club('club_name'), 'logo' => current_url_origin() . club_crest()],
-    'image' => $heroUrl !== '' ? [current_url_origin() . $heroUrl] : null,
-    'mainEntityOfPage' => current_url(),
+    'publisher' => ['@type' => 'Organization', 'name' => club('club_name'), 'logo' => ['@type' => 'ImageObject', 'url' => seo_absolute(club_crest())]],
+    'image' => [seo_image()],
+    'mainEntityOfPage' => ['@type' => 'WebPage', '@id' => seo_canonical()],
+    'description' => meta('description'),
 ]);
 ?>
 <article class="article">

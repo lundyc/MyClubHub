@@ -3,18 +3,21 @@
  *  league position + recent results + latest news + partner strip (footer). */
 declare(strict_types=1);
 
+$seasonLabel = seo_season_label();
 set_meta([
-    'title' => '',
-    'description' => club('club_name') . ' official website — fixtures, results, league table, news and squad.',
+    'title' => club('club_name') . ' (' . club('club_short_name', club('club_name')) . ') | Official Club Website',
+    'title_full' => '1',
+    'description' => 'Official website of ' . club('club_name') . '. The latest fixtures, results, news, squad information, tickets and club information'
+        . (club('ground_name') !== '' ? ' from ' . club('ground_name') : '') . '.',
 ]);
 
+pub_jsonld(seo_club_node());
 pub_jsonld([
-    '@type' => 'SportsTeam',
+    '@type' => 'WebSite',
     'name' => club('club_name'),
-    'sport' => 'Football',
-    'url' => current_url_origin() . url(),
-    'logo' => current_url_origin() . club_crest(),
-    'location' => ['@type' => 'Place', 'name' => club('ground_name'), 'address' => club('ground_address')],
+    'url' => current_url_origin() . '/',
+    'publisher' => ['@id' => current_url_origin() . '/#club'],
+    'inLanguage' => 'en-GB',
 ]);
 
 $featured = news_featured(db(), 4);
@@ -23,13 +26,14 @@ $results = pub_recent_results(4);
 $latestNews = news_published(db(), ['limit' => 6]);
 $ourRow = pub_league_our_row();
 ?>
+<h1 class="sr-only"><?= e(club('club_name')) ?> — official website</h1>
 <?php if ($featured !== []): ?>
   <?php partial('hero_featured', ['items' => $featured]); ?>
 <?php else: ?>
   <section class="hero">
     <div class="container">
       <img class="hero__crest" src="<?= e(club_crest_reverse()) ?>" alt="">
-      <h1><?= e(club('club_name')) ?></h1>
+      <p class="hero__name"><?= e(club('club_name')) ?></p>
       <p><?= e(club('club_nickname')) ?> &middot; <?= e(club('club_tagline')) ?></p>
       <div class="hero__actions">
         <a class="btn btn--light" href="<?= e(url('fixtures')) ?>">Fixtures</a>

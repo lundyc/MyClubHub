@@ -12,9 +12,12 @@ if (!$isCli && !hub_auth_has_capability('content_social')) {
     exit('Access denied.');
 }
 require_once __DIR__ . '/render_lib.php';
+require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/lib/render_access_token.php';
 
 $output = __DIR__ . '/export/latest_wosfl.png';
-$url = 'https://lundy.me.uk/league_table_graphic.php?render=1&table_style=compact';
+$url = APP_ORIGIN . '/admin/league_table_graphic.php?render=1&table_style=compact'
+    . '&_token=' . rawurlencode(RENDER_ACCESS_TOKEN);
 
 $result = render_capture_image($url, $output, '.table-card--render', 1080, 1350, '.table-card--render');
 

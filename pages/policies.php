@@ -4,7 +4,13 @@
  *  its own club_pages row; "privacy" also keeps its standalone /privacy route.) */
 declare(strict_types=1);
 
-$slugs = ['child-protection-policy', 'code-of-conduct', 'equality-diversity-inclusion', 'ground-regulations', 'privacy'];
+$slugs = [
+    'child-protection-policy', 'safeguarding-adults-at-risk', 'code-of-conduct',
+    'equality-diversity-inclusion', 'anti-discrimination-anti-racism-anti-sectarianism',
+    'complaints-disciplinary-procedure', 'health-safety-emergency-procedures',
+    'ground-regulations', 'safe-recruitment-volunteers', 'photography-filming-social-media',
+    'data-protection-gdpr', 'privacy',
+];
 $menu  = club_menu_pages($slugs);
 
 $policies = [];
@@ -21,8 +27,8 @@ foreach ($menu as $slug => $label) {
 }
 
 set_meta([
-    'title' => 'Policies & governance',
-    'description' => 'Safeguarding, conduct, equality and ground regulations for ' . club('club_name') . '.',
+    'title' => club('club_name') . ' Policies & Governance',
+    'description' => 'Safeguarding, conduct, equality, complaints, health & safety, data protection and ground regulations for ' . club('club_name') . '.',
 ]);
 ?>
 <?php partial('page_hero', [

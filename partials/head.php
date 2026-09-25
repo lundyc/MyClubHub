@@ -5,10 +5,7 @@ declare(strict_types=1);
 
 $clubName = club('club_name', 'Saltcoats Victoria FC');
 $clubShort = club('club_short_name', $clubName);
-$title = meta('title');
-$fullTitle = $title === '' ? $clubName : $title . ' — ' . $clubShort;
-$description = meta('description', $clubName . ' — official website. Fixtures, results, news, squad and more.');
-$ogImage = meta('image');
+seo_send_headers();
 
 /* Brand tokens: only emit overrides that differ from the CSS defaults so the
    stylesheet stays the single source of the base palette. */
@@ -32,23 +29,14 @@ foreach ($tokenMap as $name => $value) {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title><?= e($fullTitle) ?></title>
-<meta name="description" content="<?= e($description) ?>">
-<link rel="canonical" href="<?= e(current_url()) ?>">
-<meta property="og:site_name" content="<?= e($clubName) ?>">
-<meta property="og:title" content="<?= e($title === '' ? $clubName : $title) ?>">
-<meta property="og:description" content="<?= e($description) ?>">
-<meta property="og:type" content="website">
-<meta property="og:url" content="<?= e(current_url()) ?>">
-<?php if ($ogImage !== ''): ?>
-<meta property="og:image" content="<?= e($ogImage) ?>">
-<meta name="twitter:card" content="summary_large_image">
-<?php endif; ?>
-<link rel="icon" href="<?= e(club_crest()) ?>">
+<title><?= e(seo_title()) ?></title>
+<?= seo_head_tags() /* every value escaped inside; JSON-LD hex-encoded */ ?><link rel="icon" type="image/png" sizes="32x32" href="<?= e(pub_icon_url(32)) ?>">
+<link rel="icon" type="image/png" sizes="192x192" href="<?= e(pub_icon_url(192)) ?>">
+<link rel="apple-touch-icon" href="<?= e(pub_icon_url(180)) ?>">
+<?php if (is_file(PUBLIC_ROOT . '/uploads/club/site.webmanifest')): ?><link rel="manifest" href="/uploads/club/site.webmanifest"><?php endif; ?>
 <link rel="stylesheet" href="<?= e(asset('css/public.css')) ?>">
 <link rel="alternate" type="application/rss+xml" title="<?= e($clubName) ?> news" href="<?= e(url('news/feed.xml')) ?>">
 <?php if ($tokenCss !== ''): ?><style>:root{<?= $tokenCss /* colour literals, validated on save */ ?>}</style><?php endif; ?>
-<?php if (meta('jsonld') !== ''): ?><script type="application/ld+json"><?= meta('jsonld') /* json_encode output, slashes escaped */ ?></script><?php endif; ?>
 <script src="<?= e(asset('js/public.js')) ?>" defer></script>
 <?php if (club('ga_measurement_id') !== ''): ?>
 <script>
@@ -92,9 +80,8 @@ $utilityLinks = [
 
   <div class="masthead">
     <div class="container">
-      <a class="brand" href="<?= e(url()) ?>">
+      <a class="brand" href="<?= e(url()) ?>" aria-label="<?= e($clubShort) ?> — home">
         <img src="<?= e(club_crest_reverse()) ?>" alt="" width="42" height="42">
-        <span class="brand__name"><?= e($clubShort) ?><small><?= e(club('club_tagline')) ?></small></span>
       </a>
 
       <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" aria-label="Menu">
@@ -108,3 +95,4 @@ $utilityLinks = [
 </header>
 
 <main id="main">
+<?= seo_breadcrumb_html() ?>

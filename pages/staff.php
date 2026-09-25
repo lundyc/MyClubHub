@@ -6,7 +6,7 @@ declare(strict_types=1);
 $people = pub_staff_management();
 
 set_meta([
-    'title' => 'Management team',
+    'title' => club('club_name') . ' Management Team',
     'description' => club('club_name') . ' first-team management and coaching staff.',
 ]);
 ?>
@@ -25,7 +25,7 @@ set_meta([
       <div class="staff-grid">
         <?php foreach ($people as $person): ?>
           <div class="staffcard">
-            <div class="staffcard__photo"><span aria-hidden="true"><?= e(mb_strtoupper(mb_substr($person['name'], 0, 1))) ?></span></div>
+            <div class="staffcard__photo"><?= pub_staff_photo_html($person) ?></div>
             <span class="staffcard__role"><?= e($person['position']) ?></span>
             <span class="staffcard__name"><?= e($person['name']) ?></span>
           </div>

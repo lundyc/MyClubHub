@@ -7,7 +7,7 @@ $others = pub_other_sponsors();
 $contactEmail = club('contact_email');
 
 set_meta([
-    'title' => 'Partners',
+    'title' => club('club_name') . ' Sponsors & Partners',
     'description' => 'The businesses and supporters backing ' . club('club_name') . '.',
 ]);
 ?>
@@ -56,19 +56,19 @@ set_meta([
 <section class="band band--surface">
   <div class="container">
     <div class="band__head"><div><span class="eyebrow">In partnership with</span><h2>Our partners &amp; supporters</h2></div></div>
-    <div class="partner-grid">
+    <div class="partners__grid">
       <?php foreach ($others as $s): ?>
         <?php
         $logo = trim((string) $s['logo_path']);
         $link = pub_sponsor_link($s);
         $inner = $logo !== ''
             ? '<img src="' . e(uploads('sponsors/' . $logo)) . '" alt="' . e($s['name']) . '" loading="lazy">'
-            : '<span class="partner-grid__name">' . e($s['name']) . '</span>';
+            : '<span class="partners__name">' . e($s['name']) . '</span>';
         ?>
         <?php if ($link !== ''): ?>
-          <a class="partner-grid__item<?= $logo === '' ? ' is-text' : '' ?>" href="<?= e($link) ?>" target="_blank" rel="noopener" title="<?= e($s['name']) ?>"><?= $inner ?></a>
+          <a class="<?= $logo === '' ? 'is-text' : '' ?>" href="<?= e($link) ?>" target="_blank" rel="noopener" title="<?= e($s['name']) ?>"><?= $inner ?></a>
         <?php else: ?>
-          <span class="partner-grid__item<?= $logo === '' ? ' is-text' : '' ?>" title="<?= e($s['name']) ?>"><?= $inner ?></span>
+          <span class="<?= $logo === '' ? 'is-text' : '' ?>" title="<?= e($s['name']) ?>"><?= $inner ?></span>
         <?php endif; ?>
       <?php endforeach; ?>
     </div>
@@ -79,16 +79,48 @@ set_meta([
 <section class="band">
   <div class="container">
     <div class="partner-cta">
-      <div>
-        <h2>Partner with <?= e(club('club_short_name', club('club_name'))) ?></h2>
-        <p>Match sponsorship, matchball, hospitality, advertising boards and player sponsorship packages are available. Get your business in front of the Campbell Park crowd and support your local club.</p>
+      <div class="partner-cta__main">
+        <span class="eyebrow">Get involved</span>
+        <h2>Put your business in front of the Campbell Park crowd</h2>
+        <p>Back your local club and be seen by supporters every matchday. We'll work with you to find a package that suits your business and your budget.</p>
+        <div class="partner-cta__actions">
+          <a class="btn btn--gold btn--lg" href="<?= e(url('contact')) ?>">Become a partner</a>
+          <?php if ($contactEmail !== ''): ?>
+            <a class="btn btn--ghost btn--lg" href="mailto:<?= e($contactEmail) ?>?subject=<?= rawurlencode('Sponsorship enquiry') ?>">Email the club</a>
+          <?php endif; ?>
+        </div>
       </div>
-      <div class="partner-cta__actions">
-        <?php if ($contactEmail !== ''): ?>
-          <a class="btn" href="mailto:<?= e($contactEmail) ?>?subject=<?= rawurlencode('Sponsorship enquiry') ?>">Email the club</a>
-        <?php endif; ?>
-        <a class="btn btn--ghost" href="<?= e(url('contact')) ?>">Contact form</a>
-      </div>
+      <ul class="partner-cta__packages" aria-label="Sponsorship packages" data-rotator>
+        <li><b>Match sponsorship</b><span>Your name on the matchday programme and in the ground</span></li>
+        <li><b>Matchball</b><span>Sponsor the ball and get pitch-side recognition</span></li>
+        <li><b>Hospitality</b><span>Host clients and guests at Campbell Park</span></li>
+        <li><b>Advertising boards</b><span>Year-round visibility around the pitch</span></li>
+        <li><b>Player sponsorship</b><span>Back a first-team player for the season</span></li>
+      </ul>
     </div>
   </div>
 </section>
+
+<script>
+(function () {
+  var list = document.querySelector('[data-rotator]');
+  if (!list) return;
+  var items = list.querySelectorAll('li');
+  if (items.length < 2) return;
+  if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return; // keep the full list
+  var i = 0, paused = false;
+  list.classList.add('is-rotating');
+  items[0].classList.add('is-active');
+  list.addEventListener('mouseenter', function () { paused = true; });
+  list.addEventListener('mouseleave', function () { paused = false; });
+  setInterval(function () {
+    if (paused || document.hidden) return;
+    var old = items[i];
+    old.classList.remove('is-active');
+    old.classList.add('is-leaving');           // slides down and fades out
+    setTimeout(function () { old.classList.remove('is-leaving'); }, 800); // reset above, invisible
+    i = (i + 1) % items.length;
+    items[i].classList.add('is-active');       // drops in from above
+  }, 4000);
+})();
+</script>

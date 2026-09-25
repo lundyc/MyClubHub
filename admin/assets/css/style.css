@@ -807,7 +807,6 @@ a:hover {
 }
 
 .table-card--compact .banner-img {
-    content: url("/saltcoats/media/badges/league-logos/wosfl/wosfl-white.png");
     width: 100%;
     max-width: 175px;
     max-height: 210px;

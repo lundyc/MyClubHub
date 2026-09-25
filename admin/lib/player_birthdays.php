@@ -71,6 +71,25 @@ function players_build_birthday_row(array $row, string $nameKey, string $dobKey,
     ];
 }
 
+/**
+ * Row for someone with no DOB recorded (date/age fields left blank).
+ *
+ * @param array<string,mixed> $row
+ */
+function players_missing_row(array $row, string $nameKey, string $roleLabel, string $href): array
+{
+    return [
+        'id' => (int) ($row['id'] ?? 0),
+        'name' => (string) ($row[$nameKey] ?? ''),
+        'date_of_birth' => '',
+        'next_birthday' => '',
+        'days_until' => 0,
+        'age_turning' => 0,
+        'role_label' => ucfirst($roleLabel),
+        'href' => $href,
+    ];
+}
+
 function players_birthday_role_label(?string $roleCodes, ?string $positionNames): string
 {
     $roles = array_filter(array_map('trim', explode(',', (string) $roleCodes)));
@@ -107,7 +126,7 @@ function players_birthdays_table_exists(PDO $pdo, string $table): bool
 /**
  * @return list<array{name: string, id: int, date_of_birth: string, next_birthday: string, days_until: int, age_turning: int, role_label: string, href: string}>
  */
-function players_all_birthdays(PDO $pdo, int $limit = 0): array
+function players_all_birthdays(PDO $pdo, int $limit = 0, bool $missing = false): array
 {
     players_ensure_date_of_birth_column($pdo);
 
@@ -116,15 +135,16 @@ function players_all_birthdays(PDO $pdo, int $limit = 0): array
         FROM players
         WHERE active = 1
           AND status IN ('current', 'trialist', 'injured', 'loan')
-          AND date_of_birth IS NOT NULL
-          AND date_of_birth <> '0000-00-00'
+          AND " . ($missing ? "(date_of_birth IS NULL OR date_of_birth = '0000-00-00')" : "date_of_birth IS NOT NULL AND date_of_birth <> '0000-00-00'") . "
         ORDER BY name ASC
     ");
 
     $birthdays = [];
 
     foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
-        $birthday = players_build_birthday_row($row, 'name', 'date_of_birth', 'player', '/player_view.php?id=' . (int) $row['id']);
+        $birthday = $missing
+            ? players_missing_row($row, 'name', 'player', '/player_view.php?id=' . (int) $row['id'])
+            : players_build_birthday_row($row, 'name', 'date_of_birth', 'player', '/player_view.php?id=' . (int) $row['id']);
         if ($birthday !== null) {
             $birthdays[] = $birthday;
         }
@@ -160,20 +180,18 @@ function players_all_birthdays(PDO $pdo, int $limit = 0): array
                 AND (pp.end_date IS NULL OR pp.end_date >= CURDATE())
             LEFT JOIN hub_positions hp ON hp.id = pp.position_id
             WHERE p.is_active = 1
-              AND p.date_of_birth IS NOT NULL
-              AND p.date_of_birth <> '0000-00-00'
+              AND " . ($missing ? "(p.date_of_birth IS NULL OR p.date_of_birth = '0000-00-00')" : "p.date_of_birth IS NOT NULL AND p.date_of_birth <> '0000-00-00'") . "
+
             GROUP BY p.id, p.display_name, p.date_of_birth
             ORDER BY p.display_name ASC
         ");
 
         foreach ($peopleStmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
-            $birthday = players_build_birthday_row(
-                $row,
-                'display_name',
-                'date_of_birth',
-                players_birthday_role_label(($row['role_codes'] ?? '') . ',' . ($row['access_role_codes'] ?? ''), (string) ($row['position_names'] ?? '')),
-                '/club_person.php?id=' . (int) $row['id']
-            );
+            $roleLabel = players_birthday_role_label(($row['role_codes'] ?? '') . ',' . ($row['access_role_codes'] ?? ''), (string) ($row['position_names'] ?? ''));
+            $href = '/club_person.php?id=' . (int) $row['id'];
+            $birthday = $missing
+                ? players_missing_row($row, 'display_name', $roleLabel, $href)
+                : players_build_birthday_row($row, 'display_name', 'date_of_birth', $roleLabel, $href);
             if ($birthday !== null) {
                 $birthdays[] = $birthday;
             }
@@ -198,4 +216,38 @@ function players_all_birthdays(PDO $pdo, int $limit = 0): array
 function players_next_birthdays(PDO $pdo, int $limit = 5): array
 {
     return players_all_birthdays($pdo, $limit);
+}
+
+function players_ensure_dob_verifications_table(PDO $pdo): void
+{
+    $pdo->exec('CREATE TABLE IF NOT EXISTS dob_verifications (
+        source VARCHAR(10) NOT NULL,
+        record_id INT NOT NULL,
+        verified_dob DATE NOT NULL,
+        verified_at DATETIME NOT NULL,
+        verified_by INT NULL,
+        PRIMARY KEY (source, record_id)
+    )');
+}
+
+/**
+ * Verified only while the stored DOB still matches the one that was checked,
+ * so editing a DOB automatically un-ticks it.
+ *
+ * @return array<string,true> keyed "player:12" / "person:27"
+ */
+function players_verified_dobs(PDO $pdo): array
+{
+    players_ensure_dob_verifications_table($pdo);
+    $verified = [];
+    $sets = [
+        'player' => 'SELECT v.record_id FROM dob_verifications v JOIN players t ON t.id = v.record_id AND t.date_of_birth = v.verified_dob WHERE v.source = \'player\'',
+        'person' => 'SELECT v.record_id FROM dob_verifications v JOIN people t ON t.id = v.record_id AND t.date_of_birth = v.verified_dob WHERE v.source = \'person\'',
+    ];
+    foreach ($sets as $source => $sql) {
+        foreach ($pdo->query($sql)->fetchAll(PDO::FETCH_COLUMN) as $id) {
+            $verified[$source . ':' . (int) $id] = true;
+        }
+    }
+    return $verified;
 }

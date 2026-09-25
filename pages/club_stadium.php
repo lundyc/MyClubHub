@@ -17,9 +17,15 @@ if ($mapsUrl === '') {
 }
 
 set_meta([
-    'title' => $name,
+    'title' => $name . ' | ' . club('club_name') . ' Home Ground',
+    'title_full' => '1',
     'description' => $name . ' — ' . club('club_name') . '. ' . ($address !== '' ? $address . '. ' : '') . 'Facilities, directions and matchday information.',
 ]);
+seo_breadcrumbs([['Club', url('club/history')], [$name, url('club/stadium')]]);
+
+pub_jsonld(['@type' => 'StadiumOrArena', 'name' => $name, 'address' => $address,
+    'url' => current_url_origin() . url('club/stadium'), 'tenant' => ['@id' => current_url_origin() . '/#club'],
+    'hasMap' => $mapsUrl]);
 ?>
 <?php partial('page_hero', ['eyebrow' => 'The club', 'title' => $name, 'sub' => $address]); ?>
 

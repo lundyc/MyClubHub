@@ -16,10 +16,9 @@ $initials = mb_strtoupper(mb_substr($initials, 0, 2));
 <a class="pcard" href="<?= e($href) ?>">
   <div class="pcard__media">
     <?php if ($number !== null): ?><span class="pcard__num"><?= $number ?></span><?php endif; ?>
+    <span class="pcard__initials" aria-hidden="true"><?= e($initials) ?></span>
     <?php if ($photo !== ''): ?>
-      <img src="<?= e($photo) ?>" alt="" loading="lazy">
-    <?php else: ?>
-      <span class="pcard__initials" aria-hidden="true"><?= e($initials) ?></span>
+      <img src="<?= e($photo) ?>" alt="" loading="lazy" onerror="this.remove()">
     <?php endif; ?>
   </div>
   <div class="pcard__body">

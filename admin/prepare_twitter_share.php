@@ -13,6 +13,8 @@ require_once __DIR__ . '/matches_lib.php';
 require_once __DIR__ . '/render_lib.php';
 require_once __DIR__ . '/social_post_settings.php';
 require_once __DIR__ . '/lib/facebook_publisher.php';
+require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/lib/render_access_token.php';
 
 header('Content-Type: application/json; charset=UTF-8');
 $twitterShareHistoryId = 0;
@@ -48,9 +50,9 @@ if (!social_publishing_platform_enabled('x')) {
     twitter_share_error('X publishing is disabled in Settings.', 403);
 }
 
-$socialBaseUrl = 'https://lundy.me.uk/hub';
+$socialBaseUrl = APP_ORIGIN . '/admin';
 $exportPath = __DIR__ . '/export/latest_wosfl.png';
-$renderUrl = 'https://lundy.me.uk/league_table_graphic.php?render=1';
+$renderUrl = $socialBaseUrl . '/league_table_graphic.php?render=1&_token=' . rawurlencode(RENDER_ACCESS_TOKEN);
 $downloadUrl = $socialBaseUrl . '/download_latest_wosfl.php?v=' . rawurlencode((string) time());
 $logFile = __DIR__ . '/logs/twitter_share.log';
 $graphicType = isset($_POST['graphic']) && is_string($_POST['graphic']) && trim($_POST['graphic']) !== ''
@@ -89,7 +91,8 @@ if ($graphicType === 'match') {
 
     $baseName = matches_slugify(matches_fixture_label($match)) . '-' . ((string) ($match['match_date'] ?? date('Y-m-d')));
     $exportPath = MATCHES_EXPORT_DIR . '/' . $baseName . '.png';
-    $renderUrl = $socialBaseUrl . '/match_graphic.php?id=' . rawurlencode((string) $match['id']) . '&render=1';
+    $renderUrl = $socialBaseUrl . '/match_graphic.php?id=' . rawurlencode((string) $match['id'])
+        . '&render=1&_token=' . rawurlencode(RENDER_ACCESS_TOKEN);
     $downloadUrl = $socialBaseUrl . '/export/matches/' . rawurlencode($baseName) . '.png?v=' . rawurlencode((string) time());
     $caption = social_post_resolve_caption_with_override('x', 'match', $match, $captionOverride);
 }

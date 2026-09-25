@@ -91,10 +91,12 @@ $mvv = (static function (string $html): array {
 $mvvOk = $mvv['mission'] !== '' || $mvv['vision'] !== [] || $mvv['values'] !== [];
 
 set_meta([
-    'title' => 'About the club',
+    'title' => club('club_name') . ' History' . ($founded !== '' ? ' | Founded ' . $founded : ''),
+    'title_full' => '1',
     'description' => club('club_name') . ($founded !== '' ? ' — formed ' . $founded . '.' : '')
         . ' Our story, what the club stands for, and the committee that runs it.',
 ]);
+seo_breadcrumbs([['Club', url('club/history')], ['History', url('club/history')]]);
 ?>
 <?php partial('page_hero', [
     'eyebrow' => 'The club',
@@ -106,10 +108,7 @@ set_meta([
 <section class="band about-story">
   <div class="container clay">
     <div>
-      <div class="band__head"><div>
-        <span class="eyebrow">Our story</span>
-        <h2>Ayrshire football since <?= e($founded !== '' ? $founded : '1889') ?></h2>
-      </div></div>
+      <span class="eyebrow about-story__eyebrow">Our story</span>
       <div class="prose prose--lead about-story__body">
         <?= $body !== '' ? $body : '<p>The club story is being written and will appear here soon.</p>' ?>
       </div>
@@ -227,8 +226,8 @@ set_meta([
       <div class="staff-grid"<?= $officialsIntro !== '' ? ' style="margin-top:1.6rem"' : '' ?>>
         <?php foreach ($officials as $person): ?>
           <div class="staffcard">
-            <div class="staffcard__photo"><span aria-hidden="true"><?= e(mb_strtoupper(mb_substr($person['name'], 0, 1))) ?></span></div>
-            <span class="staffcard__role"><?= e($person['position']) ?></span>
+            <div class="staffcard__photo"><?= pub_staff_photo_html($person) ?></div>
+            <span class="staffcard__role"><?= e($person['label'] ?? $person['position']) ?></span>
             <span class="staffcard__name"><?= e($person['name']) ?></span>
           </div>
         <?php endforeach; ?>

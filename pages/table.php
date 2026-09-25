@@ -27,12 +27,14 @@ $table = pub_league_table_for_season($seasonId);
 $rowCount = count($table['rows']);
 
 set_meta([
-    'title' => 'League table',
-    'description' => $table['title'] . ' standings.',
+    'title' => club('club_short_name', club('club_name')) . ' League Table | ' . $table['title'] . ' | ' . club('club_name'),
+    'title_full' => '1',
+    'description' => $table['title'] . ' standings' . ' — played, won, drawn, lost, goal difference and points for ' . club('club_name') . ' and every club in the division.',
 ]);
+seo_breadcrumbs([['League table', url('table')]]);
 ?>
 <?php partial('page_hero', [
-    'eyebrow' => 'First team',
+    'eyebrow' => 'Matches',
     'title'   => $table['title'],
     'sub'     => $table['updated'] ? 'Updated ' . format_date(date('Y-m-d', $table['updated']), 'j M Y') : '',
 ]); ?>

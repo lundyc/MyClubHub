@@ -32,10 +32,18 @@ $articles = news_published(db(), [
 ]);
 $lastPage = max(1, (int) ceil($total / $perPage));
 
+$newsBase = $activeCategory !== '' ? url('news/category/' . news_slugify($activeCategory)) : url('news');
+if ($page > $lastPage && $total > 0) {
+    http_response_code(404);
+}
 set_meta([
-    'title' => $activeCategory !== '' ? $activeCategory . ' news' : 'News',
-    'description' => 'The latest news from ' . club('club_name') . '.',
+    'title' => $activeCategory !== '' ? ucwords(strtolower($activeCategory)) . ' News' : club('club_name') . ' News',
+    'description' => 'The latest ' . ($activeCategory !== '' ? strtolower($activeCategory) . ' ' : '') . 'news from ' . club('club_name')
+        . ($page > 1 ? ' — page ' . $page . ' of the archive.' : ' — match reports, club announcements and updates.'),
+    'rel_prev' => $page > 1 ? $newsBase . ($page > 2 ? '?page=' . ($page - 1) : '') : '',
+    'rel_next' => $page < $lastPage ? $newsBase . '?page=' . ($page + 1) : '',
 ]);
+seo_breadcrumbs($activeCategory !== '' ? [['News', url('news')], [$activeCategory, $newsBase]] : [['News', url('news')]]);
 ?>
 <?php partial('page_hero', ['eyebrow' => 'Latest', 'title' => $activeCategory !== '' ? $activeCategory : 'Club news']); ?>
 
@@ -61,9 +69,9 @@ set_meta([
       <?php if ($lastPage > 1): ?>
         <nav class="pager" aria-label="News pages">
           <?php $base = $activeCategory !== '' ? url('news/category/' . news_slugify($activeCategory)) : url('news'); ?>
-          <?php if ($page > 1): ?><a class="btn btn--ghost btn--sm" href="<?= e($base . '?page=' . ($page - 1)) ?>">← Newer</a><?php endif; ?>
+          <?php if ($page > 1): ?><a class="btn btn--ghost btn--sm" rel="prev" href="<?= e($base . ($page > 2 ? '?page=' . ($page - 1) : '')) ?>">← Newer</a><?php endif; ?>
           <span class="pager__count">Page <?= $page ?> of <?= $lastPage ?></span>
-          <?php if ($page < $lastPage): ?><a class="btn btn--ghost btn--sm" href="<?= e($base . '?page=' . ($page + 1)) ?>">Older →</a><?php endif; ?>
+          <?php if ($page < $lastPage): ?><a class="btn btn--ghost btn--sm" rel="next" href="<?= e($base . '?page=' . ($page + 1)) ?>">Older →</a><?php endif; ?>
         </nav>
       <?php endif; ?>
     <?php endif; ?>

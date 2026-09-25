@@ -5,7 +5,11 @@ declare(strict_types=1);
 
 // PHASE3B_GUARD_MARKER
 require_once __DIR__ . '/auth.php';
-if (!hub_auth_has_capability('content_social')) {
+require_once __DIR__ . '/lib/render_access_token.php';
+$isTokenRender = RENDER_ACCESS_TOKEN !== ''
+    && ($_GET['render'] ?? '') === '1'
+    && hash_equals(RENDER_ACCESS_TOKEN, (string) ($_GET['_token'] ?? ''));
+if (!$isTokenRender && !hub_auth_has_capability('content_social')) {
     http_response_code(403);
     exit('Access denied.');
 }
@@ -395,7 +399,7 @@ $leagueTableTitle = (string) $leagueConfig['league_title'];
                                 Refresh the latest standings, export the image, and prepare or publish the table for match day channels.
                             </p>
                             <div class="dashboard-actions">
-                                <button id="refreshTableBtn" class="btn btn-brand" type="button" data-csrf-token="<?= htmlspecialchars(hub_auth_csrf_token(), ENT_QUOTES, 'UTF-8') ?>">Refresh Table</button>
+                                <button id="refreshTableBtn" class="btn btn-brand" type="button" data-csrf-token="<?= htmlspecialchars((string) ($_SESSION['csrf_token'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">Refresh Table</button>
                                 <button id="saveAsImageBtn" class="btn btn-neutral" type="button">Save as Image</button>
                             </div>
                         </article>
@@ -608,6 +612,7 @@ $leagueTableTitle = (string) $leagueConfig['league_title'];
         });
 
         var postComposerPresets = <?= json_encode($postComposerPresets, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
+        var postComposerCsrfToken = <?= json_encode((string) ($_SESSION['csrf_token'] ?? ''), JSON_UNESCAPED_SLASHES) ?>;
         var postComposerConfigs = {
             facebook: {
                 buttonId: 'postToFacebookBtn',
@@ -794,6 +799,7 @@ $leagueTableTitle = (string) $leagueConfig['league_title'];
         function buildRequestBody(config, caption) {
             var params = new URLSearchParams();
             params.set('graphic', 'league_table');
+            params.set('csrf_token', postComposerCsrfToken);
             params.set('table_style', <?= json_encode($tableStyle) ?>);
             if (config.requestTarget) {
                 params.set('target', config.requestTarget);

@@ -280,28 +280,61 @@ foreach (pub_staff_management() as $person) {
     }
 }
 
+$ftHome ??= null;
+$ftAway ??= null;
+$compLabel = (string) ($fixture['competition'] ?: 'Fixture');
+$dateLong = format_date($fixture['match_date'], 'j M Y');
+if ($played && $ftHome !== null && $ftAway !== null) {
+    $matchTitle = $teams['home'] . ' ' . (int) $ftHome . '–' . (int) $ftAway . ' ' . $teams['away'] . ' | Match Report, ' . $dateLong;
+    $matchDesc = 'Match report: ' . $teams['home'] . ' ' . (int) $ftHome . '–' . (int) $ftAway . ' ' . $teams['away']
+        . ' in the ' . $compLabel . ' on ' . $dateLong . ($venue !== '' ? ' at ' . $venue : '') . '. Full-time result, line-ups and match events.';
+} else {
+    $matchTitle = $teams['home'] . ' v ' . $teams['away'] . ' | ' . $compLabel . ', ' . $dateLong;
+    $matchDesc = $compLabel . ': ' . $teams['home'] . ' v ' . $teams['away'] . ' on ' . format_date($fixture['match_date'], 'l j F Y')
+        . ($ko !== '' ? ', kick-off ' . $ko : '') . ($venue !== '' ? ' at ' . $venue : '') . '.';
+}
+// A past fixture with no recorded result has nothing to show — keep it out of the index.
+$matchThin = !$played && $fixture['match_date'] < date('Y-m-d');
 set_meta([
-    'title' => $teams['home'] . ' v ' . $teams['away'],
-    'description' => trim(($fixture['competition'] ?: 'Fixture') . ' · ' . format_date($fixture['match_date'], 'j M Y')),
+    'title' => $matchTitle,
+    'title_full' => '1',
+    'description' => $matchDesc,
+    'robots' => $matchThin ? 'noindex, follow' : '',
+]);
+seo_breadcrumbs([
+    [$played ? 'Results' : 'Fixtures', url($played ? 'results' : 'fixtures')],
+    [$teams['home'] . ' v ' . $teams['away'], url('match/' . (int) $fixture['id'])],
 ]);
 
-$startIso = trim((string) $fixture['match_date'] . 'T' . ($fixture['kickoff_time'] ?: '15:00:00'));
+$tz = new DateTimeZone('Europe/London');
+$startIso = (new DateTimeImmutable($fixture['match_date'] . ' ' . ($fixture['kickoff_time'] ?: '15:00:00'), $tz))->format('c');
+$fxStatus = strtolower((string) ($fixture['status'] ?? ''));
+$eventStatus = match (true) {
+    str_contains($fxStatus, 'postpon') => 'https://schema.org/EventPostponed',
+    str_contains($fxStatus, 'cancel'), str_contains($fxStatus, 'abandon'), str_contains($fxStatus, 'off') => 'https://schema.org/EventCancelled',
+    default => 'https://schema.org/EventScheduled',
+};
+$homeNode = ['@type' => 'SportsTeam', 'name' => $teams['home']];
+$awayNode = ['@type' => 'SportsTeam', 'name' => $teams['away']];
 pub_jsonld([
     '@type' => 'SportsEvent',
     'name' => $teams['home'] . ' v ' . $teams['away'],
+    'url' => seo_canonical(),
     'sport' => 'Football',
     'startDate' => $startIso,
-    'eventStatus' => 'https://schema.org/EventScheduled',
-    'location' => $venue !== '' ? ['@type' => 'Place', 'name' => $venue] : null,
-    'competitor' => [
-        ['@type' => 'SportsTeam', 'name' => $teams['home']],
-        ['@type' => 'SportsTeam', 'name' => $teams['away']],
-    ],
-    'organizer' => ['@type' => 'Organization', 'name' => (string) ($fixture['competition'] ?: 'Fixture')],
+    'eventStatus' => $eventStatus,
+    'eventAttendanceMode' => 'https://schema.org/OfflineEventAttendanceMode',
+    'location' => $venue !== '' ? ['@type' => 'Place', 'name' => $venue,
+        'address' => $fixture['is_home'] ? club('ground_address') : null] : null,
+    'homeTeam' => $homeNode,
+    'awayTeam' => $awayNode,
+    'superEvent' => $compLabel !== 'Fixture' ? ['@type' => 'SportsEvent', 'name' => $compLabel] : null,
+    'description' => $matchDesc,
 ]);
 ?>
 <section class="mc-hero">
   <div class="container">
+    <h1 class="sr-only"><?= e($played && $ftHome !== null && $ftAway !== null ? $teams['home'] . ' ' . (int) $ftHome . '–' . (int) $ftAway . ' ' . $teams['away'] : $teams['home'] . ' v ' . $teams['away']) ?> — <?= e($compLabel) ?>, <?= e($dateLong) ?></h1>
     <p class="mc-hero__comp"><?= e($fixture['competition'] ?: 'Fixture') ?><?php if ($fixture['competition_stage']): ?> · <?= e($fixture['competition_stage']) ?><?php endif; ?></p>
     <div class="mc-hero__grid">
       <div class="mc-hero__team">
@@ -728,6 +761,27 @@ pub_jsonld([
         <ul class="mc-related">
           <?php foreach ($moreNews as $r): ?>
             <li><a href="<?= e(url('news/' . $r['slug'])) ?>"><?= e($r['title']) ?></a></li>
+          <?php endforeach; ?>
+        </ul>
+      </div>
+    <?php endif; ?>
+
+    <?php $links = pub_fixture_links($fixture); ?>
+    <?php if ($links['prev'] || $links['next']): ?>
+      <div class="mc-panel">
+        <h2>Previous &amp; next match</h2>
+        <ul class="mc-related">
+          <?php if ($links['prev']): ?><li><a href="<?= e(url('match/' . (int) $links['prev']['id'])) ?>" rel="prev">&larr; <?= e(pub_fixture_link_label($links['prev'])) ?></a></li><?php endif; ?>
+          <?php if ($links['next']): ?><li><a href="<?= e(url('match/' . (int) $links['next']['id'])) ?>" rel="next"><?= e(pub_fixture_link_label($links['next'])) ?> &rarr;</a></li><?php endif; ?>
+        </ul>
+      </div>
+    <?php endif; ?>
+    <?php if ($links['meetings']): ?>
+      <div class="mc-panel">
+        <h2>Other games v <?= e($fixture['opponent_name'] ?: $fixture['opponent']) ?></h2>
+        <ul class="mc-related">
+          <?php foreach ($links['meetings'] as $mt): ?>
+            <li><a href="<?= e(url('match/' . (int) $mt['id'])) ?>"><?= e(pub_fixture_link_label($mt)) ?></a></li>
           <?php endforeach; ?>
         </ul>
       </div>

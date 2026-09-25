@@ -103,13 +103,10 @@ function pub_raw(bool $on = true): void
     $GLOBALS['pub_raw'] = $on;
 }
 
-/** Attach a JSON-LD document to the page head. @param array<string,mixed> $data */
+/** Attach a JSON-LD document to the page head (call repeatedly for several). @param array<string,mixed> $data */
 function pub_jsonld(array $data): void
 {
-    set_meta(['jsonld' => (string) json_encode(
-        ['@context' => 'https://schema.org'] + $data,
-        JSON_UNESCAPED_UNICODE
-    )]);
+    $GLOBALS['pub_jsonld_docs'][] = ['@context' => 'https://schema.org'] + $data;
 }
 
 /** Path of the matched route (no base, no slashes), set by the router. */
@@ -309,6 +306,7 @@ function pub_icon(string $name): string
         'menu'      => '<path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/>',
         'close'     => '<path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/>',
         'chevron'   => '<path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>',
+        'search'    => '<circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M16 16l4.5 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/>',
         'basket'    => '<path d="M5.5 8h13l-1.2 10.2a2 2 0 0 1-2 1.8H8.7a2 2 0 0 1-2-1.8L5.5 8Zm3-.5 3-4 3 4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>',
     ];
     if (!isset($paths[$name])) {
@@ -363,7 +361,40 @@ function public_render(array $handler, array $params): void
         return;
     }
 
+    pub_send_cache_headers($status);
+
+    ob_start();
     require PUBLIC_ROOT . '/partials/head.php';
     echo $content;
     require PUBLIC_ROOT . '/partials/site_footer.php';
+    echo imgopt_filter_html((string) ob_get_clean());
+}
+
+
+/**
+ * Anonymous, read-only pages may be cached briefly by browsers/CDNs. Anything
+ * with a form/CSRF token, basket, order or a logged-in visitor stays no-store.
+ */
+function pub_send_cache_headers(int $status): void
+{
+    if ($status !== 200 || ($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET' || headers_sent()) {
+        return;
+    }
+    $route = current_route();
+    if ($route === 'contact' || preg_match('#^(shop|tickets)/(basket|checkout|order)#', $route)
+        || $route === 'tickets' || $route === 'shop' || str_starts_with($route, 'shop/p/')
+        || !empty($_SESSION['hub_user_id']) || !empty($_SESSION['user_id']) || !empty($_SESSION['shop_basket'])) {
+        return;
+    }
+    header_remove('Set-Cookie');
+    header('Cache-Control: public, max-age=60, stale-while-revalidate=300');
+    header_remove('Pragma');
+    header_remove('Expires');
+}
+
+/** Generated square icon (uploads/club/icon-{n}.png) if present, else the crest. */
+function pub_icon_url(int $size): string
+{
+    $rel = '/uploads/club/icon-' . $size . '.png';
+    return is_file(PUBLIC_ROOT . $rel) ? $rel : club_crest();
 }

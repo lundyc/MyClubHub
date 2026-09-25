@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/social_auth.php';
 require_once __DIR__ . '/render_lib.php';
+require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/lib/render_access_token.php';
 
 auth_require_json();
 
@@ -13,8 +15,9 @@ $tableStyle = in_array($requestedTableStyle, ['standard', 'compact', 'expanded']
     : 'compact';
 $renderWidth = 1080;
 $renderHeight = 1350;
-$renderUrl = 'https://lundy.me.uk/league_table_graphic.php?render=1'
+$renderUrl = APP_ORIGIN . '/admin/league_table_graphic.php?render=1'
     . '&table_style=' . rawurlencode($tableStyle)
+    . '&_token=' . rawurlencode(RENDER_ACCESS_TOKEN)
     . '&v=' . rawurlencode((string) time());
 
 $tempBase = tempnam(sys_get_temp_dir(), 'league-table-download-');

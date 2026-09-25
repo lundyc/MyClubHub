@@ -11,7 +11,6 @@ $quickLinks = [
     'Results'         => url('results'),
     'League table'    => url('table'),
     'First team'      => url('team'),
-    'Results archive' => url('club/results'),
     'Club records'    => url('club/records'),
     'Photo gallery'   => url('gallery'),
 ];

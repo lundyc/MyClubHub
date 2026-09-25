@@ -81,7 +81,8 @@ set_meta(['title' => 'Contact & find us', 'description' => 'Get in touch with ' 
 
 <div class="page">
   <div class="container contact-grid">
-    <div>
+    <div class="contact-details">
+      <h2 class="contact-details__title">Get in touch</h2>
       <ul class="contact-list">
         <?php if (club('contact_email') !== ''): ?>
           <li><span>Email</span><a href="mailto:<?= e(club('contact_email')) ?>"><?= e(club('contact_email')) ?></a></li>
@@ -89,14 +90,16 @@ set_meta(['title' => 'Contact & find us', 'description' => 'Get in touch with ' 
         <?php if (club('contact_phone') !== ''): ?>
           <li><span>Phone</span><?= e(club('contact_phone')) ?></li>
         <?php endif; ?>
-        <li><span>Ground</span><?= e(club('ground_address', club('ground_name'))) ?></li>
+        <li><span>Ground</span><?= e($groundName) ?><?= $groundAddress !== '' ? ', ' . e($groundAddress) : '' ?></li>
+        <?php if ($groundStation !== ''): ?><li><span>Nearest station</span><?= e($groundStation) ?></li><?php endif; ?>
         <?php if (club('contact_address') !== ''): ?>
           <li><span>Post</span><?= nl2br(e(club('contact_address'))) ?></li>
         <?php endif; ?>
       </ul>
-      <?php if (club('ground_maps_url') !== ''): ?>
-        <p><a class="btn btn--ghost btn--sm" href="<?= e(club('ground_maps_url')) ?>" target="_blank" rel="noopener">Directions</a></p>
-      <?php endif; ?>
+      <a class="btn btn--sm" href="<?= e($mapsUrl) ?>" target="_blank" rel="noopener">Get directions</a>
+      <div class="mapembed mapembed--side">
+        <iframe src="<?= e($mapEmbed) ?>" loading="lazy" referrerpolicy="no-referrer-when-downgrade" title="Map of <?= e($groundName) ?>"></iframe>
+      </div>
     </div>
 
     <div class="contact-form">
@@ -128,28 +131,11 @@ set_meta(['title' => 'Contact & find us', 'description' => 'Get in touch with ' 
     </div>
   </div>
 
-  <div class="container clay aboutblock">
+  <div class="container contact-find">
     <div class="prose prose--lead" id="find-us">
-      <h2 class="squad-heading" style="margin-bottom:1rem">Find us: <?= e($groundName) ?></h2>
+      <span class="eyebrow">Visiting us</span>
+      <h2 class="find-heading">Plan your visit to <?= e($groundName) ?></h2>
       <?= $groundBody !== '' ? $groundBody : '<p>Information about ' . e($groundName) . ' is coming soon.</p>' ?>
-    </div>
-
-    <aside>
-      <div class="factbox">
-        <h2>Ground</h2>
-        <dl>
-          <?php if ($groundAddress !== ''): ?><div><dt>Address</dt><dd><?= e($groundAddress) ?></dd></div><?php endif; ?>
-          <?php if ($groundStation !== ''): ?><div><dt>Nearest station</dt><dd><?= e($groundStation) ?></dd></div><?php endif; ?>
-          <?php if ($groundRecord !== ''): ?><div><dt>Record attendance</dt><dd><?= e($groundRecord) ?></dd></div><?php endif; ?>
-        </dl>
-        <a class="btn btn--sm" style="margin-top:1.1rem;width:100%;justify-content:center" href="<?= e($mapsUrl) ?>" target="_blank" rel="noopener">Get directions</a>
-      </div>
-    </aside>
-  </div>
-
-  <div class="container">
-    <div class="mapembed">
-      <iframe src="<?= e($mapEmbed) ?>" loading="lazy" referrerpolicy="no-referrer-when-downgrade" title="Map of <?= e($groundName) ?>"></iframe>
     </div>
   </div>
 </div>

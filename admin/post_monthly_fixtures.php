@@ -132,7 +132,7 @@ if ($history['duplicate']) {
     monthlyFixturesPostRespond(false, 'This Monthly Fixtures graphic has already been published to ' . ucfirst($target) . '.', 409);
 }
 
-$publicImageUrl = 'https://lundy.me.uk/export/monthly-fixtures/' . rawurlencode($fileName) . '?v=' . time();
+$publicImageUrl = APP_ORIGIN . '/admin/export/monthly-fixtures/' . rawurlencode($fileName) . '?v=' . time();
 $command = escapeshellarg($phpBinary) . ' ' . escapeshellarg(__DIR__ . '/post_to_instagram.php') . ' ' . escapeshellarg($exportPath) . ' ' . escapeshellarg($publicImageUrl) . ' ' . escapeshellarg('monthly_fixtures') . ' ' . escapeshellarg((string)$seasonId) . ' ' . escapeshellarg($caption);
 
 $output = [];

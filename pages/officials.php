@@ -16,7 +16,7 @@ if ($page) {
 }
 
 set_meta([
-    'title' => 'Club officials',
+    'title' => club('club_name') . ' Committee & Club Officials',
     'description' => club('club_name') . ' committee and club officials.',
 ]);
 ?>
@@ -38,8 +38,8 @@ set_meta([
       <div class="staff-grid" style="margin-top:<?= $intro !== '' ? '1.8rem' : '0' ?>">
         <?php foreach ($people as $person): ?>
           <div class="staffcard">
-            <div class="staffcard__photo"><span aria-hidden="true"><?= e(mb_strtoupper(mb_substr($person['name'], 0, 1))) ?></span></div>
-            <span class="staffcard__role"><?= e($person['position']) ?></span>
+            <div class="staffcard__photo"><?= pub_staff_photo_html($person) ?></div>
+            <span class="staffcard__role"><?= e(($person['label'] ?? $person['position'])) ?></span>
             <span class="staffcard__name"><?= e($person['name']) ?></span>
           </div>
         <?php endforeach; ?>

@@ -15,11 +15,12 @@ $avatar = trim((string) ($player['avatar'] ?? ''));
 $photo  = $avatar !== '' ? uploads('players/' . $avatar) : '';
 $number = $player['squad_number'] !== null ? (int) $player['squad_number'] : null;
 $age    = squad_age($player['date_of_birth'] ?? null);
+if ($age !== null && ($age < 14 || $age > 60)) { $age = null; } // implausible => treat as unknown
 $bio    = trim((string) ($player['bio'] ?? ''));
 $nat    = trim((string) ($player['nationality'] ?? ''));
 $dob    = trim((string) ($player['date_of_birth'] ?? ''));
 $joined = trim((string) ($player['joined_at'] ?? ''));
-$hasDob    = $dob !== '' && $dob !== '0000-00-00';
+$hasDob    = $dob !== '' && $dob !== '0000-00-00' && $age !== null;
 $hasJoined = $joined !== '' && $joined !== '0000-00-00';
 
 $initials = '';
@@ -49,10 +50,28 @@ foreach ($groups as $k => $list) {
 $squadLabels = ['GK' => 'Goalkeepers', 'DEF' => 'Defenders', 'MID' => 'Midfielders', 'FWD' => 'Forwards'];
 $contactEmail = club('contact_email');
 
+$clubNm = club('club_name');
+$descBits = [$player['name'] . ' — ' . strtolower((string) $player['position_label']) . ($number !== null ? ' (No. ' . $number . ')' : '') . ' for ' . $clubNm . '.'];
+if ($nat !== '') { $descBits[] = 'Nationality: ' . $nat . '.'; }
+if ($hasJoined) { $descBits[] = 'Joined ' . format_date($joined, 'F Y') . '.'; }
+$descBits[] = $bio !== '' ? excerpt(strip_tags($bio), 90) : 'Player profile, squad information and more.';
 set_meta([
-    'title' => $player['name'],
-    'description' => trim($player['position_label'] . ' — ' . club('club_name') . ' first team.'),
+    'title' => $player['name'] . ' | ' . $clubNm,
+    'title_full' => '1',
+    'description' => implode(' ', $descBits),
     'image' => $photo !== '' ? (current_url_origin() . $photo) : '',
+    'og_type' => 'profile',
+]);
+seo_breadcrumbs([['First team', url('team')], [(string) $player['name'], url('team/' . $player['slug'])]]);
+pub_jsonld([
+    '@type' => 'Person',
+    'name' => (string) $player['name'],
+    'url' => seo_canonical(),
+    'image' => $photo !== '' ? current_url_origin() . $photo : null,
+    'jobTitle' => 'Footballer — ' . $player['position_label'],
+    'nationality' => $nat,
+    'birthDate' => $hasDob ? $dob : null,
+    'memberOf' => ['@id' => current_url_origin() . '/#club'],
 ]);
 ?>
 <section class="pp-hero">
@@ -86,7 +105,8 @@ set_meta([
     </ul>
   <?php endif; ?>
 
-  <section class="pp-section pp-profile">
+  <section class="pp-section pp-profile<?= $bio === '' ? ' pp-profile--nobio' : '' ?>">
+    <?php if ($bio !== ''): ?>
     <div class="pp-profile__bio">
       <h2>Profile</h2>
       <?php if ($bio !== ''): ?>
@@ -97,9 +117,9 @@ set_meta([
           <?php endforeach; ?>
         </div>
       <?php else: ?>
-        <p class="prose pp-profile__todo">A full profile for <?= e($player['name']) ?> is on the way.</p>
       <?php endif; ?>
     </div>
+    <?php endif; ?>
     <aside class="pp-profile__data">
       <h3>Player details</h3>
       <dl class="pp-datalist">

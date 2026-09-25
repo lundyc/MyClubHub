@@ -427,7 +427,7 @@ $documentTitle = $documentTitle !== '' ? $documentTitle . ' – ' . APP_NAME : A
         ?>
         <link href="/admin/assets/css/<?= htmlspecialchars($pageStyle, ENT_QUOTES, 'UTF-8') ?>?v=<?= (int)(@filemtime($pageStylePath) ?: time()) ?>" rel="stylesheet">
     <?php endforeach; ?>
-    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" defer></script>
     <script src="/admin/assets/js/app.js?v=<?= (int)(@filemtime(__DIR__ . '/assets/js/app.js') ?: time()) ?>" defer></script>
 </head>

@@ -8,12 +8,12 @@ $totals  = pub_history_totals();
 $hasData = $scorers || $apps;
 
 set_meta([
-    'title' => 'Club records',
+    'title' => club('club_name') . ' Club Records',
     'description' => 'All-time appearances and goalscorers for ' . club('club_name') . '.',
 ]);
 ?>
 <?php partial('page_hero', [
-    'eyebrow' => 'First team',
+    'eyebrow' => 'Matches',
     'title'   => 'Club records',
     'sub'     => 'The all-time leaderboard, combining every season, team and competition on record.',
 ]); ?>

@@ -57,6 +57,13 @@
   --font-body: "Roboto", "Segoe UI", system-ui, -apple-system, sans-serif;
 
   --header-h: 68px;
+
+  /* tonal ladder: deep (utility bar + footer) > secondary (masthead) > primary (match strip) */
+  --club-deep: #2a0a11;
+  --success: #1b8a4b;
+  --warning: #b9862f;
+  --danger: #b23b3b;
+  --line-strong: #d9cbb4;
 }
 
 /* ---- Reset ----------------------------------------------------------------*/
@@ -300,9 +307,10 @@ p {
 }
 
 .utility-bar {
-  background: #2a0a11;
-  color: #c8b6bb;
+  background: var(--club-accent);
+  color: #111;
   font-size: .78rem;
+  font-weight: 500;
 }
 
 .utility-bar .container {
@@ -318,8 +326,8 @@ p {
 }
 
 .utility-bar a:hover {
-  color: #fff;
-  text-decoration: none;
+  color: var(--club-primary-ink);
+  text-decoration: underline;
 }
 
 .utility-bar__links {
@@ -1253,15 +1261,15 @@ body.nav-open {
 }
 
 .chip--W {
-  background: #1b8a4b;
+  background: var(--success);
 }
 
 .chip--D {
-  background: #b9862f;
+  background: var(--warning);
 }
 
 .chip--L {
-  background: #b23b3b;
+  background: var(--danger);
 }
 
 /* =========================================================================
@@ -1422,7 +1430,7 @@ body.nav-open {
    Footer
    ========================================================================= */
 .site-footer {
-  background: #2a0a11;
+  background: var(--club-deep);
   color: #b6a7ac;
   font-size: .9rem;
 }
@@ -1477,6 +1485,7 @@ body.nav-open {
 
 .site-footer__brand img {
   height: 54px;
+  width: auto;
   margin-bottom: .8rem;
 }
 
@@ -1734,6 +1743,21 @@ body.nav-open {
 
 .policydoc .prose {
   max-width: 74ch;
+}
+
+/* Policy title: a real page-section heading, not the small uppercase eyebrow
+   that .squad-heading uses elsewhere. */
+.policydoc>.squad-heading {
+  font-family: var(--font-head);
+  font-size: clamp(1.75rem, 4.2vw, 2.4rem);
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -.01em;
+  text-transform: none;
+  color: var(--club-primary);
+  margin: 0 0 1.5rem;
+  padding-bottom: .75rem;
+  border-bottom: 3px solid var(--club-accent);
 }
 
 /* Policies — vertical side tabs, one document shown at a time
@@ -5320,8 +5344,8 @@ a.pp-sponsor:hover {
 }
 
 .staffcard__photo {
-  width: 64px;
-  height: 64px;
+  width: 88px;
+  height: 88px;
   border-radius: 50%;
   margin-bottom: .5rem;
   background: var(--club-secondary);
@@ -7107,3 +7131,630 @@ a.pp-sponsor:hover {
 .copybtn.is-copied {
   opacity: 1;
 }
+
+
+/* =========================================================================
+   Design polish (homepage audit) — unified cards, hero, partners, footer
+   ========================================================================= */
+
+/* ---- Hero: align text to the container, calmer type, stronger scrim ---- */
+.hcard {
+  padding: 1.4rem clamp(16px, 2.4vw, 28px);
+}
+.hcard--lead {
+  padding-left: max(clamp(16px, 4vw, 32px), calc((100vw - var(--container)) / 2 + clamp(16px, 4vw, 32px)));
+  padding-bottom: 2rem;
+}
+.hcard--lead .hcard__title {
+  font-size: clamp(1.4rem, 1rem + 1.6vw, 2rem);
+  max-width: 24ch;
+  text-wrap: balance;
+  text-transform: none;
+}
+.hcard__scrim {
+  background: linear-gradient(180deg, rgba(18, 8, 11, 0) 25%, rgba(18, 8, 11, .88) 100%);
+}
+.hcard__title,
+.hcard__date {
+  text-shadow: 0 1px 6px rgba(0, 0, 0, .35);
+}
+
+/* ---- Header: slightly larger crest, roomier nav ---- */
+.brand img { height: 46px; }
+.is-stuck .brand img { height: 36px; }
+.nav-item__link,
+.nav-item__toggle { padding-inline: .85rem; }
+
+/* ---- Unified card language (results + news share border, radius, shadow) ---- */
+.matchcard,
+.newscard {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  transition: transform .12s, box-shadow .12s, border-color .12s;
+}
+.matchcard:hover,
+.newscard:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow);
+  border-color: var(--line-strong);
+  text-decoration: none;
+}
+
+/* Results: equal heights, one-line competition, fixed crest boxes */
+.results-rail { align-items: stretch; }
+.matchcard {
+  color: var(--body);
+  min-height: 176px;
+}
+.matchcard__comp {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.matchcard__row img {
+  flex: 0 0 26px;
+  width: 26px;
+  height: 26px;
+  object-fit: contain;
+}
+.matchcard__row span { min-width: 0; }
+.matchcard__pens { min-height: 1.1em; }
+.matchcard__foot { margin-top: auto; }
+
+/* News: whole card is the flex column so dates align on one baseline */
+.newscard a {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.newscard__media img { object-position: center 30%; }
+.newscard__body p {
+  margin: 0;
+  color: var(--body);
+  font-size: .93rem;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.newscard h3 {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Section header pattern used everywhere */
+.band__head { align-items: flex-end; }
+.band__head .eyebrow { display: block; margin-bottom: .3rem; }
+.linkarrow { color: var(--club-primary); }
+
+/* ---- Partners: principal row + uniform tiles ---- */
+.partners { background: var(--surface); border-top: 0; }
+.partners .container { padding-block: var(--band-y); }
+.partners__group + .partners__group { margin-top: 2.2rem; }
+.partners__label {
+  text-align: center;
+  font-family: var(--font-head);
+  font-size: .72rem;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--muted-text);
+  margin-bottom: 1rem;
+}
+.partners__grid {
+  display: grid;
+  gap: 14px;
+  justify-content: center;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+}
+.partners__grid--main {
+  grid-template-columns: repeat(auto-fit, minmax(200px, 240px));
+}
+.partners__grid > a,
+.partners__grid > span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 5 / 3;
+  padding: 12px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  transition: border-color .15s, box-shadow .15s;
+}
+.partners__grid > a:hover {
+  border-color: var(--line-strong);
+  box-shadow: var(--shadow-sm);
+  text-decoration: none;
+}
+.partners__grid img,
+.partners__grid .is-main img {
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  filter: grayscale(1);
+  opacity: .8;
+  transition: filter .15s, opacity .15s;
+}
+.partners__grid--main img { filter: none; opacity: 1; }
+.partners__grid a:hover img { filter: none; opacity: 1; }
+
+/* ---- Footer: even columns, gold hairline, better link contrast ---- */
+.site-footer { border-top: 3px solid var(--club-accent); color: #cdbfc3; }
+.site-footer .container { padding-block: clamp(32px, 4vw, 48px); }
+.site-footer__cols { grid-template-columns: 1.5fr 1fr 1fr 1fr; gap: 2.5rem; }
+.site-footer a,
+.site-footer__legal a { color: #cdbfc3; }
+.site-footer a:hover,
+.site-footer__legal a:hover { color: var(--club-accent); }
+.site-footer h4 { color: var(--club-accent); }
+.site-footer__brand p { margin-bottom: .8rem; line-height: 1.5; }
+.site-footer__tagline {
+  font-family: var(--font-head);
+  font-size: .72rem;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--club-accent);
+  margin: 0 0 .4rem;
+}
+.site-footer__bar { padding-block: 1rem; }
+.site-footer__meta span:last-child { opacity: .7; font-size: .78rem; }
+@media (max-width: 820px) {
+  .site-footer__cols { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 520px) {
+  .site-footer__cols { grid-template-columns: 1fr; }
+}
+
+/* specificity fixes for the polish block */
+.partners__grid.partners__grid--main .is-main img { filter: none; opacity: 1; }
+.site-footer__bar .container { padding-block: 0; }
+
+/* =========================================================================
+   Site-wide polish (full-site audit)
+   ========================================================================= */
+
+/* ---- Accessibility: stronger muted text + visible focus on dark surfaces -- */
+:root { --muted-text: #6a5f66; }
+.masthead :focus-visible,
+.utility-bar :focus-visible,
+.site-footer :focus-visible,
+.pagehero :focus-visible,
+.hfeature :focus-visible,
+.matchbar :focus-visible,
+.mc-hero :focus-visible,
+.pp-hero :focus-visible {
+  outline-color: var(--club-accent);
+}
+
+/* ---- One hero pattern: match + player heroes get the gold hairline ------- */
+.mc-hero,
+.pp-hero {
+  border-bottom: 2px solid var(--club-accent);
+  background: linear-gradient(180deg, var(--club-primary-ink), var(--club-secondary));
+}
+.pp-profile--nobio { grid-template-columns: minmax(0, 420px); }
+
+/* ---- Unified card language: every card type shares one treatment -------- */
+.pcard,
+.gcard,
+.prodcard,
+.partner-lead__card {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  transition: transform .12s, box-shadow .12s, border-color .12s;
+}
+.pcard:hover,
+.gcard:hover,
+.prodcard:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow);
+  border-color: var(--line-strong);
+  text-decoration: none;
+}
+.prodcard__body,
+.gcard__body { flex: 1; }
+.prodcard__cta { margin-top: auto; padding-top: .3rem; }
+.tag--muted { background: rgba(42, 10, 17, .86); color: #fff; }
+.tag--gold { background: var(--club-accent); color: var(--club-deep); }
+
+/* ---- Text scale: club prose matches article body ------------------------- */
+.prose { font-size: 1rem; line-height: 1.7; }
+.prose p { margin: 0 0 1.1em; }
+.prose,
+.policydoc { max-width: 72ch; }
+.factbox h2,
+.pp-profile__data h3,
+.mc-panel h2,
+.mc-panel h3,
+.shopnote strong {
+  font-family: var(--font-head);
+}
+.factbox dt,
+.pp-datalist dt,
+.contact-list span,
+.mc-facts dt,
+.pp-stats__k {
+  font-family: var(--font-head);
+  font-weight: 700;
+  font-size: .7rem;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--muted-text);
+}
+
+/* ---- Fixtures / results rows -------------------------------------------- */
+.fxrow--w { box-shadow: inset 3px 0 0 var(--success); }
+.fxrow--d { box-shadow: inset 3px 0 0 var(--warning); }
+.fxrow--l { box-shadow: inset 3px 0 0 var(--danger); }
+.fxfilters select { max-width: 100%; }
+.fxrow__date span { line-height: 1.3; }
+@media (min-width: 681px) {
+  /* results: give the competition its own readable line, no 3-line wrapping */
+  .fxrow__date { min-width: 0; }
+  .fxrow__date span {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+}
+@media (max-width: 680px) {
+  .fxfilters { gap: .75rem; }
+  .fxfilters label { flex: 1 1 100%; }
+  .fxfilters select { width: 100%; min-width: 0; }
+  .fxrow {
+    grid-template-columns: minmax(0, 1fr) 54px minmax(0, 1fr);
+    grid-template-areas: "date date meta" "home score away";
+    row-gap: .5rem;
+    padding: .75rem .85rem;
+  }
+  .fxrow__meta { grid-area: meta; text-align: right; }
+  .fxrow__team { flex-direction: column; gap: .3rem; align-items: center; text-align: center; font-size: .85rem; }
+  .fxrow__team--home { flex-direction: column-reverse; justify-content: center; text-align: center; }
+  .fxrow__team span { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.2; }
+  .fxrow__team img { width: 30px; height: 30px; }
+}
+
+/* ---- League table + records: fit on phones, no forced clipping ---------- */
+.leaguetable td.form .chip { width: 1.3rem; height: 1.3rem; font-size: .66rem; }
+@media (max-width: 560px) {
+  .leaguetable { min-width: 0; font-size: .84rem; }
+  .leaguetable th,
+  .leaguetable td { padding: .55rem .35rem; }
+  .leaguetable td.club { gap: .4rem; }
+  .leaguetable td.club img { width: 20px; height: 20px; }
+  .tablebar { flex-wrap: wrap; gap: .75rem; }
+  .records-grid { grid-template-columns: 1fr; }
+}
+.tablewrap { background: var(--paper); }
+
+/* ---- Squad: two-up on phones, never-blank tiles ------------------------- */
+.pcard__media img { position: absolute; inset: 0; }
+.pcard__initials { position: absolute; inset: 0; display: grid; place-items: center; }
+.pcard__body { flex: 1; }
+@media (max-width: 600px) {
+  .squad-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+  .pcard__initials { font-size: 2rem; }
+  .pcard__num { font-size: 1.7rem; }
+  .pcard__body { padding: .65rem .75rem .8rem; }
+  .pcard__name { font-size: .9rem; }
+}
+
+/* ---- Contact ------------------------------------------------------------ */
+.contact-grid { align-items: start; }
+.contact-details {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: clamp(1.25rem, 3vw, 2rem);
+}
+.contact-details__title { font-size: 1.25rem; margin: 0 0 1.1rem; }
+.contact-details .contact-list { margin-bottom: 1.4rem; }
+.contact-details .contact-list a { font-weight: 600; }
+.contact-form .field span { color: var(--ink); }
+.mapembed { margin-top: clamp(1.75rem, 4vw, 2.75rem); border-radius: var(--radius); overflow: hidden; border: 1px solid var(--line); }
+.mapembed iframe { display: block; width: 100%; min-height: 320px; border: 0; }
+.contact-find { margin-top: clamp(1.75rem, 4vw, 2.75rem); }
+
+/* ---- 404 ---------------------------------------------------------------- */
+.notfound__lead { font-family: var(--font-head); font-weight: 700; margin-bottom: 1rem; }
+.notfound__links {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 14px;
+}
+.notfound__links a {
+  display: flex;
+  flex-direction: column;
+  gap: .15rem;
+  padding: 1rem 1.15rem;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  color: var(--body);
+  transition: transform .12s, box-shadow .12s, border-color .12s;
+}
+.notfound__links a:hover { transform: translateY(-2px); box-shadow: var(--shadow); border-color: var(--line-strong); text-decoration: none; }
+.notfound__links b { font-family: var(--font-head); color: var(--club-primary); }
+.notfound__links span { font-size: .85rem; color: var(--muted-text); }
+.notfound__home { margin-top: 1.75rem; }
+
+/* ---- Partners page uses the same tile as the footer strip --------------- */
+.band--surface .partners__grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+.partners__grid > .is-text,
+.partners__grid .partners__name {
+  font-family: var(--font-head);
+  font-weight: 700;
+  font-size: .85rem;
+  text-align: center;
+  color: var(--body);
+}
+.partner-lead__card:hover { border-color: var(--line-strong); }
+
+/* ---- Shop: drop the duplicate label, tighter search --------------------- */
+.shopbar__home { display: none; }
+.shopsearch { max-width: 520px; }
+
+/* ---- Tickets: clearer steps -------------------------------------------- */
+.tkt-how li { color: var(--ink); font-weight: 500; }
+.tkt-how li span { background: var(--club-primary); color: #fff; }
+
+/* ---- Gallery: cover the empty space when a year has few albums ---------- */
+.gallery-grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr)); }
+
+/* ---- Mobile header: socials live in the menu, not above the logo -------- */
+.primary-nav__social { display: none; }
+@media (max-width: 1024px) {
+  .utility-bar { display: none; }
+  .primary-nav__social {
+    display: flex;
+    gap: 1rem;
+    padding: 1.1rem 1.25rem;
+    border-top: 1px solid rgba(255, 255, 255, .12);
+  }
+  .primary-nav__social a { color: #fff; display: inline-flex; }
+  .primary-nav__social svg { width: 22px; height: 22px; fill: currentColor; }
+}
+
+/* ---- Partners strip: collapse the long list on phones ------------------- */
+@media (max-width: 600px) {
+  .partners__grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 120px), 1fr)); gap: 10px; }
+}
+
+/* ---- Image loading: tint behind media stops layout jumps ---------------- */
+.newscard__media,
+.gcard__media,
+.prodcard__media,
+.pcard__media { background-color: var(--surface-2); }
+
+/* ---- Contact: map sits under the details card; clearer find-us heading --- */
+.mapembed--side { margin-top: 1.5rem; }
+.mapembed--side iframe { min-height: 280px; }
+.contact-find .eyebrow { display: block; margin-bottom: .3rem; }
+.find-heading { font-size: clamp(1.4rem, 1.1rem + 1.2vw, 1.75rem); margin: 0 0 1rem; }
+.mapembed--side { aspect-ratio: auto; height: 300px; }
+.mapembed--side iframe { min-height: 0; height: 100%; }
+@media (max-width: 620px) { .mapembed--side { aspect-ratio: auto; height: 280px; } }
+
+.utility-bar :focus-visible { outline-color: #111; }
+
+/* ---- Shop search lives in the shop bar ---------------------------------- */
+.shopbar .shopsearch {
+  margin: 0 0 0 auto;
+  padding-block: .4rem;
+  max-width: none;
+  flex: 0 1 340px;
+  flex-wrap: nowrap;
+  gap: .4rem;
+}
+.shopbar .shopsearch input[type="search"] {
+  flex: 1 1 auto;
+  padding: .4rem .7rem;
+  font-size: .85rem;
+}
+.shopbar .shopsearch + .shopbar__basket { margin-left: .5rem; }
+@media (max-width: 720px) {
+  .shopbar .shopsearch { order: 3; flex: 1 1 100%; margin: 0; }
+}
+
+/* ---- Shop search: icon that expands into an input ------------------------ */
+.shopbar .shopsearch {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  margin: 0 0 0 auto;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0 0 0 .85rem;
+  height: 36px;
+  transition: border-color .15s;
+}
+.shopbar .shopsearch:focus-within { border-color: var(--club-primary); }
+.shopbar .shopsearch input[type="search"] {
+  border: 0;
+  outline: 0;
+  background: transparent;
+  width: min(240px, 44vw);
+  padding: 0;
+  font-size: .85rem;
+  transition: width .2s ease;
+}
+.shopbar .shopsearch__btn {
+  display: inline-grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--club-primary);
+  cursor: pointer;
+}
+.shopbar .shopsearch__btn:hover { background: var(--surface-2); }
+.shopbar .shopsearch__btn svg { width: 19px; height: 19px; }
+.shopbar .shopsearch__clear { font-size: .78rem; margin-right: .35rem; white-space: nowrap; }
+/* collapsed: just the icon, no box */
+.shopbar .shopsearch.is-collapsed { background: transparent; border-color: transparent; padding-left: 0; }
+.shopbar .shopsearch.is-collapsed input[type="search"] { width: 0; }
+.shopbar .shopsearch.is-collapsed:hover .shopsearch__btn { background: var(--surface-2); }
+@media (max-width: 720px) {
+  .shopbar .shopsearch { order: 0; flex: 0 0 auto; margin-left: auto; }
+  .shopbar .shopsearch input[type="search"] { width: min(180px, 40vw); }
+}
+
+/* ---- Shop list heading --------------------------------------------------- */
+.shoplist-head { margin-bottom: 1.5rem; }
+.shoplist-head__count { font-size: .82rem; color: var(--muted-text); }
+.shopbar .shopsearch ~ .shopbar__basket { margin-left: .5rem; }
+
+/* ---- Breadcrumbs live in the shop bar (product page) -------------------- */
+.shopbar__crumbs {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: .4rem;
+  min-width: 0;
+}
+.shopbar__crumbs a { color: var(--body); font-weight: 600; }
+.shopbar__crumbs span[aria-current] { color: var(--ink); font-weight: 700; }
+.shopbar__crumbs .crumbs__sep { color: var(--muted-text); }
+.pdp { margin-top: 0; }
+
+/* ---- Partners page call-to-action --------------------------------------- */
+.btn--gold {
+  --btn-bg: var(--club-accent);
+  --btn-fg: var(--club-deep);
+}
+.btn--gold:hover {
+  background: #f0c94a;
+  border-color: #f0c94a;
+  color: var(--club-deep);
+}
+.partner-cta {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  gap: clamp(1.75rem, 4vw, 3.25rem);
+  align-items: center;
+  padding: clamp(1.75rem, 5vw, 3.25rem);
+  border-radius: var(--radius);
+  border-top: 4px solid var(--club-accent);
+  color: #ecdde0;
+  overflow: hidden;
+  background:
+    radial-gradient(90% 120% at 100% 0%, rgba(224, 180, 42, .16), transparent 55%),
+    linear-gradient(135deg, var(--club-primary-ink), var(--club-deep));
+  box-shadow: var(--shadow);
+}
+.partner-cta .eyebrow { color: var(--club-accent); display: block; margin-bottom: .5rem; }
+.partner-cta h2 {
+  color: #fff;
+  font-size: clamp(1.5rem, 1.1rem + 1.6vw, 2.15rem);
+  margin: 0 0 .9rem;
+  text-wrap: balance;
+}
+.partner-cta p { margin: 0 0 1.5rem; max-width: 52ch; font-size: 1.02rem; }
+.partner-cta__actions { display: flex; flex-wrap: wrap; gap: .75rem; }
+.partner-cta__actions .btn--ghost { color: #fff; }
+.partner-cta__packages {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: .6rem;
+}
+.partner-cta__packages li {
+  display: flex;
+  flex-direction: column;
+  gap: .1rem;
+  padding: .75rem 1rem .75rem 1.15rem;
+  background: rgba(255, 255, 255, .06);
+  border: 1px solid rgba(255, 255, 255, .12);
+  border-left: 3px solid var(--club-accent);
+  border-radius: var(--radius-sm);
+}
+.partner-cta__packages b { font-family: var(--font-head); color: #fff; font-size: .95rem; }
+.partner-cta__packages span { font-size: .85rem; color: #d9c6ca; }
+@media (max-width: 860px) {
+  .partner-cta { grid-template-columns: 1fr; }
+}
+
+/* Packages rotate one at a time: the old one slides down and fades out while the
+   next drops in from above (JS adds .is-rotating; without it the list shows in full) */
+.partner-cta__packages.is-rotating { display: grid; overflow: hidden; }
+.partner-cta__packages.is-rotating li {
+  grid-area: 1 / 1;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-22px);
+  transition: opacity .7s ease, transform .7s ease, visibility 0s linear .7s;
+  padding: 1.1rem 1.3rem 1.1rem 1.4rem;
+}
+.partner-cta__packages.is-rotating li.is-active {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+  transition: opacity .7s ease, transform .7s ease, visibility 0s;
+}
+.partner-cta__packages.is-rotating li.is-leaving {
+  opacity: 0;
+  visibility: visible;
+  transform: translateY(22px);
+  transition: opacity .7s ease, transform .7s ease, visibility 0s linear .7s;
+}
+.partner-cta__packages.is-rotating b { font-size: 1.15rem; }
+.partner-cta__packages.is-rotating span { font-size: .95rem; }
+
+/* ---- About page: story headings from the club_pages "history" body -------- */
+.about-story__eyebrow { display: block; margin-bottom: .5rem; }
+.about-story__body { max-width: 70ch; }
+.about-story__body > h2:first-child { margin-top: 0; font-size: clamp(1.6rem, 1.2rem + 1.6vw, 2.1rem); }
+.about-story__body h3 {
+  margin: 2.2rem 0 .8rem;
+  padding-top: 1.1rem;
+  border-top: 1px solid var(--line);
+  font-size: 1.3rem;
+  color: var(--club-primary);
+  position: relative;
+}
+.about-story__body h3::before {
+  content: "";
+  position: absolute;
+  top: -1px;
+  left: 0;
+  width: 44px;
+  height: 3px;
+  background: var(--club-accent);
+}
+.about-story__body > p:last-child {
+  margin-top: 2rem;
+  padding: 1rem 1.25rem;
+  border-left: 4px solid var(--club-accent);
+  background: var(--surface);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  font-family: var(--font-head);
+  color: var(--club-primary);
+  font-size: 1.05rem;
+}
+
+/* Breadcrumbs (seo_breadcrumb_html) */
+.breadcrumbs{background:var(--surface,#fff);border-bottom:1px solid rgba(0,0,0,.08);font-size:.8125rem}
+.breadcrumbs ol{display:flex;flex-wrap:wrap;gap:.25rem;list-style:none;margin:0;padding:.6rem 0}
+.breadcrumbs li+li::before{content:"/";margin-right:.25rem;opacity:.5}
+.breadcrumbs a{text-decoration:underline;text-underline-offset:2px}
+.breadcrumbs [aria-current]{opacity:.75}

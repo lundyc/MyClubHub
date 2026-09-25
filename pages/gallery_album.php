@@ -29,6 +29,7 @@ set_meta([
             (!empty($album['album_date']) ? ' (' . format_date($album['album_date'], 'F Y') . ')' : ''),
     'image' => $album['cover_path'] ? current_url_origin() . uploads($album['cover_path']) : '',
 ]);
+seo_breadcrumbs([['Gallery', url('gallery')], [(string) $album['title'], url('gallery/' . $album['slug'])]]);
 ?>
 <?php partial('page_hero', [
     'back'  => ['href' => url('gallery'), 'label' => 'All albums'],

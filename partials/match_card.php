@@ -17,7 +17,7 @@ $awayScore = $played ? (int) $fixture['full_time_away_score'] : null;
 $href = url('match/' . (int) $fixture['id']);
 ?>
 <a class="matchcard" href="<?= e($href) ?>">
-  <span class="matchcard__comp"><?= e($fixture['competition'] ?: 'Fixture') ?></span>
+  <span class="matchcard__comp" title="<?= e($fixture['competition'] ?: 'Fixture') ?>"><?= e($fixture['competition'] ?: 'Fixture') ?></span>
 
   <div class="matchcard__row">
     <?php if ($homeCrest !== ''): ?><img src="<?= e($homeCrest) ?>" alt=""><?php endif; ?>

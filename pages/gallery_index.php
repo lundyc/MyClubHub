@@ -42,7 +42,7 @@ foreach ($albums as $a) {
               <span class="gcard__body">
                 <span class="gcard__title"><?= e($a['title']) ?></span>
                 <?php if (!empty($a['album_date'])): ?>
-                  <span class="gcard__date"><?= e(format_date($a['album_date'], 'j M Y')) ?></span>
+                  <span class="gcard__date"><?= e(format_date($a['album_date'], 'D j M Y')) ?></span>
                 <?php endif; ?>
               </span>
             </a>

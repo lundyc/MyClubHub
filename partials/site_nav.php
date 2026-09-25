@@ -22,7 +22,6 @@ $nav = [
         'Fixtures'        => url('fixtures'),
         'Results'         => url('results'),
         'League table'    => url('table'),
-        'Results archive' => url('club/results'),
         'Club records'    => url('club/records'),
     ]],
     ['route' => null,    'label' => 'Club',    'href' => url('club/history'), 'sections' => ['club', 'contact', 'privacy', 'gallery'], 'except' => ['club/results', 'club/records'], 'children' => [
@@ -89,4 +88,13 @@ $childActive = static function (string $href) use ($curPath): bool {
       </li>
     <?php endforeach; ?>
   </ul>
+
+  <?php $navSocial = pub_social_links(); ?>
+  <?php if ($navSocial): ?>
+    <div class="primary-nav__social">
+      <?php foreach ($navSocial as $network => $href): ?>
+        <a href="<?= e($href) ?>" aria-label="<?= e(ucfirst($network)) ?>" rel="noopener" target="_blank"><?= pub_icon($network) ?></a>
+      <?php endforeach; ?>
+    </div>
+  <?php endif; ?>
 </nav>
