@@ -287,6 +287,13 @@ function ensureHubPositionsSchema(PDO $pdo): void
         return;
     }
 
+    // Renamed to club_roles by migration 2026_09_25_001; hub_positions is now a
+    // compatibility view, so there is no schema left to ensure.
+    if ((bool) $pdo->query("SHOW TABLES LIKE 'club_roles'")->fetchColumn()) {
+        $done = true;
+        return;
+    }
+
     $pdo->exec("CREATE TABLE IF NOT EXISTS hub_positions (
         id INT UNSIGNED NOT NULL AUTO_INCREMENT,
         name VARCHAR(100) NOT NULL,

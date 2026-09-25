@@ -17,6 +17,12 @@ function ensurePersonPositionsDateSchema(PDO $pdo): void
     if (!$tableExists) {
         return;
     }
+    // After the access-model rename person_positions is a compatibility view
+    // over person_club_roles (migration 2026_09_25_001), which already has the
+    // date columns and index; nothing to add, and ALTER TABLE on a view fails.
+    if ((bool) $pdo->query("SHOW TABLES LIKE 'person_club_roles'")->fetchColumn()) {
+        return;
+    }
 
     $columns = [];
     foreach ($pdo->query('SHOW COLUMNS FROM person_positions') as $row) {
