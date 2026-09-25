@@ -2251,6 +2251,40 @@ body.nav-open {
   font-style: italic;
 }
 
+/* Quotes inside news articles: a pull-quote panel with a large gold mark. */
+.article__main blockquote {
+  position: relative;
+  margin: 2rem 0;
+  padding: 2.6rem 1.6rem 1.4rem 1.8rem;
+  background: var(--surface);
+  border-left: 5px solid var(--club-primary);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  font-style: normal;
+  color: var(--ink);
+}
+
+.article__main blockquote::before {
+  content: "\201C";
+  position: absolute;
+  top: 0.35rem;
+  left: 1.2rem;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 4.2rem;
+  line-height: 1;
+  color: var(--club-accent);
+}
+
+.article__main blockquote p {
+  margin: 0 0 1rem;
+  font-size: 1.08em;
+  line-height: 1.7;
+  font-style: italic;
+}
+
+.article__main blockquote p:last-child {
+  margin-bottom: 0;
+}
+
 .prose table {
   width: 100%;
   border-collapse: collapse;
