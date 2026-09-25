@@ -34,7 +34,7 @@ $currentRole = $currentUser['role'] ?? 'guest';
 // handful of pages already gated by the separate role-based
 // tickets.*/pos.* permission layer, which grants volunteer/staff a
 // ticket-ops baseline independent of committee position).
-if (in_array($currentRole, ['volunteer', 'staff'], true) && !in_array($currentScript, HUB_PAGE_GATE_EXEMPT, true)) {
+if (in_array($currentRole, ['volunteer', 'staff'], true) && !hub_auth_is_admin() && !in_array($currentScript, HUB_PAGE_GATE_EXEMPT, true)) {
     $roleCapabilities = HUB_PAGE_CAPABILITIES[$currentScript] ?? null;
     if ($roleCapabilities === null || !hub_auth_has_any_capability($roleCapabilities)) {
         http_response_code(403);

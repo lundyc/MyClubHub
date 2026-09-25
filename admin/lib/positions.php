@@ -148,6 +148,7 @@ const HUB_PAGE_CAPABILITIES = [
     'season_ticket_types.php' => ['tickets_ops'],
     'ticket_packages.php' => ['tickets_ops'],
     'complimentary_admission.php' => ['tickets_refund_comp'],
+    'access_review.php' => ['admin_settings'],
     'fixture_ticketing_dashboard.php' => ['tickets_ops'],
     'scan_overview.php' => ['tickets_ops'],
     'season_pass_rules.php' => ['tickets_ops'],
