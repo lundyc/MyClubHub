@@ -2,10 +2,11 @@
 
 // PHASE3B_GUARD_MARKER
 require_once __DIR__ . '/auth.php';
-if (!hub_auth_has_capability('finance_manage')) {
+if (!hub_auth_has_any_capability(['sponsorship', 'finance_manage'])) {
     http_response_code(403);
     exit('Access denied.');
 }
+$canRecordPayments = hub_auth_has_capability('finance_manage');
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/lib/functions.php';
 require_once __DIR__ . '/lib/sponsorship_catalog.php';
@@ -26,7 +27,7 @@ $slot        = $_POST['slot'] ?? '';
 $sponsor     = (int)($_POST['sponsor_id'] ?? 0);
 $amount      = (float)($_POST['amount'] ?? 0);
 $is_free     = isset($_POST['is_free']) ? 1 : 0;
-$add_payment = (float)($_POST['add_payment'] ?? 0);
+$add_payment = $canRecordPayments ? (float)($_POST['add_payment'] ?? 0) : 0.0;
 $notes       = trim($_POST['notes'] ?? '');
 
 if (!$player_id || !in_array($slot, $allowedSlots, true)) {
@@ -36,6 +37,10 @@ if (!$player_id || !in_array($slot, $allowedSlots, true)) {
 
 try {
           $pdo->beginTransaction();
+
+          if (!$canRecordPayments) {
+                    assertSponsorshipEditable($pdo, $seasonId);
+          }
 
           // check existing sponsorship
           $stmt = $pdo->prepare("SELECT id FROM sponsorships WHERE player_id=:pid AND slot=:slot AND season_id = :season_id AND ended_at IS NULL");

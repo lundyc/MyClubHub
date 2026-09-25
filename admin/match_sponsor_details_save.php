@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 // PHASE3B_GUARD_MARKER
 require_once __DIR__ . '/auth.php';
-if (!hub_auth_has_capability('finance_manage')) {
+if (!hub_auth_has_any_capability(['sponsorship', 'finance_manage'])) {
     http_response_code(403);
     exit('Access denied.');
 }
+$canRecordPayments = hub_auth_has_capability('finance_manage');
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/lib/functions.php';

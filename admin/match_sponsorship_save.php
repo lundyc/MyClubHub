@@ -2,10 +2,11 @@
 
 // PHASE3B_GUARD_MARKER
 require_once __DIR__ . '/auth.php';
-if (!hub_auth_has_capability('finance_manage')) {
+if (!hub_auth_has_any_capability(['sponsorship', 'finance_manage'])) {
     http_response_code(403);
     exit('Access denied.');
 }
+$canRecordPayments = hub_auth_has_capability('finance_manage');
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/lib/functions.php';
 require_once __DIR__ . '/lib/match_sponsorship.php';
@@ -25,7 +26,7 @@ if (!csrf_check()) {
 $fixtureId = (int)($_POST['fixture_id'] ?? 0);
 $sponsorId = (int)($_POST['sponsor_id'] ?? 0);
 $notes = trim($_POST['notes'] ?? '');
-$markPaid = isset($_POST['mark_paid']) && (string)$_POST['mark_paid'] === '1';
+$markPaid = $canRecordPayments && isset($_POST['mark_paid']) && (string)$_POST['mark_paid'] === '1';
 $isComplimentary = isset($_POST['is_complimentary']) && (string)$_POST['is_complimentary'] === '1';
 $postedRoles = $_POST['sponsorship_roles'] ?? [];
 if (!is_array($postedRoles)) {

@@ -2,10 +2,11 @@
 
 // PHASE3B_GUARD_MARKER
 require_once __DIR__ . '/auth.php';
-if (!hub_auth_has_capability('finance_manage')) {
+if (!hub_auth_has_any_capability(['sponsorship', 'finance_manage'])) {
     http_response_code(403);
     exit('Access denied.');
 }
+$canRecordPayments = hub_auth_has_capability('finance_manage');
 // sponsor_ajax.php — handles slot & payment actions
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/lib/functions.php';
@@ -28,6 +29,12 @@ if (!isset($pdo)) {
 }
 
 $action = $_POST['action'] ?? '';
+
+if (!$canRecordPayments && in_array($action, ['add_payment', 'delete_payment', 'mark_sponsor_paid', 'unmark_sponsor_paid'], true)) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'You do not have permission to record payments.']);
+    exit;
+}
 
 try {
     switch ($action) {

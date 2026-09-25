@@ -3,7 +3,7 @@
 $pageHero = [];
 require_once __DIR__ . '/header.php';
 require_once __DIR__ . '/lib/functions.php';
-require_once __DIR__ . '/sync_social_directory.php';
+require_once __DIR__ . '/lib/social_directory_sync.php';
 require_once __DIR__ . '/lib/sponsorship_catalog.php';
 require_once __DIR__ . '/lib/facebook_page_resolver.php';
 require_once __DIR__ . '/lib/match_sponsorship.php';

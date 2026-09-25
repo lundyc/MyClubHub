@@ -2,10 +2,11 @@
 
 // PHASE3B_GUARD_MARKER
 require_once __DIR__ . '/auth.php';
-if (!hub_auth_has_capability('finance_manage')) {
+if (!hub_auth_has_any_capability(['sponsorship', 'finance_manage'])) {
     http_response_code(403);
     exit('Access denied.');
 }
+$canRecordPayments = hub_auth_has_capability('finance_manage');
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/lib/functions.php';
 require_once __DIR__ . '/lib/match_sponsorship.php';
@@ -26,7 +27,7 @@ $id = (int)($_POST['id'] ?? 0);
 $sponsorId = (int)($_POST['sponsor_id'] ?? 0);
 $amount = isset($_POST['amount']) && $_POST['amount'] !== '' ? (float)$_POST['amount'] : null;
 $notes = trim((string)($_POST['notes'] ?? ''));
-$paid = isset($_POST['paid']) && (string)$_POST['paid'] === '1';
+$paid = $canRecordPayments && isset($_POST['paid']) && (string)$_POST['paid'] === '1';
 $isComplimentary = isset($_POST['is_complimentary']) && (string)$_POST['is_complimentary'] === '1';
 
 if ($id <= 0) {
@@ -101,7 +102,9 @@ try {
 
           recomputeMatchPaidFlag($pdo, $id);
 
-          if ($paid) {
+          if (!$canRecordPayments) {
+                    // payment state is finance_manage only; leave it untouched
+          } elseif ($paid) {
                     markMatchSponsorshipPaid($pdo, $id);
           } elseif ($paidTotal > 0.0001) {
                     unpayMatchSponsorship($pdo, $id);

@@ -2,15 +2,15 @@
 
 // PHASE3B_GUARD_MARKER
 require_once __DIR__ . '/auth.php';
-if (!hub_auth_has_capability('finance_manage')) {
+if (!hub_auth_has_any_capability(['sponsorship', 'finance_manage'])) {
     http_response_code(403);
     exit('Access denied.');
 }
+$canRecordPayments = hub_auth_has_capability('finance_manage');
 // sponsor_save.php — handle sponsor actions (AJAX-friendly)
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/lib/functions.php';
 require_once __DIR__ . '/lib/sponsorship_catalog.php';
-require_once __DIR__ . '/sync_social_directory.php';
 
 header('Content-Type: application/json');
 
@@ -43,7 +43,7 @@ try {
                     $slot = strtolower(trim($_POST['slot'] ?? ''));
                     $amount = (float)($_POST['amount'] ?? 0);
                     $notes = trim($_POST['notes'] ?? '');
-                    $mark_paid = isset($_POST['mark_paid']) && (int)$_POST['mark_paid'] === 1;
+                    $mark_paid = $canRecordPayments && isset($_POST['mark_paid']) && (int)$_POST['mark_paid'] === 1;
 
                     if ($season_id <= 0) {
                               throw new Exception("Invalid season selected");
@@ -59,6 +59,10 @@ try {
 
                     if ($player_id <= 0) {
                               throw new HubFieldValidationException('player_id', "Invalid player selected");
+                    }
+
+                    if (!$canRecordPayments) {
+                              assertSponsorshipEditable($pdo, $season_id);
                     }
 
                     $allowedSlots = getAllowedSponsorshipSlots($pdo, $season_id);
@@ -188,6 +192,9 @@ try {
           }
 
           if ($action === 'add_payment') {
+                    if (!$canRecordPayments) {
+                              throw new Exception('You do not have permission to record payments.');
+                    }
                     $amount = (float)($_POST['amount'] ?? 0);
                     $method = trim($_POST['method'] ?? '');
                     $note   = trim($_POST['note'] ?? '');
