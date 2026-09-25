@@ -1007,11 +1007,11 @@ $reportTypeCapability = [
     'appearances' => ['matchday'],
     'match_events' => ['matchday'],
     'results_summary' => ['matchday'],
-    'roster' => ['finance', 'matchday'],
-    'season_tickets' => ['finance', 'tickets_ops'],
-    'season_ticket_comparison' => ['finance', 'tickets_ops'],
+    'roster' => ['finance_view', 'matchday'],
+    'season_tickets' => ['finance_view', 'tickets_ops'],
+    'season_ticket_comparison' => ['finance_view', 'tickets_ops'],
 ];
-$defaultReportCapability = ['finance'];
+$defaultReportCapability = ['finance_view'];
 
 $reportType = (string)($_GET['report_type'] ?? 'portfolio');
 if (!isset($REPORTS[$reportType])) {

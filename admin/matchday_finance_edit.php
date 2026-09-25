@@ -18,7 +18,7 @@ require_once __DIR__ . '/header.php';
 require_once __DIR__ . '/lib/matchday_finance.php';
 require_once __DIR__ . '/lib/audit.php';
 
-if (!hub_auth_is_admin() && !hub_auth_has_any_capability(['finance', 'matchday'])) {
+if (!hub_auth_is_admin() && !hub_auth_has_any_capability(['finance_manage', 'matchday'])) {
     http_response_code(403);
     echo '<div><div class="alert alert-danger">You do not have permission to view this page.</div></div>';
     require __DIR__ . '/footer.php';

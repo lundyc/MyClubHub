@@ -18,12 +18,12 @@ $showMobileNav = !in_array($currentScript, ['login.php', 'forgot_password.php', 
  * time. Order here mirrors how often each area is used day-to-day.
  */
 $mobileNavCandidates = [
-    ['caps' => ['matchday', 'tickets_ops', 'finance'], 'pages' => ['matches.php', 'match.php', 'match_starting_11.php', 'match_events.php'], 'feature' => 'matchday.matches', 'href' => '/admin/matches.php', 'icon' => 'fa-futbol', 'label' => 'Match day'],
+    ['caps' => ['matchday', 'tickets_ops', 'finance_view'], 'pages' => ['matches.php', 'match.php', 'match_starting_11.php', 'match_events.php'], 'feature' => 'matchday.matches', 'href' => '/admin/matches.php', 'icon' => 'fa-futbol', 'label' => 'Match day'],
     ['caps' => ['matchday'], 'pages' => ['players.php', 'player_view.php', 'player_edit.php', 'player_add.php'], 'feature' => 'matchday.players', 'href' => '/admin/players.php', 'icon' => 'fa-users', 'label' => 'Players'],
-    ['caps' => ['finance'], 'pages' => ['sponsors.php', 'sponsor.php', 'sponsorship_agreements.php', 'sponsorship_agreement.php'], 'feature' => 'sponsorship.sponsors', 'href' => '/admin/sponsors.php', 'icon' => 'fa-handshake', 'label' => 'Sponsors'],
+    ['caps' => ['finance_view'], 'pages' => ['sponsors.php', 'sponsor.php', 'sponsorship_agreements.php', 'sponsorship_agreement.php'], 'feature' => 'sponsorship.sponsors', 'href' => '/admin/sponsors.php', 'icon' => 'fa-handshake', 'label' => 'Sponsors'],
     ['caps' => ['shop'], 'pages' => ['shop_overview.php', 'shop_orders.php', 'shop_order.php', 'shop_products.php'], 'feature' => 'shop.shop_overview', 'href' => '/admin/shop_overview.php', 'icon' => 'fa-bag-shopping', 'label' => 'Shop'],
     ['caps' => ['tickets_ops'], 'pages' => ['fixture_tickets.php', 'ticket_orders.php', 'season_ticket_orders.php'], 'feature' => 'ticketing.fixture_tickets', 'href' => '/admin/fixture_tickets.php', 'icon' => 'fa-cash-register', 'label' => 'Tickets'],
-    ['caps' => ['finance', 'matchday'], 'pages' => ['reports.php', 'matchday_finance.php', 'matchday_finance_edit.php'], 'feature' => 'finance.reports', 'href' => '/admin/reports.php', 'icon' => 'fa-sterling-sign', 'label' => 'Finance'],
+    ['caps' => ['finance_view', 'matchday'], 'pages' => ['reports.php', 'matchday_finance.php', 'matchday_finance_edit.php'], 'feature' => 'finance.reports', 'href' => '/admin/reports.php', 'icon' => 'fa-sterling-sign', 'label' => 'Finance'],
     ['caps' => ['secretary_ops'], 'pages' => ['secretary_dashboard.php', 'discipline_register.php', 'secretary_tasks.php'], 'feature' => 'secretary.secretary_dashboard', 'href' => '/admin/secretary_dashboard.php', 'icon' => 'fa-user-tie', 'label' => 'Secretary'],
     ['caps' => ['website'], 'pages' => ['news.php', 'news_edit.php', 'club_pages.php'], 'feature' => 'website.news', 'href' => '/admin/news.php', 'icon' => 'fa-newspaper', 'label' => 'Website'],
 ];

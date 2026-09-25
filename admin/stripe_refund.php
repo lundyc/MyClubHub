@@ -7,7 +7,7 @@ require_once __DIR__ . '/lib/stripe.php';
 
 header('Content-Type: application/json');
 
-if (!hub_auth_has_capability('finance')) {
+if (!hub_auth_has_capability('finance_manage')) {
     http_response_code(403);
     echo json_encode(['ok' => false, 'error' => 'You do not have permission to issue refunds.']);
     exit;

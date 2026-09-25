@@ -19,7 +19,7 @@ require_once __DIR__ . '/lib/matchday_finance.php';
 // Delegable to the treasurer (finance) or the match secretary (matchday);
 // admins always pass. header.php already denies volunteers/staff who hold
 // neither capability, but keep an explicit guard here too.
-if (!hub_auth_is_admin() && !hub_auth_has_any_capability(['finance', 'matchday'])) {
+if (!hub_auth_is_admin() && !hub_auth_has_any_capability(['finance_view', 'matchday'])) {
     http_response_code(403);
     echo '<div><div class="alert alert-danger">You do not have permission to view this page.</div></div>';
     require __DIR__ . '/footer.php';

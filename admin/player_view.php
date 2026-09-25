@@ -24,7 +24,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && isset($_POST['ajax_delet
         echo json_encode(['success' => false, 'error' => 'Please log in again.']);
         exit;
     }
-    if (!hub_auth_has_capability('finance')) {
+    if (!hub_auth_has_capability('finance_manage')) {
         http_response_code(403);
         echo json_encode(['success' => false, 'error' => 'You do not have permission to delete payments.']);
         exit;

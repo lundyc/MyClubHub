@@ -36,7 +36,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                 exit;
             }
             if ($action === 'refund_order') {
-                if (!hub_auth_has_capability('tickets_ops') && !hub_auth_has_capability('finance')) {
+                if (!hub_auth_has_any_capability(['tickets_refund_comp', 'finance_manage'])) {
                     throw new RuntimeException('You do not have permission to refund ticket orders.');
                 }
                 refundMatchTicketOrder($pdo, $orderId, (string) ($_POST['reason'] ?? ''), $userId);

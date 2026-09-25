@@ -215,7 +215,7 @@ function invoices_mark_paid(PDO $pdo, int $id): void
 /**
  * True if the current actor has the same access the host page an invoice was
  * raised from would require — sponsorship agreements and player sponsorship
- * orders need the 'finance' capability, shop orders need full admin, match
+ * orders need the 'finance_view' capability, shop orders need full admin, match
  * ticket and season pass orders need the 'tickets.view' permission. Without
  * this, invoice_pdf.php etc. would only check "is a logged-in Hub user" —
  * weaker than the record itself, since a volunteer with no finance access
@@ -241,7 +241,7 @@ function invoices_has_source_access(PDO $pdo, array $invoice): bool
         return false;
     }
     return match ($sourceType) {
-        'sponsorship_agreement', 'player_sponsorship_order' => hub_auth_has_capability('finance'),
+        'sponsorship_agreement', 'player_sponsorship_order' => hub_auth_has_capability('finance_view'),
         'shop_order' => hub_auth_is_admin(),
         'match_ticket_order', 'season_pass_order' => hub_auth_has_capability('tickets_ops'),
         default => hub_auth_is_admin(),

@@ -18,7 +18,8 @@ const HUB_CAPABILITIES = [
     'club_setup' => 'Club setup (seasons, opponents, competitions, venues, facilities)',
     'sponsorship' => 'Sponsorship (sponsors, follow-ups, agreements, bundles, packages)',
     'fundraising' => 'Fundraising (Hidden Team)',
-    'finance' => 'Finance (reports, matchday income, Stripe, refunds)',
+    'finance_view' => 'Finance - view (reports, matchday income, Stripe dashboard, exports)',
+    'finance_manage' => 'Finance - manage (record/edit payments, payment links, refunds, recalculate)',
     'tickets_ops' => 'Ticketing & gate operations (incl. POS)',
     'shop' => 'Club shop (orders, products, storefront settings)',
     'secretary_ops' => 'Secretary & club administration (discipline, registrations, correspondence, governance)',
@@ -41,11 +42,11 @@ const HUB_CAPABILITIES = [
 const HUB_PAGE_CAPABILITIES = [
     'pdf_importer.php' => ['matchday'], // Temporary historical importer.
     // Cross-club overview
-    'club_reminders.php' => ['finance', 'matchday', 'club_setup', 'tickets_ops', 'secretary_ops'],
+    'club_reminders.php' => ['finance_view', 'matchday', 'club_setup', 'tickets_ops', 'secretary_ops'],
 
     // Finance / Stripe (already gated)
-    'stripe_dashboard.php' => ['finance'],
-    'stripe_refund.php' => ['finance'],
+    'stripe_dashboard.php' => ['finance_view'],
+    'stripe_refund.php' => ['finance_manage'],
 
     // Content & social media tools (already gated)
     'facebook_diagnostics.php' => ['content_social'],
@@ -67,9 +68,9 @@ const HUB_PAGE_CAPABILITIES = [
     'match_player_of_match.php' => ['matchday'],
     // Matchday balance sheet: recorded by the treasurer or matchday staff,
     // so either capability grants access.
-    'matchday_finance.php' => ['finance', 'matchday'],
-    'matchday_finance_edit.php' => ['finance', 'matchday'],
-    'matchday_finance_export.php' => ['finance', 'matchday'],
+    'matchday_finance.php' => ['finance_view', 'matchday'],
+    'matchday_finance_edit.php' => ['finance_manage', 'matchday'],
+    'matchday_finance_export.php' => ['finance_view', 'matchday'],
     'matches.php' => ['matchday'],
     'stats.php' => ['matchday'],
     'monthly_fixtures.php' => ['matchday'],
@@ -131,9 +132,9 @@ const HUB_PAGE_CAPABILITIES = [
     'hidden_team_games.php' => ['fundraising'],
 
     // Finance — payments not already covered above
-    'match_payment_delete.php' => ['finance'],
-    'payment_add.php' => ['finance'],
-    'payment_edit.php' => ['finance'],
+    'match_payment_delete.php' => ['finance_manage'],
+    'payment_add.php' => ['finance_manage'],
+    'payment_edit.php' => ['finance_manage'],
 
     // Ticketing & gate operations — includes the pages that used to sit on
     // the separate RBAC permission layer (lib/permissions.php); that layer
@@ -146,7 +147,7 @@ const HUB_PAGE_CAPABILITIES = [
     'season_ticket_type.php' => ['tickets_ops'],
     'season_ticket_types.php' => ['tickets_ops'],
     'ticket_packages.php' => ['tickets_ops'],
-    'complimentary_admission.php' => ['tickets_ops'],
+    'complimentary_admission.php' => ['tickets_refund_comp'],
     'fixture_ticketing_dashboard.php' => ['tickets_ops'],
     'scan_overview.php' => ['tickets_ops'],
     'season_pass_rules.php' => ['tickets_ops'],
@@ -324,7 +325,7 @@ function ensureHubPositionsSchema(PDO $pdo): void
             ['Chairman', 'committee', []],
             ['Vice Chairman', 'committee', []],
             ['Secretary', 'committee', []],
-            ['Treasurer', 'committee', ['finance']],
+            ['Treasurer', 'committee', ['finance_view', 'finance_manage']],
             ['Committee Member', 'committee', []],
         ];
         foreach ($positions as $i => [$name, $department, $capabilities]) {

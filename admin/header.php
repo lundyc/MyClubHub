@@ -501,14 +501,14 @@ $documentTitle = $documentTitle !== '' ? $documentTitle . ' – ' . APP_NAME : A
                                 <?php if (hub_navigation_item_visible('overview.developer_analytics')): ?><li class="nav-item"><a class="nav-link <?= activePage('developer_analytics.php') ?>"<?= hub_nav_current(['developer_analytics.php']) ?> href="/admin/developer_analytics.php"><i class="fa-solid fa-chart-line me-1" aria-hidden="true"></i>Product analytics</a></li><?php endif; ?>
                             <?php endif; ?>
                             <?php if (hub_navigation_item_visible('overview.index')): ?><li class="nav-item"><a class="nav-link <?= activePage('index.php') ?>"<?= hub_nav_current(['index.php']) ?> href="/admin/index.php"><i class="fa-solid fa-house me-1" aria-hidden="true"></i>Club overview</a></li><?php endif; ?>
-                            <?php if (hub_auth_has_any_capability(['finance', 'matchday', 'club_setup', 'tickets_ops', 'secretary_ops'])): ?>
+                            <?php if (hub_auth_has_any_capability(['finance_view', 'matchday', 'club_setup', 'tickets_ops', 'secretary_ops'])): ?>
                                 <?php if (hub_navigation_item_visible('overview.club_reminders')): ?><li class="nav-item"><a class="nav-link <?= activePage('club_reminders.php') ?>"<?= hub_nav_current(['club_reminders.php']) ?> href="/admin/club_reminders.php"><i class="fa-solid fa-bell me-1" aria-hidden="true"></i>Reminders</a></li><?php endif; ?>
                             <?php endif; ?>
                         </ul>
                     </section>
                     <?php endif; ?>
 
-                    <?php if (hub_auth_has_any_capability(['matchday', 'tickets_ops', 'finance'])): ?>
+                    <?php if (hub_auth_has_any_capability(['matchday', 'tickets_ops', 'finance_view'])): ?>
                     <?php if (hub_navigation_group_available('matchday')): ?>
 <section class="nav-section">
                         <?php
@@ -531,7 +531,7 @@ $documentTitle = $documentTitle !== '' ? $documentTitle . ' – ' . APP_NAME : A
                             <?php if (hub_navigation_item_visible('matchday.scan_overview')): ?><li class="nav-item"><a class="nav-link <?= str_starts_with((string)($_SERVER['REQUEST_URI'] ?? ''), '/scan') ? 'active' : '' ?>"<?= str_starts_with((string)($_SERVER['REQUEST_URI'] ?? ''), '/scan') ? ' aria-current="page"' : '' ?> href="/admin/scan_overview.php"><i class="fa-solid fa-qrcode me-1" aria-hidden="true"></i>Scan</a></li><?php endif; ?>
                             <?php if (hub_navigation_item_visible('matchday.pos_overview')): ?><li class="nav-item"><a class="nav-link <?= str_starts_with((string)($_SERVER['REQUEST_URI'] ?? ''), '/pos') ? 'active' : '' ?>"<?= str_starts_with((string)($_SERVER['REQUEST_URI'] ?? ''), '/pos') ? ' aria-current="page"' : '' ?> href="/admin/pos_overview.php"><i class="fa-solid fa-cash-register me-1" aria-hidden="true"></i>POS</a></li><?php endif; ?>
                             <?php endif; ?>
-                            <?php if (hub_auth_has_any_capability(['finance', 'matchday'])): ?>
+                            <?php if (hub_auth_has_any_capability(['finance_view', 'matchday'])): ?>
                             <?php if (hub_navigation_item_visible('matchday.matchday_finance')): ?><li class="nav-item"><a class="nav-link <?= activeGroup(['matchday_finance.php', 'matchday_finance_edit.php']) ?>"<?= hub_nav_current(['matchday_finance.php', 'matchday_finance_edit.php']) ?> href="/admin/matchday_finance.php"><i class="fa-solid fa-sterling-sign me-1" aria-hidden="true"></i>Matchday income</a></li><?php endif; ?>
                             <?php endif; ?>
                             <?php if (hub_auth_has_capability('matchday')): ?>
@@ -542,7 +542,7 @@ $documentTitle = $documentTitle !== '' ? $documentTitle . ' – ' . APP_NAME : A
                     <?php endif; ?>
                     <?php endif; ?>
 
-                    <?php if (hub_auth_has_capability('finance')): ?>
+                    <?php if (hub_auth_has_capability('finance_view')): ?>
                     <?php if (hub_navigation_group_available('sponsorship')): ?>
 <section class="nav-section">
                         <?php $sponsorshipActive = activeGroup(['sponsors.php', 'sponsor.php', 'sponsor_followups.php', 'sponsorship_agreements.php', 'sponsorship_agreement.php', 'sponsorship_bundles.php', 'sponsorship_bundle.php', 'sponsorship_packages.php', 'sponsorship_package.php', 'sponsorship_types.php', 'sponsorship_type.php']); ?>
@@ -636,7 +636,7 @@ $documentTitle = $documentTitle !== '' ? $documentTitle . ' – ' . APP_NAME : A
                     <?php endif; ?>
                     <?php endif; ?>
 
-                    <?php if (hub_auth_has_any_capability(['finance', 'matchday'])): ?>
+                    <?php if (hub_auth_has_any_capability(['finance_view', 'matchday'])): ?>
                     <?php if (hub_navigation_group_available('finance')): ?>
 <section class="nav-section">
                         <?php $financeActive = activeGroup(['reports.php', 'stripe_dashboard.php', 'matchday_finance.php', 'matchday_finance_edit.php']); ?>
@@ -646,7 +646,7 @@ $documentTitle = $documentTitle !== '' ? $documentTitle . ' – ' . APP_NAME : A
                         <ul class="navbar-nav nav-main nav-submenu collapse <?= $financeActive === 'active' ? 'show' : '' ?> mb-0" id="hubFinanceNavigation">
                             <?php if (hub_navigation_item_visible('finance.reports')): ?><li class="nav-item"><a class="nav-link <?= activePage('reports.php') ?>"<?= hub_nav_current(['reports.php']) ?> href="/admin/reports.php"><i class="fa-solid fa-chart-column me-1" aria-hidden="true"></i>Reports</a></li><?php endif; ?>
                             <?php if (hub_navigation_item_visible('finance.matchday_finance')): ?><li class="nav-item"><a class="nav-link <?= activeGroup(['matchday_finance.php', 'matchday_finance_edit.php']) ?>"<?= hub_nav_current(['matchday_finance.php', 'matchday_finance_edit.php']) ?> href="/admin/matchday_finance.php"><i class="fa-solid fa-sterling-sign me-1" aria-hidden="true"></i>Matchday income</a></li><?php endif; ?>
-                            <?php if (hub_auth_has_capability('finance')): ?>
+                            <?php if (hub_auth_has_capability('finance_view')): ?>
                             <?php if (hub_navigation_item_visible('finance.stripe_dashboard')): ?><li class="nav-item"><a class="nav-link <?= activePage('stripe_dashboard.php') ?>"<?= hub_nav_current(['stripe_dashboard.php']) ?> href="/admin/stripe_dashboard.php"><i class="fa-brands fa-stripe-s me-1" aria-hidden="true"></i>Stripe Dashboard</a></li><?php endif; ?>
                             <?php endif; ?>
                         </ul>

@@ -353,7 +353,7 @@ try {
         }
         $sponsorshipTotals['outstanding'] = max(0.0, $sponsorshipTotals['agreed'] - $sponsorshipTotals['paid']);
 
-        if (hub_auth_has_capability('finance')) {
+        if (hub_auth_has_capability('finance_view')) {
             $stripeOverviewTotals = stripe_all_payments_summary($pdo);
             $recentStripeOrders = stripe_get_all_transactions($pdo, ['limit' => 4]);
         }
@@ -410,7 +410,7 @@ $leaguePosition = hub_index_ordinal_position($leagueSnapshot['pos'] ?? null);
 $attentionItems = array_values(array_filter(
     hub_index_filter_by_capability([
     [
-        'cap' => ['sponsorship', 'finance'],
+        'cap' => ['sponsorship', 'finance_view'],
         'count' => $attentionTotals['players_without_sponsors'],
         'href' => 'players.php?sponsor_status=none',
         'icon' => 'fa-user-tag',
@@ -418,7 +418,7 @@ $attentionItems = array_values(array_filter(
         'meta' => 'Review available player packages',
     ],
     [
-        'cap' => ['sponsorship', 'finance'],
+        'cap' => ['sponsorship', 'finance_view'],
         'count' => $attentionTotals['unpaid_sponsorships'],
         'href' => 'reports.php?season_id=' . $seasonId,
         'icon' => 'fa-sterling-sign',
@@ -434,7 +434,7 @@ $attentionItems = array_values(array_filter(
         'meta' => 'Add venue, opponent, or kick-off time',
     ],
     [
-        'cap' => ['tickets_ops', 'finance'],
+        'cap' => ['tickets_ops', 'finance_view'],
         'count' => $attentionTotals['open_orders'],
         'href' => 'reports.php?report_type=season_tickets&status=pending_payment' . ($openOrderSeasonId > 0 ? '&season_id=' . $openOrderSeasonId : ''),
         'icon' => 'fa-cart-shopping',
@@ -466,7 +466,7 @@ $attentionItems = array_values(array_filter(
         'meta' => gbp($operationsTotals['sponsor_pipeline_value']) . ' open pipeline value',
     ],
     [
-        'cap' => ['tickets_ops', 'finance'],
+        'cap' => ['tickets_ops', 'finance_view'],
         'count' => $attentionTotals['cashup_variances'],
         'href' => 'pos/reports.php?date=' . date('Y-m-d'),
         'icon' => 'fa-cash-register',
@@ -490,7 +490,7 @@ $canSeeMatchdayFocus = hub_index_can(['matchday']);
 // Revenue-by-source chart — only include a source once it has actually collected
 // something, so the legend doesn't fill up with permanently-zero slices.
 $revenueSources = [];
-if (hub_index_can(['sponsorship', 'finance', 'tickets_ops'])) {
+if (hub_index_can(['sponsorship', 'finance_view', 'tickets_ops'])) {
     $revenueSources = [
         ['label' => 'Sponsorship', 'value' => round($sponsorshipTotals['paid'], 2), 'color' => '#6a2036'],
         ['label' => 'Season tickets', 'value' => round($seasonTicketTotals['collected'], 2), 'color' => '#b99b61'],
@@ -568,9 +568,9 @@ if (hub_index_can(['sponsorship', 'finance', 'tickets_ops'])) {
     // every money figure sits next to the online activity feed and the
     // revenue chart, instead of being split across two sections.
     $moneyMetrics = hub_index_filter_by_capability([
-        ['cap' => ['finance'], 'label' => 'Online payments', 'value' => gbp((float) $stripeOverviewTotals['collected']), 'meta' => (int) $stripeOverviewTotals['payments'] . ' payment' . ((int) $stripeOverviewTotals['payments'] === 1 ? '' : 's') . ((float) $stripeOverviewTotals['refunded'] > 0 ? ' · ' . gbp((float) $stripeOverviewTotals['refunded']) . ' refunded' : ''), 'icon' => 'fa-credit-card', 'tone' => 'success', 'href' => 'stripe_dashboard.php'],
-        ['cap' => ['tickets_ops', 'finance'], 'label' => 'Season tickets', 'value' => (int) $seasonTicketTotals['holders'], 'meta' => gbp($seasonTicketTotals['collected']) . ' collected' . ($seasonTicketTotals['outstanding'] > 0 ? ', ' . gbp($seasonTicketTotals['outstanding']) . ' outstanding' : ''), 'icon' => 'fa-id-card', 'tone' => 'primary', 'href' => 'season_ticket_orders.php'],
-        ['cap' => ['sponsorship', 'finance'], 'label' => 'Sponsorship collected', 'value' => gbp($sponsorshipTotals['paid']), 'meta' => gbp($sponsorshipTotals['outstanding']) . ' outstanding of ' . gbp($sponsorshipTotals['agreed']) . ' agreed', 'icon' => 'fa-sterling-sign', 'tone' => $sponsorshipTotals['outstanding'] > 0 ? 'warning' : 'success', 'href' => 'sponsorship_agreements.php'],
+        ['cap' => ['finance_view'], 'label' => 'Online payments', 'value' => gbp((float) $stripeOverviewTotals['collected']), 'meta' => (int) $stripeOverviewTotals['payments'] . ' payment' . ((int) $stripeOverviewTotals['payments'] === 1 ? '' : 's') . ((float) $stripeOverviewTotals['refunded'] > 0 ? ' · ' . gbp((float) $stripeOverviewTotals['refunded']) . ' refunded' : ''), 'icon' => 'fa-credit-card', 'tone' => 'success', 'href' => 'stripe_dashboard.php'],
+        ['cap' => ['tickets_ops', 'finance_view'], 'label' => 'Season tickets', 'value' => (int) $seasonTicketTotals['holders'], 'meta' => gbp($seasonTicketTotals['collected']) . ' collected' . ($seasonTicketTotals['outstanding'] > 0 ? ', ' . gbp($seasonTicketTotals['outstanding']) . ' outstanding' : ''), 'icon' => 'fa-id-card', 'tone' => 'primary', 'href' => 'season_ticket_orders.php'],
+        ['cap' => ['sponsorship', 'finance_view'], 'label' => 'Sponsorship collected', 'value' => gbp($sponsorshipTotals['paid']), 'meta' => gbp($sponsorshipTotals['outstanding']) . ' outstanding of ' . gbp($sponsorshipTotals['agreed']) . ' agreed', 'icon' => 'fa-sterling-sign', 'tone' => $sponsorshipTotals['outstanding'] > 0 ? 'warning' : 'success', 'href' => 'sponsorship_agreements.php'],
     ]);
     $showMoneySection = $moneyMetrics !== [] || $revenueSources !== [];
     ?>
@@ -584,7 +584,7 @@ if (hub_index_can(['sponsorship', 'finance', 'tickets_ops'])) {
             </div>
 
             <div class="hub-index-money">
-                <?php if (hub_auth_has_capability('finance')): ?>
+                <?php if (hub_auth_has_capability('finance_view')): ?>
                 <div class="card shadow-sm border-0 hub-panel hub-index-money__stripe">
                     <div class="card-body p-0">
                         <?php if ($recentStripeOrders === []): ?>

@@ -5,7 +5,7 @@ $pageHero=[
 ];
 require_once __DIR__.'/header.php';
 
-if (!hub_auth_has_capability('finance')) {
+if (!hub_auth_has_capability('finance_view')) {
     http_response_code(403);
     echo '<div><div class="alert alert-danger">You do not have permission to view this page.</div></div>';
     require __DIR__.'/footer.php';
@@ -56,7 +56,7 @@ $statusTones=['succeeded'=>'text-bg-success','refunded'=>'text-bg-secondary','pa
   <td data-label="Status"><span class="badge hub-status <?= h($statusTones[$t['status']]??'text-bg-light') ?>"><?= h($statusLabels[$t['status']]??ucfirst((string)$t['status'])) ?></span></td>
   <td data-label="Record"><?php if(!empty($t['manage_url'])): ?><a href="<?= h((string)$t['manage_url']) ?>">Manage</a><?php else: ?>&mdash;<?php endif; ?></td>
   <td data-label="Actions" class="text-end">
-   <?php if(hub_auth_has_capability('finance')&&($t['source']??'')==='Sponsorship'&&!empty($t['local_transaction_id'])&&(float)$t['refunded_amount']<(float)$t['amount']-0.0001): ?>
+   <?php if(hub_auth_has_capability('finance_manage')&&($t['source']??'')==='Sponsorship'&&!empty($t['local_transaction_id'])&&(float)$t['refunded_amount']<(float)$t['amount']-0.0001): ?>
    <button type="button" class="btn btn-sm btn-outline-danger stripe-refund-btn"
      data-transaction-id="<?= (int)$t['local_transaction_id'] ?>"
      data-remaining="<?= h(number_format((float)$t['amount']-(float)$t['refunded_amount'],2,'.','')) ?>"
@@ -68,7 +68,7 @@ $statusTones=['succeeded'=>'text-bg-success','refunded'=>'text-bg-secondary','pa
  <?php if(!$transactions): ?><tr><td colspan="8" class="hub-record-empty hub-empty-state">No Stripe transactions match these filters.</td></tr><?php endif; ?>
  </tbody></table></div></div></div>
 
-<?php if(hub_auth_has_capability('finance')): ?>
+<?php if(hub_auth_has_capability('finance_manage')): ?>
 <div class="modal fade" id="stripeRefundModal" tabindex="-1" aria-labelledby="stripeRefundModalTitle" aria-hidden="true">
  <div class="modal-dialog modal-dialog-centered">
   <div class="modal-content">
