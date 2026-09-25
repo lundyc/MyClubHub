@@ -49,6 +49,13 @@ function pub_staff_in_department(string $department): array
         $people[] = ['name' => (string) $r['display_name'], 'position' => $position, 'label' => $label,
             'image' => trim((string) ($r['profile_image_path'] ?? ''))];
     }
+    // The same person holding the same role on two overlapping records (e.g. an
+    // open-ended one and a season one) must show once, not twice.
+    $seen = [];
+    $people = array_values(array_filter($people, static function (array $p) use (&$seen): bool {
+        $key = strtolower($p['name'] . '|' . $p['position']);
+        return isset($seen[$key]) ? false : ($seen[$key] = true);
+    }));
     usort($people, static fn ($a, $b) => pub_staff_rank($a['position']) <=> pub_staff_rank($b['position'])
         ?: strcmp($a['name'], $b['name']));
     return $people;
