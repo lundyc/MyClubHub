@@ -45,7 +45,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
             if ($name === '') {
                 $formErrors[] = 'Enter a club role name.';
             } else {
-                $duplicate = $pdo->prepare('SELECT COUNT(*) FROM hub_positions WHERE name = :name AND id <> :id');
+                $duplicate = $pdo->prepare('SELECT COUNT(*) FROM club_roles WHERE name = :name AND id <> :id');
                 $duplicate->execute([':name' => $name, ':id' => $positionId]);
                 if ((int) $duplicate->fetchColumn() > 0) {
                     $formErrors[] = 'A club role with that name already exists.';
@@ -84,7 +84,7 @@ foreach ($positions as $position) {
 }
 
 $holderCounts = [];
-foreach ($pdo->query('SELECT position_id, COUNT(*) AS c FROM person_positions GROUP BY position_id') as $row) {
+foreach ($pdo->query('SELECT club_role_id AS position_id, COUNT(*) AS c FROM person_club_roles GROUP BY club_role_id') as $row) {
     $holderCounts[(int) $row['position_id']] = (int) $row['c'];
 }
 
@@ -140,7 +140,7 @@ foreach ($accessRoles as $role) {
                                 </tr>
                             <?php else: ?>
                                 <?php foreach ($departmentPositions as $position): ?>
-                                    <?php $accessRoleId = (int) ($position['access_role_id'] ?? 0); ?>
+                                    <?php $accessRoleId = (int) ($position['access_template_id'] ?? 0); ?>
                                     <tr>
                                         <td><?= htmlspecialchars((string) $position['name'], ENT_QUOTES, 'UTF-8') ?></td>
                                         <td>

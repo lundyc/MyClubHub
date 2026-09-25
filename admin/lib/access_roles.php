@@ -6,8 +6,8 @@ require_once __DIR__ . '/people.php'; // for identityAuditLog()
 
 /**
  * WordPress-style roles & capabilities — CRUD helpers for the
- * access_roles / capabilities / access_role_capabilities /
- * person_access_roles tables added by
+ * access_templates / capabilities / access_template_capabilities /
+ * person_access_templates tables added by
  * database/migrations/2026_09_14_001_access_roles_capabilities.php.
  *
  * @return list<array<string, mixed>>
@@ -22,12 +22,12 @@ function getCapabilitiesCatalog(PDO $pdo): array
  */
 function getAccessRoles(PDO $pdo): array
 {
-    return $pdo->query('SELECT * FROM access_roles ORDER BY sort_order, name')->fetchAll(PDO::FETCH_ASSOC);
+    return $pdo->query('SELECT * FROM access_templates ORDER BY sort_order, name')->fetchAll(PDO::FETCH_ASSOC);
 }
 
 function getAccessRole(PDO $pdo, int $roleId): ?array
 {
-    $stmt = $pdo->prepare('SELECT * FROM access_roles WHERE id = :id LIMIT 1');
+    $stmt = $pdo->prepare('SELECT * FROM access_templates WHERE id = :id LIMIT 1');
     $stmt->execute([':id' => $roleId]);
     return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
 }
@@ -42,9 +42,9 @@ function getAccessRole(PDO $pdo, int $roleId): ?array
 function getAccessRoleCapabilitySlugs(PDO $pdo, int $roleId): array
 {
     $stmt = $pdo->prepare('SELECT c.slug
-        FROM access_role_capabilities arc
+        FROM access_template_capabilities arc
         JOIN capabilities c ON c.id = arc.capability_id
-        WHERE arc.role_id = :role_id');
+        WHERE arc.template_id = :role_id');
     $stmt->execute([':role_id' => $roleId]);
     return array_map('strval', $stmt->fetchAll(PDO::FETCH_COLUMN));
 }
@@ -57,22 +57,22 @@ function getAccessRoleCapabilitySlugs(PDO $pdo, int $roleId): array
  */
 function setAccessRoleCapabilities(PDO $pdo, int $roleId, array $capabilityIds): void
 {
-    $pdo->prepare('DELETE FROM access_role_capabilities WHERE role_id = :role_id')->execute([':role_id' => $roleId]);
+    $pdo->prepare('DELETE FROM access_template_capabilities WHERE template_id = :role_id')->execute([':role_id' => $roleId]);
     if ($capabilityIds === []) {
         return;
     }
-    $insert = $pdo->prepare('INSERT IGNORE INTO access_role_capabilities (role_id, capability_id) VALUES (:role_id, :capability_id)');
+    $insert = $pdo->prepare('INSERT IGNORE INTO access_template_capabilities (template_id, capability_id) VALUES (:role_id, :capability_id)');
     foreach ($capabilityIds as $capabilityId) {
         $insert->execute([':role_id' => $roleId, ':capability_id' => (int) $capabilityId]);
     }
-    identityAuditLog($pdo, 'access_role_capabilities_changed', 'Updated capability grants for access role #' . $roleId);
+    identityAuditLog($pdo, 'access_template_capabilities_changed', 'Updated capability grants for access role #' . $roleId);
 }
 
 function createAccessRole(PDO $pdo, string $name): int
 {
     $slug = access_role_slugify($pdo, $name);
-    $maxSort = (int) $pdo->query('SELECT COALESCE(MAX(sort_order), 0) FROM access_roles')->fetchColumn();
-    $stmt = $pdo->prepare('INSERT INTO access_roles (slug, name, bypass_all, is_system, sort_order) VALUES (:slug, :name, 0, 0, :sort_order)');
+    $maxSort = (int) $pdo->query('SELECT COALESCE(MAX(sort_order), 0) FROM access_templates')->fetchColumn();
+    $stmt = $pdo->prepare('INSERT INTO access_templates (slug, name, bypass_all, is_system, sort_order) VALUES (:slug, :name, 0, 0, :sort_order)');
     $stmt->execute([':slug' => $slug, ':name' => $name, ':sort_order' => $maxSort + 10]);
     $roleId = (int) $pdo->lastInsertId();
     identityAuditLog($pdo, 'access_role_created', 'Created access role "' . $name . '" (#' . $roleId . ')');
@@ -91,14 +91,14 @@ function renameAccessRole(PDO $pdo, int $roleId, string $name): bool
     if ($role === null || (int) $role['is_system'] === 1 || $name === '') {
         return false;
     }
-    $pdo->prepare('UPDATE access_roles SET name = :name WHERE id = :id')->execute([':name' => $name, ':id' => $roleId]);
+    $pdo->prepare('UPDATE access_templates SET name = :name WHERE id = :id')->execute([':name' => $name, ':id' => $roleId]);
     identityAuditLog($pdo, 'access_role_renamed', 'Renamed access role #' . $roleId . ' to "' . $name . '"');
     return true;
 }
 
 /**
- * How many people directly hold $roleId (person_access_roles), plus how many
- * committee positions link to it (hub_positions.access_role_id) — shown on
+ * How many people directly hold $roleId (person_access_templates), plus how many
+ * committee positions link to it (club_roles.access_template_id) — shown on
  * the Roles & Capabilities list so an admin can see what's using a role
  * before deleting it.
  *
@@ -106,10 +106,10 @@ function renameAccessRole(PDO $pdo, int $roleId, string $name): bool
  */
 function getAccessRoleUsageCounts(PDO $pdo, int $roleId): array
 {
-    $peopleStmt = $pdo->prepare('SELECT COUNT(*) FROM person_access_roles WHERE role_id = :role_id');
+    $peopleStmt = $pdo->prepare('SELECT COUNT(*) FROM person_access_templates WHERE template_id = :role_id');
     $peopleStmt->execute([':role_id' => $roleId]);
 
-    $positionsStmt = $pdo->prepare('SELECT COUNT(*) FROM hub_positions WHERE access_role_id = :role_id');
+    $positionsStmt = $pdo->prepare('SELECT COUNT(*) FROM club_roles WHERE access_template_id = :role_id');
     $positionsStmt->execute([':role_id' => $roleId]);
 
     return [
@@ -140,7 +140,7 @@ function deleteAccessRole(PDO $pdo, int $roleId): array
     if ($usage['people'] > 0 || $usage['positions'] > 0) {
         return ['ok' => false, 'error' => 'This role is still assigned to ' . $usage['people'] . ' people or linked from ' . $usage['positions'] . ' position(s). Reassign them first.'];
     }
-    $pdo->prepare('DELETE FROM access_roles WHERE id = :id')->execute([':id' => $roleId]);
+    $pdo->prepare('DELETE FROM access_templates WHERE id = :id')->execute([':id' => $roleId]);
     identityAuditLog($pdo, 'access_role_deleted', 'Deleted access role "' . $role['name'] . '" (#' . $roleId . ')');
     return ['ok' => true];
 }
@@ -153,7 +153,7 @@ function access_role_slugify(PDO $pdo, string $name): string
     }
     $slug = $base;
     $suffix = 2;
-    $stmt = $pdo->prepare('SELECT COUNT(*) FROM access_roles WHERE slug = :slug');
+    $stmt = $pdo->prepare('SELECT COUNT(*) FROM access_templates WHERE slug = :slug');
     while (true) {
         $stmt->execute([':slug' => $slug]);
         if ((int) $stmt->fetchColumn() === 0) {
@@ -170,8 +170,8 @@ function access_role_slugify(PDO $pdo, string $name): string
 function getPersonAccessRoles(PDO $pdo, int $personId): array
 {
     $stmt = $pdo->prepare('SELECT ar.*
-        FROM person_access_roles par
-        JOIN access_roles ar ON ar.id = par.role_id
+        FROM person_access_templates par
+        JOIN access_templates ar ON ar.id = par.template_id
         WHERE par.person_id = :person_id
         ORDER BY ar.sort_order, ar.name');
     $stmt->execute([':person_id' => $personId]);
@@ -186,12 +186,12 @@ function getPersonAccessRoles(PDO $pdo, int $personId): array
  */
 function setPersonAccessRoles(PDO $pdo, int $personId, array $roleIds): void
 {
-    $pdo->prepare('DELETE FROM person_access_roles WHERE person_id = :person_id')->execute([':person_id' => $personId]);
-    $insert = $pdo->prepare('INSERT IGNORE INTO person_access_roles (person_id, role_id) VALUES (:person_id, :role_id)');
+    $pdo->prepare('DELETE FROM person_access_templates WHERE person_id = :person_id')->execute([':person_id' => $personId]);
+    $insert = $pdo->prepare('INSERT IGNORE INTO person_access_templates (person_id, template_id) VALUES (:person_id, :role_id)');
     foreach ($roleIds as $roleId) {
         $insert->execute([':person_id' => $personId, ':role_id' => (int) $roleId]);
     }
-    identityAuditLog($pdo, 'person_access_roles_changed', 'Updated access roles for person #' . $personId);
+    identityAuditLog($pdo, 'person_access_templates_changed', 'Updated access roles for person #' . $personId);
 }
 
 

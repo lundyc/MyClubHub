@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /*
- * Public people data from person_positions × hub_positions × people.
+ * Public people data from person_club_roles × club_roles × people.
  *   - pub_staff_management()  -> football department  (shown on /staff)
  *   - pub_staff_officials()   -> committee department  (shown on /club/officials)
  * The `other` department (volunteers etc.) is intentionally excluded.
@@ -27,8 +27,8 @@ function pub_staff_in_department(string $department): array
 {
     $stmt = db()->prepare(
         "SELECT p.display_name, p.profile_image_path, hp.name AS position, hp.sort_order
-         FROM person_positions pp
-         JOIN hub_positions hp ON hp.id = pp.position_id
+         FROM person_club_roles pp
+         JOIN club_roles hp ON hp.id = pp.club_role_id
          JOIN people p ON p.id = pp.person_id
          WHERE hp.department = :dept
            AND (pp.end_date IS NULL OR pp.end_date >= CURDATE())

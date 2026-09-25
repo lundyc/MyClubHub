@@ -170,7 +170,7 @@ const HUB_PAGE_CAPABILITIES = [
 
     // Site administration — previously admin-only by omission (not in this
     // map at all); now a normal, grantable capability, still admin-only by
-    // default (see access_role_capabilities seed data).
+    // default (see access_template_capabilities seed data).
     'club_people.php' => ['admin_settings'],
     'club_person.php' => ['admin_settings'],
     'positions.php' => ['admin_settings'],
@@ -181,7 +181,7 @@ const HUB_PAGE_CAPABILITIES = [
     'user_delete.php' => ['admin_settings'],
 
     // Public website — was admin-only by omission, now its own capability
-    // (still admin-only by default; see access_role_capabilities seed data).
+    // (still admin-only by default; see access_template_capabilities seed data).
     'news.php' => ['website'],
     'news_edit.php' => ['website'],
     'club_pages.php' => ['website'],
@@ -288,62 +288,14 @@ function ensureHubPositionsSchema(PDO $pdo): void
         return;
     }
 
-    // Renamed to club_roles by migration 2026_09_25_001; hub_positions is now a
-    // compatibility view, so there is no schema left to ensure.
-    if ((bool) $pdo->query("SHOW TABLES LIKE 'club_roles'")->fetchColumn()) {
-        $done = true;
-        return;
-    }
-
-    $pdo->exec("CREATE TABLE IF NOT EXISTS hub_positions (
-        id INT UNSIGNED NOT NULL AUTO_INCREMENT,
-        name VARCHAR(100) NOT NULL,
-        department VARCHAR(20) NOT NULL DEFAULT 'other',
-        capabilities TEXT NULL,
-        sort_order INT NOT NULL DEFAULT 0,
-        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
-        PRIMARY KEY (id),
-        UNIQUE KEY uq_hub_positions_name (name)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
-
-    $columns = [];
-    foreach ($pdo->query('SHOW COLUMNS FROM hub_positions') as $row) {
-        $columns[(string) $row['Field']] = true;
-    }
-    if (!isset($columns['department'])) {
-        $pdo->exec("ALTER TABLE hub_positions ADD COLUMN department VARCHAR(20) NOT NULL DEFAULT 'other' AFTER name");
-        // Best-effort classification of positions that predate this column.
-        $pdo->exec("UPDATE hub_positions SET department = 'committee' WHERE name IN ('Chairman', 'Vice Chairman', 'Secretary', 'Treasurer', 'Committee Member')");
-        $pdo->exec("UPDATE hub_positions SET department = 'football' WHERE name IN ('Manager', 'Assistant Manager', 'Coach', 'Goalkeeping Coach')");
-    }
-
-    $count = (int) $pdo->query('SELECT COUNT(*) FROM hub_positions')->fetchColumn();
-    if ($count === 0) {
-        $seed = $pdo->prepare('INSERT INTO hub_positions (name, department, capabilities, sort_order) VALUES (:name, :department, :capabilities, :sort_order)');
-        $positions = [
-            ['Chairman', 'committee', []],
-            ['Vice Chairman', 'committee', []],
-            ['Secretary', 'committee', []],
-            ['Treasurer', 'committee', ['finance_view', 'finance_manage']],
-            ['Committee Member', 'committee', []],
-        ];
-        foreach ($positions as $i => [$name, $department, $capabilities]) {
-            $seed->execute([
-                ':name' => $name,
-                ':department' => $department,
-                ':capabilities' => json_encode($capabilities),
-                ':sort_order' => $i,
-            ]);
-        }
-    }
-
+    // club_roles was renamed club_roles (migration 2026_09_25_001); the
+    // schema is managed by migrations, so there is nothing to ensure.
     $done = true;
 }
 
 /**
  * Capability slugs a position grants — resolved through its linked access
- * role (see access_role_id / access_roles.php's Roles & Capabilities grid),
+ * role (see access_template_id / access_roles.php's Roles & Capabilities grid),
  * not a capabilities list of the position's own. A position with no linked
  * role (e.g. Committee Member, Volunteer) grants nothing.
  *
@@ -351,7 +303,7 @@ function ensureHubPositionsSchema(PDO $pdo): void
  */
 function hub_position_capabilities(PDO $pdo, array $position): array
 {
-    $accessRoleId = (int) ($position['access_role_id'] ?? 0);
+    $accessRoleId = (int) ($position['access_template_id'] ?? 0);
     if ($accessRoleId <= 0) {
         return [];
     }
@@ -364,14 +316,14 @@ function hub_position_capabilities(PDO $pdo, array $position): array
 function getHubPositions(PDO $pdo): array
 {
     ensureHubPositionsSchema($pdo);
-    $stmt = $pdo->query('SELECT * FROM hub_positions ORDER BY sort_order, name');
+    $stmt = $pdo->query('SELECT * FROM club_roles ORDER BY sort_order, name');
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
 function getHubPosition(PDO $pdo, int $id): ?array
 {
     ensureHubPositionsSchema($pdo);
-    $stmt = $pdo->prepare('SELECT * FROM hub_positions WHERE id = :id');
+    $stmt = $pdo->prepare('SELECT * FROM club_roles WHERE id = :id');
     $stmt->execute([':id' => $id]);
     $position = $stmt->fetch(PDO::FETCH_ASSOC);
     return $position ?: null;
@@ -398,14 +350,14 @@ function saveHubPosition(PDO $pdo, ?int $id, array $data): int
     $sortOrder = (int) ($data['sort_order'] ?? 0);
 
     if ($id === null) {
-        $stmt = $pdo->prepare('INSERT INTO hub_positions (name, department, access_role_id, sort_order) VALUES (:name, :department, :access_role_id, :sort_order)');
+        $stmt = $pdo->prepare('INSERT INTO club_roles (name, department, access_template_id, sort_order) VALUES (:name, :department, :access_role_id, :sort_order)');
         $stmt->execute([':name' => $name, ':department' => $department, ':access_role_id' => $accessRoleId, ':sort_order' => $sortOrder]);
         $newId = (int) $pdo->lastInsertId();
         auditLog($pdo, 'position_created', 'Created position #' . $newId . ' (' . $name . ')');
         return $newId;
     }
 
-    $stmt = $pdo->prepare('UPDATE hub_positions SET name = :name, department = :department, access_role_id = :access_role_id, sort_order = :sort_order WHERE id = :id');
+    $stmt = $pdo->prepare('UPDATE club_roles SET name = :name, department = :department, access_template_id = :access_role_id, sort_order = :sort_order WHERE id = :id');
     $stmt->execute([':name' => $name, ':department' => $department, ':access_role_id' => $accessRoleId, ':sort_order' => $sortOrder, ':id' => $id]);
     auditLog($pdo, 'position_updated', 'Updated position #' . $id . ' (' . $name . ')');
     return $id;
@@ -418,14 +370,14 @@ function deleteHubPosition(PDO $pdo, int $id): array
 {
     ensureHubPositionsSchema($pdo);
 
-    $inUse = $pdo->prepare('SELECT COUNT(*) FROM person_positions WHERE position_id = :id');
+    $inUse = $pdo->prepare('SELECT COUNT(*) FROM person_club_roles WHERE club_role_id = :id');
     $inUse->execute([':id' => $id]);
     if ((int) $inUse->fetchColumn() > 0) {
         return ['ok' => false, 'error' => 'This position is still assigned to one or more accounts. Reassign them first.'];
     }
 
     $position = getHubPosition($pdo, $id);
-    $pdo->prepare('DELETE FROM hub_positions WHERE id = :id')->execute([':id' => $id]);
+    $pdo->prepare('DELETE FROM club_roles WHERE id = :id')->execute([':id' => $id]);
     auditLog($pdo, 'position_deleted', 'Deleted position #' . $id . ' (' . (string) ($position['name'] ?? '') . ')');
     return ['ok' => true];
 }

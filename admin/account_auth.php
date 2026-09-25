@@ -22,7 +22,6 @@ require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/lib/season_tickets.php';
 require_once __DIR__ . '/lib/positions.php';
 require_once __DIR__ . '/lib/accounts.php';
-require_once __DIR__ . '/lib/permissions.php';
 require_once __DIR__ . '/lib/access_roles.php';
 require_once __DIR__ . '/lib/access.php';
 require_once __DIR__ . '/lib/people.php';
@@ -62,9 +61,9 @@ function account_auth_set_position(PDO $pdo, int $accountId, ?int $positionId): 
 {
     $person = getPersonByLegacyHolderId($pdo, $accountId);
     if ($person) {
-        $pdo->prepare('DELETE FROM person_positions WHERE person_id = :person_id')->execute([':person_id' => (int) $person['id']]);
+        $pdo->prepare('DELETE FROM person_club_roles WHERE person_id = :person_id')->execute([':person_id' => (int) $person['id']]);
         if ($positionId !== null) {
-            $pdo->prepare('INSERT IGNORE INTO person_positions (person_id, position_id) VALUES (:person_id, :position_id)')
+            $pdo->prepare('INSERT IGNORE INTO person_club_roles (person_id, club_role_id) VALUES (:person_id, :position_id)')
                 ->execute([':person_id' => (int) $person['id'], ':position_id' => $positionId]);
         }
     }
@@ -380,26 +379,8 @@ function hub_auth_has_any_capability(array $capabilities): bool
     return false;
 }
 
-function hub_auth_has_permission(string $permission): bool
-{
-    $user = hub_auth_current_user();
-    if (!$user) {
-        return false;
-    }
-    $accountId = (int) ($user['account_id'] ?? 0);
-    return $accountId > 0 && accountHasPermission($GLOBALS['pdo'], $accountId, $permission);
-}
-
-function hub_auth_require_permission(string $permission): void
-{
-    if (hub_auth_has_permission($permission)) {
-        return;
-    }
-    http_response_code(403);
-    echo '<div><div class="alert alert-danger">You do not have permission to view this page.</div></div>';
-    exit;
-}
-
+// hub_auth_has_permission()/hub_auth_require_permission() (the old tickets.*/pos.* layer) were
+// removed: nothing calls them; gate scanning is now the tickets_scan capability.
 /**
  * Thin 403-and-exit wrapper around hub_auth_has_capability(), for gated
  * pages to use as a one-line guard — same shape as the existing

@@ -155,15 +155,15 @@ function players_all_birthdays(PDO $pdo, int $limit = 0, bool $missing = false):
         && players_birthdays_table_exists($pdo, 'accounts')
         && players_birthdays_table_exists($pdo, 'roles')
         && players_birthdays_table_exists($pdo, 'account_roles')
-        && players_birthdays_table_exists($pdo, 'person_positions')
-        && players_birthdays_table_exists($pdo, 'hub_positions')
+        && players_birthdays_table_exists($pdo, 'person_club_roles')
+        && players_birthdays_table_exists($pdo, 'club_roles')
     ) {
         $accessRoleSelect = "''";
         $accessRoleJoins = '';
-        if (players_birthdays_table_exists($pdo, 'person_access_roles') && players_birthdays_table_exists($pdo, 'access_roles')) {
+        if (players_birthdays_table_exists($pdo, 'person_access_templates') && players_birthdays_table_exists($pdo, 'access_templates')) {
             $accessRoleSelect = "GROUP_CONCAT(DISTINCT access_role.slug ORDER BY access_role.slug SEPARATOR ',')";
-            $accessRoleJoins = 'LEFT JOIN person_access_roles par ON par.person_id = p.id
-                LEFT JOIN access_roles access_role ON access_role.id = par.role_id';
+            $accessRoleJoins = 'LEFT JOIN person_access_templates par ON par.person_id = p.id
+                LEFT JOIN access_templates access_role ON access_role.id = par.template_id';
         }
         $peopleStmt = $pdo->query("
             SELECT p.id, p.display_name, p.date_of_birth,
@@ -175,10 +175,10 @@ function players_all_birthdays(PDO $pdo, int $limit = 0, bool $missing = false):
             LEFT JOIN accounts a ON a.person_id = p.id AND a.is_active = 1
             LEFT JOIN account_roles ar ON ar.account_id = a.id
             LEFT JOIN roles r ON r.id = ar.role_id
-            LEFT JOIN person_positions pp ON pp.person_id = p.id
+            LEFT JOIN person_club_roles pp ON pp.person_id = p.id
                 AND COALESCE(pp.start_date, DATE(pp.assigned_at)) <= CURDATE()
                 AND (pp.end_date IS NULL OR pp.end_date >= CURDATE())
-            LEFT JOIN hub_positions hp ON hp.id = pp.position_id
+            LEFT JOIN club_roles hp ON hp.id = pp.club_role_id
             WHERE p.is_active = 1
               AND " . ($missing ? "(p.date_of_birth IS NULL OR p.date_of_birth = '0000-00-00')" : "p.date_of_birth IS NOT NULL AND p.date_of_birth <> '0000-00-00'") . "
 

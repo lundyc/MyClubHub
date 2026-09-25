@@ -7,44 +7,8 @@ require_once __DIR__ . '/audit.php';
 
 function ensurePersonPositionsDateSchema(PDO $pdo): void
 {
-    static $done = false;
-    if ($done) {
-        return;
-    }
-    $done = true;
-
-    $tableExists = (bool) $pdo->query("SHOW TABLES LIKE 'person_positions'")->fetchColumn();
-    if (!$tableExists) {
-        return;
-    }
-    // After the access-model rename person_positions is a compatibility view
-    // over person_club_roles (migration 2026_09_25_001), which already has the
-    // date columns and index; nothing to add, and ALTER TABLE on a view fails.
-    if ((bool) $pdo->query("SHOW TABLES LIKE 'person_club_roles'")->fetchColumn()) {
-        return;
-    }
-
-    $columns = [];
-    foreach ($pdo->query('SHOW COLUMNS FROM person_positions') as $row) {
-        $columns[(string) $row['Field']] = true;
-    }
-
-    if (!isset($columns['start_date'])) {
-        $pdo->exec('ALTER TABLE person_positions ADD COLUMN start_date DATE NULL AFTER season_id');
-        $pdo->exec('UPDATE person_positions pp LEFT JOIN seasons s ON s.id = pp.season_id SET pp.start_date = s.start_date WHERE pp.start_date IS NULL');
-    }
-    if (!isset($columns['end_date'])) {
-        $pdo->exec('ALTER TABLE person_positions ADD COLUMN end_date DATE NULL AFTER start_date');
-        $pdo->exec('UPDATE person_positions pp LEFT JOIN seasons s ON s.id = pp.season_id SET pp.end_date = s.end_date WHERE pp.end_date IS NULL');
-    }
-
-    $indexes = [];
-    foreach ($pdo->query('SHOW INDEX FROM person_positions') as $row) {
-        $indexes[(string) $row['Key_name']] = true;
-    }
-    if (!isset($indexes['idx_person_positions_dates'])) {
-        $pdo->exec('ALTER TABLE person_positions ADD KEY idx_person_positions_dates (person_id, start_date, end_date)');
-    }
+    // person_club_roles ships with its date columns and index (migration
+    // 2026_09_25_001); nothing left to ensure. Kept as a no-op for callers.
 }
 
 function people_normalize_email(?string $email): ?string
@@ -341,7 +305,7 @@ function getPeopleDirectory(PDO $pdo, array $filters = []): array
         $where[] = 'a.id IS NULL';
     }
     if (!empty($filters['position_id'])) {
-        $where[] = 'pp.position_id = :position_id';
+        $where[] = 'pp.club_role_id = :position_id';
         $params[':position_id'] = (int) $filters['position_id'];
     }
     if (!empty($filters['role'])) {
@@ -372,10 +336,10 @@ function getPeopleDirectory(PDO $pdo, array $filters = []): array
         LEFT JOIN accounts a ON a.person_id = p.id
         LEFT JOIN account_roles ar ON ar.account_id = a.id
         LEFT JOIN roles r ON r.id = ar.role_id
-        LEFT JOIN person_positions pp ON pp.person_id = p.id
+        LEFT JOIN person_club_roles pp ON pp.person_id = p.id
             AND pp.start_date <= CURDATE()
             AND (pp.end_date IS NULL OR pp.end_date >= CURDATE())
-        LEFT JOIN hub_positions hp ON hp.id = pp.position_id
+        LEFT JOIN club_roles hp ON hp.id = pp.club_role_id
         LEFT JOIN person_relationships pr ON pr.manager_person_id = p.id
         " . ($where ? ' WHERE ' . implode(' AND ', $where) : '') . "
         GROUP BY p.id, m.old_holder_id, a.id
@@ -523,11 +487,11 @@ function getPersonManagers(PDO $pdo, int $personId): array
 function getPersonPositions(PDO $pdo, int $personId): array
 {
     ensurePersonPositionsDateSchema($pdo);
-    $stmt = $pdo->prepare('SELECT pp.id, pp.person_id, pp.position_id, pp.season_id, pp.start_date, pp.end_date, pp.notes, pp.assigned_at,
+    $stmt = $pdo->prepare('SELECT pp.id, pp.person_id, pp.club_role_id, pp.club_role_id AS position_id, pp.season_id, pp.start_date, pp.end_date, pp.notes, pp.assigned_at,
             hp.name AS position_name, hp.capabilities, hp.sort_order,
             s.name AS season_name, s.is_current AS season_is_current
-        FROM person_positions pp
-        JOIN hub_positions hp ON hp.id = pp.position_id
+        FROM person_club_roles pp
+        JOIN club_roles hp ON hp.id = pp.club_role_id
         LEFT JOIN seasons s ON s.id = pp.season_id
         WHERE pp.person_id = :person_id
         ORDER BY COALESCE(pp.start_date, s.start_date, DATE(pp.assigned_at)) DESC, pp.id DESC, hp.sort_order, hp.name');
@@ -546,8 +510,8 @@ function getCurrentPersonPositions(PDO $pdo, int $personId, int $seasonId = 0): 
 {
     ensurePersonPositionsDateSchema($pdo);
     $stmt = $pdo->prepare('SELECT hp.*
-        FROM person_positions pp
-        JOIN hub_positions hp ON hp.id = pp.position_id
+        FROM person_club_roles pp
+        JOIN club_roles hp ON hp.id = pp.club_role_id
         LEFT JOIN seasons s ON s.id = pp.season_id
         WHERE pp.person_id = :person_id
           AND COALESCE(pp.start_date, s.start_date, DATE(pp.assigned_at)) <= CURDATE()
@@ -558,7 +522,7 @@ function getCurrentPersonPositions(PDO $pdo, int $personId, int $seasonId = 0): 
 }
 
 /**
- * person_positions.season_id is NOT NULL with a FK to seasons, but the Add/Edit
+ * person_club_roles.season_id is NOT NULL with a FK to seasons, but the Add/Edit
  * position form only collects start/end dates (no season picker) -- so a
  * caller passing seasonId=0 gets the season whose date range contains the
  * given start date, falling back to the current season if none matches
@@ -592,13 +556,13 @@ function addPersonPosition(PDO $pdo, int $personId, int $positionId, int $season
     }
     $seasonId = $seasonId > 0 ? $seasonId : resolvePersonPositionSeasonId($pdo, $startDate);
 
-    $existing = $pdo->prepare('SELECT id FROM person_positions WHERE person_id = :person_id AND position_id = :position_id AND season_id = :season_id');
+    $existing = $pdo->prepare('SELECT id FROM person_club_roles WHERE person_id = :person_id AND club_role_id = :position_id AND season_id = :season_id');
     $existing->execute([':person_id' => $personId, ':position_id' => $positionId, ':season_id' => $seasonId]);
     if ($existing->fetchColumn()) {
         throw new RuntimeException('This person already holds this position for that season. Edit the existing entry instead of adding a new one.');
     }
 
-    $stmt = $pdo->prepare('INSERT INTO person_positions (person_id, position_id, season_id, start_date, end_date, notes) VALUES (:person_id, :position_id, :season_id, :start_date, :end_date, :notes)');
+    $stmt = $pdo->prepare('INSERT INTO person_club_roles (person_id, club_role_id, season_id, start_date, end_date, notes) VALUES (:person_id, :position_id, :season_id, :start_date, :end_date, :notes)');
     $stmt->execute([
         ':person_id' => $personId,
         ':position_id' => $positionId,
@@ -616,7 +580,7 @@ function addPersonPosition(PDO $pdo, int $personId, int $positionId, int $season
 function updatePersonPosition(PDO $pdo, int $rowId, int $positionId, int $seasonId = 0, ?string $notes = null, ?string $startDate = null, ?string $endDate = null): void
 {
     ensurePersonPositionsDateSchema($pdo);
-    $stmt = $pdo->prepare('SELECT person_id FROM person_positions WHERE id = :id');
+    $stmt = $pdo->prepare('SELECT person_id FROM person_club_roles WHERE id = :id');
     $stmt->execute([':id' => $rowId]);
     $personId = (int) $stmt->fetchColumn();
     if ($personId <= 0) {
@@ -633,7 +597,7 @@ function updatePersonPosition(PDO $pdo, int $rowId, int $positionId, int $season
     }
     $seasonId = $seasonId > 0 ? $seasonId : resolvePersonPositionSeasonId($pdo, $startDate);
 
-    $pdo->prepare('UPDATE person_positions SET position_id = :position_id, season_id = :season_id, start_date = :start_date, end_date = :end_date, notes = :notes WHERE id = :id')
+    $pdo->prepare('UPDATE person_club_roles SET club_role_id = :position_id, season_id = :season_id, start_date = :start_date, end_date = :end_date, notes = :notes WHERE id = :id')
         ->execute([
             ':position_id' => $positionId,
             ':season_id' => $seasonId,
@@ -649,14 +613,14 @@ function updatePersonPosition(PDO $pdo, int $rowId, int $positionId, int $season
 function deletePersonPosition(PDO $pdo, int $rowId): void
 {
     ensurePersonPositionsDateSchema($pdo);
-    $stmt = $pdo->prepare('SELECT person_id FROM person_positions WHERE id = :id');
+    $stmt = $pdo->prepare('SELECT person_id FROM person_club_roles WHERE id = :id');
     $stmt->execute([':id' => $rowId]);
     $personId = (int) $stmt->fetchColumn();
     if ($personId <= 0) {
         throw new RuntimeException('Position assignment not found.');
     }
 
-    $pdo->prepare('DELETE FROM person_positions WHERE id = :id')->execute([':id' => $rowId]);
+    $pdo->prepare('DELETE FROM person_club_roles WHERE id = :id')->execute([':id' => $rowId]);
     identityAuditLog($pdo, 'person_position_removed', "Removed position assignment #{$rowId} for person #{$personId}");
     syncAccountRoleForPerson($pdo, $personId);
 }

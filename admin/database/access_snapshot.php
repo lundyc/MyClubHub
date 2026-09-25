@@ -68,8 +68,8 @@ sort($capabilitySlugs);
 // any current position, and any legacy season-ticket-holder with a staff role.
 $personIds = array_map('intval', $pdo->query(
     'SELECT person_id FROM accounts
-     UNION SELECT person_id FROM person_access_roles
-     UNION SELECT person_id FROM person_positions'
+     UNION SELECT person_id FROM person_access_templates
+     UNION SELECT person_id FROM person_club_roles'
 )->fetchAll(PDO::FETCH_COLUMN));
 sort($personIds);
 
