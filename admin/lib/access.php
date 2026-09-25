@@ -18,14 +18,13 @@ declare(strict_types=1);
  *   A template with bypass_all (Administrator) gets every capability and cannot
  *   be narrowed by a denial; nor can an account whose role is admin.
  *
- * TRANSITIONAL: until phase 6 of the access refactor, ACCESS_LEGACY_POSITION_GRANTS
- * is true and a current club role that still points at an access template
- * (club_roles.access_template_id) also contributes that template's capabilities,
- * exactly as before. Phase 5 converts those into explicit person assignments,
- * then phase 6 flips this to false and positions stop granting anything.
+ * Club roles grant nothing. ACCESS_LEGACY_POSITION_GRANTS (now false) is the old
+ * behaviour where holding e.g. Treasurer also pulled in a template; it stays
+ * only until the club_roles.access_template_id column is dropped.
+ * "Admin" is not special either: it is the Administrator template (bypass_all).
  */
 
-const ACCESS_LEGACY_POSITION_GRANTS = true;
+const ACCESS_LEGACY_POSITION_GRANTS = false;
 
 /**
  * Capabilities that include a weaker one, so nobody can hold the powerful
@@ -169,22 +168,39 @@ function access_effective(PDO $pdo, int $personId, bool $isAdminAccount = false)
     return $memo[$key] ??= access_explain($pdo, $personId, $isAdminAccount);
 }
 
-/** The one question every gated page asks. */
-function access_can(string $capability): bool
+/**
+ * Effective access of the logged-in Hub user, or null when nobody is logged in.
+ *
+ * @return array{capabilities: list<string>, bypass: bool, sources: array<string, list<string>>, denied: list<string>}|null
+ */
+function access_current_effective(): ?array
 {
     global $pdo;
     $user = hub_auth_current_user();
     if ($user === null) {
-        return false;
+        return null;
     }
     $personId = (int) ($user['person_id'] ?? 0);
     if ($personId <= 0) {
         $personId = (int) (personIdFromLegacyHolderId($pdo, (int) ($user['id'] ?? 0)) ?? 0);
     }
-    $isAdminAccount = (string) ($user['role'] ?? '') === ACCOUNT_ROLE_ADMIN;
     if ($personId <= 0) {
-        return $isAdminAccount;
+        return null;
     }
-    $effective = access_effective($pdo, $personId, $isAdminAccount);
-    return $effective['bypass'] || in_array($capability, $effective['capabilities'], true);
+    return access_effective($pdo, $personId, false);
+}
+
+/** The one question every gated page asks. */
+function access_can(string $capability): bool
+{
+    $effective = access_current_effective();
+    return $effective !== null
+        && ($effective['bypass'] || in_array($capability, $effective['capabilities'], true));
+}
+
+/** True for anyone on a bypass template (Administrator). */
+function access_is_admin(): bool
+{
+    $effective = access_current_effective();
+    return $effective !== null && $effective['bypass'];
 }

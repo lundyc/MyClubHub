@@ -224,8 +224,9 @@ function hub_auth_is_authenticated(): bool
 
 function hub_auth_is_admin(): bool
 {
-    $user = hub_auth_current_user();
-    return $user !== null && (string) ($user['role'] ?? '') === ACCOUNT_ROLE_ADMIN;
+    // Admin is the Administrator access template (lib/access.php), not an
+    // account flag.
+    return access_is_admin();
 }
 
 /**

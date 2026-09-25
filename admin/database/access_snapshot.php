@@ -120,7 +120,7 @@ foreach ($personIds as $personId) {
     if ($canLogIn) {
         if (in_array('--core', $argv, true)) {
             // Ask the real access core (lib/access.php) instead of replaying the old rules.
-            $effective = access_effective($pdo, $personId, $isAdmin)['capabilities'];
+            $effective = access_effective($pdo, $personId, false)['capabilities'];
         } else {
             $effective = ($isAdmin || $bypass) ? $capabilitySlugs : array_keys($sources);
         }
