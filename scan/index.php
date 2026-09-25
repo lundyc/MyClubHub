@@ -13,7 +13,7 @@ if (!hub_auth_is_authenticated()) {
     header('Location: /admin/login.php');
     exit;
 }
-hub_auth_require_permission('tickets.scan');
+hub_auth_require_capability('tickets_scan');
 
 $currentUser = hub_auth_current_user();
 $currentSeason = getCurrentSeason($pdo);

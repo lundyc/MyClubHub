@@ -34,6 +34,7 @@ const ACCESS_LEGACY_POSITION_GRANTS = false;
 const ACCESS_IMPLIES = [
     'finance_manage' => ['finance_view'],
     'tickets_refund_comp' => ['tickets_ops'],
+    'tickets_ops' => ['tickets_scan'],
 ];
 
 /**
