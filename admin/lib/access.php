@@ -28,6 +28,16 @@ declare(strict_types=1);
 const ACCESS_LEGACY_POSITION_GRANTS = true;
 
 /**
+ * Capabilities that include a weaker one, so nobody can hold the powerful
+ * right without the basic one (like WordPress: edit implies read). Applied
+ * after grants and before denials, so an explicit denial still wins.
+ */
+const ACCESS_IMPLIES = [
+    'finance_manage' => ['finance_view'],
+    'tickets_refund_comp' => ['tickets_ops'],
+];
+
+/**
  * Full explanation of one person's access: the capability list plus where each
  * capability comes from. $isAdminAccount is the account-level admin flag
  * (accounts role), passed in because it lives outside the tables read here.
@@ -96,6 +106,15 @@ function access_explain(PDO $pdo, int $personId, bool $isAdminAccount = false): 
             $templateCaps->execute([':template' => (int) $row['access_template_id']]);
             foreach ($templateCaps->fetchAll(PDO::FETCH_COLUMN) as $slug) {
                 $sources[$slug][] = 'club role (legacy):' . $row['name'];
+            }
+        }
+    }
+
+    // Implied capabilities (manage => view, refund/comp => ticket ops).
+    foreach (ACCESS_IMPLIES as $strong => $weakList) {
+        if (isset($sources[$strong])) {
+            foreach ($weakList as $weak) {
+                $sources[$weak][] = 'implied by ' . $strong;
             }
         }
     }
